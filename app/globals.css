@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: light, dark;
+}
+
+@theme {
+  --color-primary: #3885f8;
+  --color-primary-content: #ffffff;
+  --color-info: #0ea5e9;
+}
+
+[data-theme="light"] {
+  --color-primary: #3885f8;
+  --color-base-100: #ffffff;
+  --color-base-content: #1f2937;
+}
+
+[data-theme="dark"] {
+  --color-primary: #3885f8;
+  --color-base-100: #0f172a;
+  --color-base-content: #f8fafc;
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
