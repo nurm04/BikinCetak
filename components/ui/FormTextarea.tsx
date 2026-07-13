@@ -3,11 +3,11 @@ interface FormTextareaProps {
   name: string;
   placeholder?: string;
   className?: string;
-  defaultValue?: string;
+  value?: string;
   onChange?: (name: string, value: string) => void;
 }
 
-export default function FormTextarea({ label, name, placeholder, defaultValue, className, onChange }: FormTextareaProps) {
+export default function FormTextarea({ label, name, placeholder, value, className, onChange }: FormTextareaProps) {
   return (
     <div className={`form-control w-full ${className}`}>
       <label className="label px-1">
@@ -18,7 +18,7 @@ export default function FormTextarea({ label, name, placeholder, defaultValue, c
       <textarea 
         name={name}
         placeholder={placeholder}
-        defaultValue={defaultValue}
+        value={value ?? ""}
         onChange={(e) => onChange?.(name, e.target.value)}
         className="textarea mt-1 w-full bg-base-200 border-none rounded-2xl font-medium text-sm p-5 h-28 transition-all focus:outline-none focus:ring-2 focus:ring-primary"
       ></textarea>

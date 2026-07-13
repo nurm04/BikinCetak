@@ -1,58 +1,291 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use server";
 
 import { cookies } from "next/headers";
 
-export interface OrderRequest {
-  address_name: string;
-  selected_item_ids: string[];
-}
-
-export interface OrderResponse {
-  message: string;
-  snap_token: string;
-  order_id: string;
-}
-
-const API_URL = "https://bikincetak-api.up.railway.app/v1/order";
+const API_URL = "http://127.0.0.1:8000/api";
 
 async function getAuthHeader() {
   const cookieStore = await cookies();
   const jwtCookie = cookieStore.get("jwt");
+
   if (!jwtCookie) return null;
+
   return {
     "Content-Type": "application/json",
-    "Cookie": `jwt=${jwtCookie.value}`
+    Accept: "application/json",
+    Authorization: `Bearer ${jwtCookie.value}`,
+    Cookie: `jwt=${jwtCookie.value}`,
   };
 }
 
-export async function createOrder(data: OrderRequest): Promise<OrderResponse | null> {
+export interface RincianDiskon {
+  nama: string;
+  nominal: number;
+}
+
+export interface PesananItemFinishing {
+  id: number;
+  id_pesanan_item: number;
+  id_sku_finishing: string;
+
+  nama_finishing_snapshot: string;
+  harga_finishing_snapshot: number;
+
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PesananItem {
+  id: number;
+
+  id_pesan: string;
+  id_sku: string;
+
+  nama_produk_snapshot: string;
+
+  jumlah: number;
+
+  harga_satuan_snapshot: number;
+  harga_pengerjaan_snapshot: number;
+  
+  harga_dasar_awal_snapshot?: number;
+  total_diskon_snapshot?: number;
+  rincian_diskon_snapshot?: RincianDiskon[] | null;
+
+  estimasi_pengerjaan_snapshot?: string;
+
+  file_desain?: string | null;
+  catatan?: string | null;
+
+  created_at?: string;
+  updated_at?: string;
+
+  pesanan_item_finishing?: PesananItemFinishing[];
+}
+
+export interface AlamatPesanan {
+  id_alamat: string;
+
+  nama_penerima: string;
+  no_hp: string;
+
+  provinsi: string;
+  kota: string;
+  kecamatan: string;
+
+  kode_pos: string;
+
+  alamat_lengkap: string;
+}
+
+export interface Pesanan {
+  id_pesan: string;
+
+  id_customer: string;
+  id_alamat: string;
+
+  tanggal_pesan: string;
+  tanggal_selesai?: string | null;
+
+  status_operasional:
+    | "keranjang"
+    | "menunggu_diproses"
+    | "proses_pengerjaan"
+    | "proses_pengantaran"
+    | "selesai"
+    | "batal";
+
+  status_pembayaran:
+    | "belum_lunas"
+    | "dibayar_sebagian"
+    | "lunas";
+
+  ekspedisi_nama?: string | null;
+  ekspedisi_layanan?: string | null;
+  harga_ongkir?: number;
+  ekspedisi_estimasi?: string | null;
+  nomor_resi?: string | null; // <-- Tipe data baru ditambahkan
+  kode_unik?: number;
+
+  kode_voucher?: string | null;
+  diskon_voucher_nominal?: number;
+
+  total_tagihan?: number;
+  total_dibayar?: number;
+  sisa_tagihan?: number;
+
+  alamat?: AlamatPesanan;
+
+  pesanan_item?: PesananItem[];
+
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PesanServiceResponse<T = unknown> {
+  success?: boolean;
+  message?: string;
+  data?: T;
+  error?: string;
+}
+
+export async function getPesanan(): Promise<PesanServiceResponse<Pesanan[]>> {
   try {
     const headers = await getAuthHeader();
-    
+
     if (!headers) {
-      console.error("ORDER_SERVICE: Tidak ada sesi aktif.");
-      return null;
+      return {
+        error: "Silakan login terlebih dahulu.",
+      };
     }
 
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(data),
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${API_URL}/pesanan`,
+      {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      }
+    );
 
-    const responseData = await response.json();
+    const result = await response.json();
 
     if (!response.ok) {
-      console.error("ALASAN DITOLAK GOLANG:", responseData);
-      throw new Error(responseData.error || responseData.message || "Gagal membuat pesanan");
+      return {
+        error:
+          result.message ||
+          "Gagal mengambil data pesanan.",
+      };
     }
 
-    return responseData as OrderResponse;
+    return result;
+
   } catch (error) {
-    if (error instanceof Error) {
-      console.error("Order Service Error:", error.message);
+    return {
+      error:
+        "Terjadi kesalahan saat mengambil data pesanan.",
+    };
+  }
+}
+
+export async function getPesananById(
+  id_pesan: string
+): Promise<PesanServiceResponse<Pesanan>> {
+  try {
+    const headers = await getAuthHeader();
+
+    if (!headers) {
+      return {
+        error: "Silakan login terlebih dahulu.",
+      };
     }
-    return null;
+
+    const response = await fetch(
+      `${API_URL}/pesanan/${id_pesan}`,
+      {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        error:
+          result.message ||
+          "Gagal mengambil detail pesanan.",
+      };
+    }
+
+    return result;
+
+  } catch (error) {
+    return {
+      error:
+        "Terjadi kesalahan saat mengambil detail pesanan.",
+    };
+  }
+}
+
+export async function cancelPesanan(
+  id_pesan: string
+): Promise<PesanServiceResponse<Pesanan>> {
+  try {
+    const headers = await getAuthHeader();
+
+    if (!headers) {
+      return {
+        error: "Silakan login terlebih dahulu.",
+      };
+    }
+
+    const response = await fetch(
+      `${API_URL}/pesanan/${id_pesan}/cancel`,
+      {
+        method: "PATCH",
+        headers,
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        error:
+          result.message ||
+          "Gagal membatalkan pesanan.",
+      };
+    }
+
+    return result;
+
+  } catch (error) {
+    return {
+      error:
+        "Terjadi kesalahan saat membatalkan pesanan.",
+    };
+  }
+}
+
+export async function completePesanan(
+  id_pesan: string
+): Promise<PesanServiceResponse<Pesanan>> {
+  try {
+    const headers = await getAuthHeader();
+
+    if (!headers) {
+      return {
+        error: "Silakan login terlebih dahulu.",
+      };
+    }
+
+    const response = await fetch(
+      `${API_URL}/pesanan/${id_pesan}/selesai`,
+      {
+        method: "PUT",
+        headers,
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        error:
+          result.message ||
+          "Gagal menyelesaikan pesanan.",
+      };
+    }
+
+    return result;
+
+  } catch (error) {
+    return {
+      error:
+        "Terjadi kesalahan saat menyelesaikan pesanan.",
+    };
   }
 }

@@ -9,13 +9,37 @@ interface FooterProps {
 }
 
 const Footer = ({ items = [] }: FooterProps) => {
-  const dynamicCategories = items
-  .filter((group) => group.item_group_name.toLowerCase() !== "services") // Saring di sini
-  .map((group) => ({
-    key: slugify(group.item_group_name),
-    label: group.item_group_name,
-    submenu: group.templates.map((t) => ({ name: t.item_name }))
+
+  // --- LOGIC BARU: Grouping data flat dari Laravel ---
+  const groupedItems: Record<string, Array<{ name: string }>> = {};
+
+  items.forEach((item) => {
+    // Lewati jika produk tidak aktif
+    if (item.is_active === 0) return;
+
+    // Ambil kategori, beri default "Lainnya" jika kosong
+    const categoryName = item.kategori || "Lainnya";
+    const lowerCat = categoryName.toLowerCase();
+
+    // Saring kategori "services" atau "jasa" seperti logic lama
+    if (lowerCat === "services" || lowerCat === "jasa") return;
+
+    // Buat array baru jika kategori belum ada
+    if (!groupedItems[categoryName]) {
+      groupedItems[categoryName] = [];
+    }
+
+    // Masukkan nama produk ke dalam kategori yang sesuai
+    groupedItems[categoryName].push({ name: item.nama_produk });
+  });
+
+  // Ubah object hasil grouping menjadi format array untuk ditampilkan
+  const dynamicCategories = Object.keys(groupedItems).map((categoryKey) => ({
+    key: slugify(categoryKey),
+    label: categoryKey,
+    submenu: groupedItems[categoryKey],
   }));
+  // --------------------------------------------------
 
   return (
     <footer className="bg-primary text-white">

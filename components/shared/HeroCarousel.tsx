@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
@@ -36,7 +37,7 @@ export default function HeroCarousel() {
 
   return (
     <div className="relative w-full px-4 md:px-10 lg:px-20 group">
-      <div className="relative overflow-hidden rounded-3xl h-[200px] md:h-[300px] shadow-xl bg-base-300">
+      <div className="relative overflow-hidden rounded-3xl h-50 md:h-75 shadow-xl bg-base-300">
         <div 
           className="flex transition-transform duration-700 ease-in-out h-full"
           style={{ transform: `translateX(-${current * 100}%)` }}

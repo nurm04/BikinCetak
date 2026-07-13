@@ -1,19 +1,35 @@
-import { getUserAddresses, getUserProfile, AddressItem } from "@/services/userService";
+import { getUserProfile } from "@/services/userService";
+import { getAlamat, Alamat } from "@/services/alamatService";
+import { getPesanan, Pesanan } from "@/services/pesanService";
 import { redirect } from "next/navigation";
-import { User, Mail, Phone, MapPin, ShieldCheck, ShoppingBag, Plus, Home } from "lucide-react";
+import { User, Mail, Phone, ShieldCheck, ShoppingBag, Plus } from "lucide-react";
 import Link from "next/link";
+import AddressList from "./AlamatList";
+import CardPesanan from "@/components/shared/CardPesanan";
 
 export default async function ProfilePage() {
-  const profilRes = await getUserProfile();
-  const alamatRes = await getUserAddresses();
+  const [profilRes, alamatRes, pesananRes] =
+    await Promise.all([
+      getUserProfile(),
+      getAlamat(),
+      getPesanan(),
+    ]);
 
   if (!profilRes.data || profilRes.error) {
     redirect("/login");
   }
 
   const user = profilRes.data;
-  const daftarAlamat: AddressItem[] = Array.isArray(alamatRes.data) ? alamatRes.data : [];
-  const alamatUtama = daftarAlamat.length > 0 ? daftarAlamat[0] : null;
+  const daftarAlamat: Alamat[] = Array.isArray(alamatRes.data) ? alamatRes.data : [];
+  const daftarPesanan: Pesanan[] = Array.isArray(pesananRes.data) ? pesananRes.data : [];
+
+  const aktivitasTerakhir =
+    daftarPesanan
+      .sort((a, b) =>
+        new Date(b.tanggal_pesan).getTime() -
+        new Date(a.tanggal_pesan).getTime()
+      )
+      .slice(0, 3);
 
   return (
     <main className="min-h-screen bg-base-200 py-12 px-4 md:px-8">
@@ -29,10 +45,10 @@ export default async function ProfilePage() {
             </div>
             <div className="text-center md:text-left">
               <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">
-                {user.customer_name || "Pelanggan Setia"}
+                {user.name || "Pelanggan Setia"}
               </h1>
               <div className="badge badge-success badge-sm gap-1 py-3 px-3 text-[10px] font-black uppercase tracking-widest text-white mt-2">
-                <ShieldCheck size={12} /> {user.customer_group || "Individual"}
+                <ShieldCheck size={12} /> {user.customer?.role || "Individual"}
               </div>
             </div>
           </div>
@@ -62,25 +78,7 @@ export default async function ProfilePage() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold opacity-40 uppercase">WhatsApp</p>
-                    <p className="text-xs font-black">{user.mobile_no || "-"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4 border-t border-base-content/5 pt-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <Home size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold opacity-40 uppercase">Alamat Utama</p>
-                    {alamatUtama ? (
-                      <div className="text-xs font-black leading-tight mt-1">
-                        <p className="truncate text-primary uppercase">{alamatUtama.address_title}</p>
-                        <p className="opacity-60 line-clamp-2 mt-1">{alamatUtama.address_line1}</p>
-                        <p className="opacity-40 font-bold mt-1 uppercase">{alamatUtama.city}, {alamatUtama.pincode}</p>
-                      </div>
-                    ) : (
-                      <p className="text-xs font-black opacity-30 italic mt-1">Belum ada alamat</p>
-                    )}
+                    <p className="text-xs font-black">{user.customer?.no_hp || "-"}</p>
                   </div>
                 </div>
               </div>
@@ -96,49 +94,60 @@ export default async function ProfilePage() {
             
             <div className="bg-base-100 rounded-2xl shadow-sm border border-base-content/5 overflow-hidden">
               <div className="p-6 border-b border-base-content/5 flex justify-between items-center bg-base-200/30">
-                <h3 className="text-xs font-black uppercase tracking-tight">Semua Daftar Alamat</h3>
-                <Link href="/profil/edit" className="btn btn-ghost btn-xs text-[10px] font-black uppercase border border-base-content/10">
+                <h3 className="text-xs font-black uppercase tracking-tight">
+                  Semua Daftar Alamat
+                </h3>
+                <Link href="/profil/alamat/tambah" className="btn btn-ghost btn-xs text-[10px] font-black uppercase border border-base-content/10">
                   <Plus size={14} /> Tambah
                 </Link>
               </div>
-              
-              <div className="divide-y divide-base-content/5">
-                {daftarAlamat.length > 0 ? (
-                  daftarAlamat.map((item: AddressItem, idx: number) => (
-                    <div key={idx} className="p-6 hover:bg-base-200/20 transition-colors flex justify-between items-center group">
-                      <div className="min-w-0 pr-4">
-                        <div className="flex items-center gap-2">
-                           <p className="text-xs font-black uppercase tracking-tight">{item.address_title}</p>
-                           <span className="badge badge-ghost text-[9px] font-bold opacity-50 uppercase">{item.address_type}</span>
-                        </div>
-                        <p className="text-xs opacity-60 mt-1 line-clamp-1">{item.address_line1}</p>
-                        <p className="text-[10px] font-bold opacity-30 mt-0.5 uppercase tracking-wide">
-                          {item.city}, {item.state} {item.pincode}
-                        </p>
-                      </div>
-                      <MapPin size={16} className="opacity-0 group-hover:opacity-20 transition-opacity shrink-0" />
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-16 text-center opacity-30 italic text-sm font-black">
-                    Belum ada alamat yang tersimpan.
-                  </div>
-                )}
+
+              <div className="h-50 md:h-75 overflow-y-auto scrollbar-thin">
+                <AddressList daftarAlamat={daftarAlamat} />
               </div>
             </div>
 
-            <div className="p-6 bg-base-100 rounded-2xl shadow-sm border border-base-content/5 overflow-hidden">
-              <div className="border-b border-base-content/5 text-center">
-                <h3 className="text-sm font-black uppercase tracking-tight">Aktivitas Terakhir</h3>
+            <div className="bg-base-100 rounded-2xl shadow-sm border border-base-content/5 overflow-hidden">
+              <div className="p-6 border-b border-base-content/5 flex justify-between items-center bg-base-200/30">
+                <h3 className="text-xs font-black uppercase tracking-tight">
+                  Aktivitas Terakhir
+                </h3>
+
+                <Link
+                  href="/pesan"
+                  className="btn btn-ghost btn-xs text-[10px] font-black uppercase border border-base-content/10"
+                >
+                  Lihat Semua
+                </Link>
               </div>
-              <div className="p-12 text-center space-y-4">
-                <div className="w-16 h-16 bg-base-200 rounded-full flex items-center justify-center mx-auto opacity-30">
-                  <ShoppingBag size={24} />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-black opacity-50 uppercase tracking-tighter">Belum ada pesanan aktif</p>
-                  <p className="text-[10px] font-bold opacity-30 uppercase mt-1">Semua jejak cetak lu bakal muncul di sini</p>
-                </div>
+
+              <div className="h-50 md:h-75 overflow-y-auto scrollbar-thin">
+                {aktivitasTerakhir.length > 0 ? (
+                  aktivitasTerakhir.map((pesanan) => (
+                    <CardPesanan
+                      key={pesanan.id_pesan}
+                      pesanan={pesanan}
+                    />
+                  ))
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center space-y-4">
+                      <div className="w-16 h-16 bg-base-200 rounded-full flex items-center justify-center mx-auto opacity-30">
+                        <ShoppingBag size={24} />
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-black opacity-50 uppercase tracking-tighter">
+                          Belum ada pesanan
+                        </p>
+
+                        <p className="text-[10px] font-bold opacity-30 uppercase mt-1">
+                          Semua jejak cetak akan muncul di sini
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

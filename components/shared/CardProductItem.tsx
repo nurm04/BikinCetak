@@ -1,18 +1,32 @@
+"use client";
 import Image from "next/image";
-import { Trash2, Plus, Minus } from "lucide-react";
+import { Trash2, Plus, Minus, Clock, Paperclip } from "lucide-react";
+import { useState, useEffect } from "react";
+import { RincianDiskonAPI } from "@/services/cartService";
 
-interface JasaTambahan {
-  item_code: string;
-  price: number;
+interface FinishingItem {
+  id?: number;
+  id_pilihan_finishing?: string;
+  nama_pilihan?: string;
+  nama_finishing?: string;
+  harga_tambahan: number;
 }
 
 interface CartProductItemProps {
   id: number;
-  variant_name: string;
-  price: number; 
-  qty: number;
-  image_url?: string;
-  jasa_tambahan?: JasaTambahan[];
+  nama_sku: string;
+  harga_satuan: number;
+  jumlah: number;
+  finishing?: FinishingItem[];
+  
+  harga_dasar_awal_snapshot?: number;
+  total_diskon_snapshot?: number;
+  rincian_diskon_snapshot?: RincianDiskonAPI[];
+  estimasi_pengerjaan?: string;
+  harga_pengerjaan_snapshot?: number;
+  catatan?: string | null;
+  file_desain?: string[];
+
   isReadOnly?: boolean; 
   isSelected?: boolean;
   onToggleSelect?: (id: number) => void;
@@ -23,11 +37,17 @@ interface CartProductItemProps {
 
 export default function CartProductItem({
   id,
-  variant_name,
-  price,
-  qty,
-  image_url,
-  jasa_tambahan = [],
+  nama_sku,
+  harga_satuan,
+  jumlah,
+  finishing = [],
+
+  rincian_diskon_snapshot = [],
+  estimasi_pengerjaan,
+  harga_pengerjaan_snapshot = 0,
+  catatan,
+  file_desain = [],
+
   isReadOnly = false,
   isSelected = false,
   onToggleSelect,
@@ -35,19 +55,51 @@ export default function CartProductItem({
   onDelete,
   isLoading = false,
 }: CartProductItemProps) {
+  const totalJasa = finishing.reduce((acc, f) => acc + f.harga_tambahan, 0);
+  const unitPriceTotal = harga_satuan + totalJasa;
+  const rowTotal = (unitPriceTotal * jumlah) + harga_pengerjaan_snapshot;
 
-	console.log(`Item ${variant_name}:`, jasa_tambahan);
-  
-  // Hitung total harga satuan (Dasar + Jasa)
-  const totalJasa = jasa_tambahan.reduce((acc, j) => acc + j.price, 0);
-  const unitPriceTotal = price + totalJasa;
+  const productName = nama_sku;
+
+  // =========================================
+  // STATE LOKAL UNTUK INPUT JUMLAH (QTY)
+  // =========================================
+  const [localQty, setLocalQty] = useState<string>(jumlah.toString());
+
+  // Sinkronisasi jika jumlah dari backend/props berubah
+  useEffect(() => {
+    setLocalQty(jumlah.toString());
+  }, [jumlah]);
+
+  const handleQtyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalQty(e.target.value);
+  };
+
+  const submitQty = () => {
+    const newQty = parseInt(localQty, 10);
+    // Kalau yang diketik bukan angka atau kurang dari 1, kembalikan ke angka semula
+    if (isNaN(newQty) || newQty < 1) {
+      setLocalQty(jumlah.toString());
+      return;
+    }
+    // Jika angka berubah, jalankan update ke backend
+    if (newQty !== jumlah) {
+      onUpdateQty?.(id, newQty);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur(); // Memicu onBlur yang otomatis ngejalanin submitQty()
+    }
+  };
 
   return (
     <div className={`py-6 flex flex-col sm:flex-row gap-6 items-start transition-all ${!isReadOnly && !isSelected ? "opacity-60" : "opacity-100"}`}>
       
       {/* 1. CHECKBOX */}
       {!isReadOnly && onToggleSelect && (
-        <div className="pt-8 hidden sm:block">
+        <div className="pt-8 hidden sm:block shrink-0">
           <input 
             type="checkbox" 
             className="checkbox checkbox-primary checkbox-sm rounded-lg" 
@@ -60,68 +112,129 @@ export default function CartProductItem({
       {/* 2. IMAGE */}
       <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-base-200 border border-base-content/5 shrink-0">
         <Image 
-          src={image_url || "/images/placeholder-product.jpg"} 
-          alt={variant_name} 
+          src="/favicon.ico"
+          alt={productName} 
           fill 
+          unoptimized
           sizes="96px" 
           className="object-cover" 
         />
       </div>
 
-      {/* 3. INFO PRODUK - TAMPILAN FIXED */}
+      {/* 3. INFO PRODUK */}
       <div className="flex-1 space-y-1 min-w-0">
-				<h3 className="font-black uppercase text-sm tracking-tight leading-tight truncate">
-					{variant_name.split("-")[0]}
-				</h3>
-				
-				<p className="text-xs font-bold text-primary">
-					Rp {unitPriceTotal.toLocaleString("id-ID")} / pcs
-				</p>
-				
-				<div className="mt-3">
-          <div className="inline-block bg-base-300/50 px-4 py-2 rounded-xl border border-base-content/5">
-            <p className="text-[10px] font-black uppercase tracking-tight leading-relaxed">
-              {/* Varian Utama */}
-              <span className="opacity-60">
-                VARIAN: {variant_name.split("-").slice(1).join(" ") || "DEFAULT"}
+        <h3 className="font-black uppercase text-sm tracking-tight leading-tight truncate">
+          {productName}
+        </h3>
+        
+        {/* HARGA SATUAN DENGAN CORETAN DISKON */}
+        <div className="flex items-center gap-2">
+           <p className="text-xs font-bold text-primary">
+             Rp {unitPriceTotal.toLocaleString("id-ID")} / pcs
+           </p>
+        </div>
+
+        {/* BADGES (Diskon & Pengerjaan) */}
+        <div className="flex flex-wrap gap-2 mt-1">
+           {rincian_diskon_snapshot.length > 0 && (
+              <span className="text-[9px] font-black uppercase tracking-widest text-success bg-success/10 px-2 py-0.5 rounded">
+                 ✨ {rincian_diskon_snapshot[0].nama}
               </span>
-              
-              {/* Jasa Tambahan - Pastikan mapping property-nya bener (jasa_tambahan) */}
-              {jasa_tambahan && jasa_tambahan.length > 0 && (
+           )}
+           {harga_pengerjaan_snapshot > 0 && (
+              <span className="text-[9px] font-black uppercase tracking-widest text-warning bg-warning/10 px-2 py-0.5 rounded flex items-center gap-1">
+                 <Clock size={10}/> {estimasi_pengerjaan} (+ Rp {harga_pengerjaan_snapshot.toLocaleString("id-ID")})
+              </span>
+           )}
+        </div>
+        
+        <div className="mt-3">
+          <div className="inline-block w-full bg-base-300/50 px-4 py-3 rounded-xl border border-base-content/5 space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-tight leading-relaxed">
+              {finishing.length > 0 ? (
                 <span>
-                  {jasa_tambahan.map((jasa, idx) => (
+                  {finishing.map((f, idx) => (
                     <span key={idx}>
-                      <span className="mx-2 opacity-20"> | </span>
+                      {idx > 0 && <span className="mx-2 opacity-20"> | </span>}
                       <span className="opacity-60">
-                        {/* Split item_code jasa, ambil bagian belakangnya aja */}
-                        {jasa.item_code.split("-").pop()?.replace(/_/g, " ")}
+                        {f.nama_pilihan || f.nama_finishing}
                       </span>
                     </span>
                   ))}
                 </span>
+              ) : (
+                <span className="opacity-40">Tidak ada jasa tambahan</span>
               )}
             </p>
+
+            {catatan && (
+               <p className="text-[9px] font-bold opacity-60 lowercase first-letter:uppercase pt-2 border-t border-base-content/10">
+                 Catatan: {catatan}
+               </p>
+            )}
+
+            {/* BADGE LIST FILE DESAIN YANG BISA DI KLIK */}
+            {file_desain.length > 0 && (
+              <div className="pt-2 border-t border-base-content/10">
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1.5">File Desain Terlampir:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {file_desain.map((file, idx) => {
+                    const fileName = file.split('/').pop() || `File ${idx + 1}`;
+                    // Buat link ke storage Laravel lu
+                    const fileUrl = `http://127.0.0.1:8000/storage/${file}`; 
+                    return (
+                      <a 
+                        key={idx} 
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 bg-base-100 hover:bg-base-200 transition-colors border border-base-content/10 hover:border-primary/50 px-2 py-1 rounded text-[9px] font-bold shadow-sm cursor-pointer group"
+                      >
+                        <Paperclip size={10} className="text-primary group-hover:text-primary-focus"/>
+                        <span className="truncate max-w-30 group-hover:underline">{fileName}</span>
+                      </a>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
-			</div>
+      </div>
 
-      {/* 4. ACTIONS & TOTAL */}
+      {/* 4. ACTIONS QTY & TOTAL BILL */}
       <div className="flex flex-row sm:flex-col justify-between items-center sm:items-end w-full sm:w-auto gap-4 shrink-0">
-        
         {!isReadOnly ? (
-          <div className="flex items-center bg-base-200 rounded-xl p-1">
+          <div className="flex items-center bg-base-200 rounded-xl p-1 relative">
             <button 
-              onClick={() => onUpdateQty?.(id, qty - 1)} 
-              disabled={isLoading || qty <= 1} 
+              onClick={() => onUpdateQty?.(id, Math.max(1, jumlah - 1))} 
+              disabled={isLoading || jumlah <= 1} 
               className="btn btn-ghost btn-xs btn-square"
             >
               <Minus size={12}/>
             </button>
-            <span className="px-3 text-xs font-black w-8 text-center">
-              {isLoading ? <span className="loading loading-spinner loading-xs"></span> : qty}
-            </span>
+            
+            {/* AREA INPUT ANGKA & SPINNER */}
+            <div className="relative w-12 h-6 flex justify-center items-center">
+              {isLoading ? (
+                <span className="loading loading-spinner loading-xs absolute text-primary"></span>
+              ) : (
+                <input 
+                  type="number"
+                  value={localQty}
+                  onChange={handleQtyChange}
+                  onBlur={submitQty}
+                  onKeyDown={handleKeyDown}
+                  disabled={isLoading}
+                  className="w-full h-full text-xs font-black text-center bg-transparent outline-none focus:bg-base-100 focus:ring-1 focus:ring-primary rounded transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="1"
+                />
+              )}
+            </div>
+
             <button 
-              onClick={() => onUpdateQty?.(id, qty + 1)} 
+              onClick={() => onUpdateQty?.(id, jumlah + 1)} 
               disabled={isLoading} 
               className="btn btn-ghost btn-xs btn-square"
             >
@@ -130,14 +243,21 @@ export default function CartProductItem({
           </div>
         ) : (
           <div className="bg-base-200 px-3 py-1.5 rounded-lg text-[10px] font-black opacity-60 uppercase tracking-widest border border-base-content/5">
-            {qty} Pcs
+            {jumlah} Pcs
           </div>
         )}
         
         <div className="flex items-center gap-4">
-          <p className="font-black text-sm text-primary">
-            Rp {(unitPriceTotal * qty).toLocaleString("id-ID")}
-          </p>
+          <div className="flex flex-col items-end">
+            <p className="font-black text-sm text-primary">
+              Rp {rowTotal.toLocaleString("id-ID")}
+            </p>
+            {harga_pengerjaan_snapshot > 0 && (
+               <span className="text-[8px] opacity-40 uppercase font-bold tracking-widest mt-0.5">
+                 *Termasuk Biaya {estimasi_pengerjaan}
+               </span>
+            )}
+          </div>
           
           {!isReadOnly && onDelete && (
             <button 
@@ -150,6 +270,7 @@ export default function CartProductItem({
           )}
         </div>
       </div>
+
     </div>
   );
 }

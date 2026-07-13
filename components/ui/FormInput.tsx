@@ -8,20 +8,21 @@ interface FormInputProps {
   icon?: ReactNode;
   min?: string;
   max?: string;
+  value?: string;
   defaultValue?: string;
   onChange?: (name: string, value: string) => void;
 }
 
-export default function FormInput({ 
-  label, 
-  name, 
-  type = "text", 
-  placeholder, 
-  icon, 
-  min, 
-  max, 
-  defaultValue, 
-  onChange 
+export default function FormInput({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  icon,
+  min,
+  max,
+  value,
+  onChange,
 }: FormInputProps) {
   
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -72,7 +73,7 @@ export default function FormInput({
           name={name}
           min={min}
           max={max}
-          defaultValue={defaultValue}
+          value={value ?? ""}
           placeholder={placeholder}
           onChange={handleChange}
           onBlur={handleBlur}

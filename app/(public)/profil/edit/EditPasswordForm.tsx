@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Lock, ShieldCheck } from "lucide-react";
 import FormInput from "@/components/ui/FormInput";
-import { updateUserProfile } from "@/services/userService";
+import { updatePassword } from "@/services/userService";
 import AlertPopup from "@/components/ui/AlertPopup";
 
 export default function EditPasswordForm() {
@@ -11,32 +11,68 @@ export default function EditPasswordForm() {
     isOpen: boolean; title: string; message: string; type: "success" | "error" | "warning" | "info";
   }>({ isOpen: false, title: "", message: "", type: "info" });
 
+	const [form, setForm] = useState({
+		old_password: "",
+		new_password: "",
+		confirm_password: "",
+	});
+
+	const handleChange = (name: string, value: string) => {
+		setForm((prev) => ({...prev, [name]: value}));
+	};
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newPass = formData.get("new_password") as string;
-    const confirmPass = formData.get("confirm_password") as string;
+		e.preventDefault();
 
-    if (newPass !== confirmPass) return alert("Konfirmasi password tidak cocok!");
+		if (form.new_password !== form.confirm_password) {
+			setPopup({
+				isOpen: true,
+				title: "Gagal!",
+				message:
+					"Konfirmasi password tidak cocok.",
+				type: "error",
+			});
 
-    setLoading(true);
-    const res = await updateUserProfile({ new_password: newPass });
-		setPopup(res.success ?
-			{ 
-				isOpen: true, 
-				title: "Berhasil!", 
-				message: "Password berhasil diganti!", 
-				type: "success" 
-			} : { 
-				isOpen: true, 
-				title: "Gagal!", 
-				message: `${res.error}`, 
-				type: "error" 
-			}
+			return;
+		}
+
+		setLoading(true);
+
+		const res = await updatePassword({
+			old_password: form.old_password,
+			password: form.new_password,
+			password_confirmation: form.confirm_password,
+		});
+
+		setPopup(
+			res.success
+				? {
+						isOpen: true,
+						title: "Berhasil!",
+						message:
+							"Password berhasil diganti!",
+						type: "success",
+					}
+				: {
+						isOpen: true,
+						title: "Gagal!",
+						message:
+							res.error ||
+							"Terjadi kesalahan.",
+						type: "error",
+					}
 		);
-    setLoading(false);
-    (e.target as HTMLFormElement).reset();
-  };
+
+		if (res.success) {
+			setForm({
+				old_password: "",
+				new_password: "",
+				confirm_password: "",
+			});
+		}
+
+		setLoading(false);
+	};
 
   return (
     <>
@@ -55,9 +91,32 @@ export default function EditPasswordForm() {
 						<h2 className="text-sm font-black uppercase tracking-widest leading-none">Keamanan Akun</h2>
 					</div>
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-						<FormInput label="Password Lama" name="old_password" type="password" icon={<ShieldCheck size={16}/>} />
-						<FormInput label="Password Baru" name="new_password" type="password" icon={<Lock size={16}/>} />
-						<FormInput label="Konfirmasi Baru" name="confirm_password" type="password" icon={<Lock size={16}/>} />
+						<FormInput
+							label="Password Lama"
+							name="old_password"
+							type="password"
+							value={form.old_password}
+							onChange={handleChange}
+							icon={<ShieldCheck size={16}/>}
+						/>
+
+						<FormInput
+							label="Password Baru"
+							name="new_password"
+							type="password"
+							value={form.new_password}
+							onChange={handleChange}
+							icon={<Lock size={16}/>}
+						/>
+
+						<FormInput
+							label="Konfirmasi Baru"
+							name="confirm_password"
+							type="password"
+							value={form.confirm_password}
+							onChange={handleChange}
+							icon={<Lock size={16}/>}
+						/>
 					</div>
 					<button disabled={loading} className="btn btn-error btn-outline rounded-xl mt-6 font-black uppercase tracking-widest border-2">
 						{loading ? "Memproses..." : "Ganti Password"}

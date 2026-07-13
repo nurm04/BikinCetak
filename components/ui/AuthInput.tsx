@@ -4,18 +4,24 @@ interface AuthInputProps {
   label: string;
   name: string;
   type: string;
-  placeholder: string;
+  defaultValue?: string;
+  placeholder?: string; 
   icon: ReactNode;
   rightLabel?: ReactNode;
+  readOnly?: boolean;
+  required?: boolean;   
 }
 
 export default function AuthInput({ 
   label, 
   name, 
-  type, 
+  type,
+  defaultValue,
   placeholder, 
   icon, 
-  rightLabel 
+  rightLabel,
+  readOnly = false,
+  required = false      
 }: AuthInputProps) {
   return (
     <div className="form-control w-full">
@@ -27,14 +33,16 @@ export default function AuthInput({
       </div>
       <div className="relative mt-1">
         <span className="absolute inset-y-0 left-4 flex items-center opacity-40 z-10 pointer-events-none">
-        	{icon}
+          {icon}
         </span>
         <input
           type={type}
           name={name}
+          defaultValue={defaultValue}
           placeholder={placeholder}
           className="input input-bordered w-full pl-12 bg-base-200 focus:input-primary border-none rounded-2xl font-medium placeholder:opacity-30 text-sm"
-          required
+          required={required}
+          readOnly={readOnly}
         />
       </div>
     </div>

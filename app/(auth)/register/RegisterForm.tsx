@@ -1,16 +1,17 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState } from "react";
 import { UserPlus, Mail, Lock, User, Phone } from "lucide-react";
 import AuthInput from "@/components/ui/AuthInput";
-import Alert from "../../../components/ui/Alert";
+import Alert from "@/components/ui/Alert"; // Perbaikan jalur path import agar lebih rapi jika selevel
 import { useRouter } from "next/navigation";
 import { registerUser, RegisterPayload } from "@/services/authService";
 
 export default function RegisterForm() {
   const router = useRouter();
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<{msg: string, type: "success" | "error"} | null>(null);
+  const [error, setError] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -30,32 +31,42 @@ export default function RegisterForm() {
       
       if (res.error) {
         setError({ msg: res.error, type: "error" });
-        setLoading(false);
+        setLoading(false); // Langsung matikan loading di sini jika gagal
         return;
       }
 
       setError({ msg: "Pendaftaran Berhasil! Mengalihkan...", type: "success" });
+      // Biarkan loading tetap true saat proses pengalihan halaman menuju login
       setTimeout(() => router.push("/login"), 2000);
       
     } catch (err) {
       setError({ msg: "Terjadi kesalahan sistem yang tidak diketahui.", type: "error" });
-    } finally {
-      if (error?.type === "error") {
-          setLoading(false);
-      }
+      setLoading(false); // Matikan loading jika masuk block catch
     }
   };
 
   return (
     <form className="space-y-4" onSubmit={handleRegister}>
       {error && <Alert type={error.type} message={error.msg} onClose={() => setError(null)} />}
-      <AuthInput label="Nama Lengkap" name="name" type="text" placeholder="nama" icon={<User size={18} />} />
+      
+      <AuthInput label="Nama Lengkap" name="name" type="text" placeholder="Masukkan nama lengkap" icon={<User size={18} />} />
       <AuthInput label="Alamat Email" name="email" type="email" placeholder="email@email.com" icon={<Mail size={18} />} />
       <AuthInput label="WhatsApp" name="number" type="text" placeholder="0812..." icon={<Phone size={18} />} />
       <AuthInput label="Kata Sandi" name="password" type="password" placeholder="••••••••" icon={<Lock size={18} />} />
 
-      <button type="submit" disabled={loading} className="btn btn-primary w-full rounded-2xl shadow-xl shadow-primary/20 uppercase font-black tracking-widest mt-6 h-14">
-        {loading ? <span className="loading loading-spinner"></span> : <div className="flex items-center gap-2"><UserPlus size={18} /><span>Buat Akun</span></div>}
+      <button 
+        type="submit" 
+        disabled={loading} 
+        className="btn btn-primary w-full rounded-2xl shadow-xl shadow-primary/20 uppercase font-black tracking-widest mt-6 h-14"
+      >
+        {loading ? (
+          <span className="loading loading-spinner"></span>
+        ) : (
+          <div className="flex items-center gap-2">
+            <UserPlus size={18} />
+            <span>Buat Akun</span>
+          </div>
+        )}
       </button>
     </form>
   );

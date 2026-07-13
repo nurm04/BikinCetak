@@ -1,150 +1,199 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use server";
 
 import { cookies } from "next/headers";
 
+export interface CustomerProfile {
+  id_customer: string;
+  user_id: number;
+  no_hp: string;
+  id_role_customer: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserProfile {
+  id: number;
+  name: string;
   email: string;
-  customer_name?: string;
-  mobile_no?: string;
-  customer_group?: string;
+  email_verified_at: string | null;
+  role: string;
+  created_at: string;
+  updated_at: string;
+
+  customer: CustomerProfile | null;
 }
 
-export interface AddressItem {
-  address_title: string;
-  address_type: string;
-  address_line1: string;
-  city: string;
-  state: string;
-  pincode: string;
-  country: string;
-  phone: string;
-  city_id: string;
-  province_id: string;
-  subdistrict_id: string;
-}
+const BASE_URL = "http://127.0.0.1:8000/api";
 
-// Update return type di fungsi-fungsi terkait di userService.ts lu
-// Contoh: export async function getUserAddresses(): Promise<{ data?: AddressItem[]; error?: string }>
-
-const BASE_URL = "https://bikincetak-api.up.railway.app/v1/user";
-
-// Helper buat ambil cookie JWT di server
 async function getAuthHeader() {
   const cookieStore = await cookies();
   const jwtCookie = cookieStore.get("jwt");
   if (!jwtCookie) return null;
   return {
     "Content-Type": "application/json",
+    "Authorization": `Bearer ${jwtCookie.value}`,
     "Cookie": `jwt=${jwtCookie.value}`
   };
 }
 
-// --- PROFILE ACTIONS ---
+function getCustomerRole(idRoleCustomer: string): string {
+  const parts = idRoleCustomer.split("-");
 
-export async function getUserProfile(): Promise<{ data?: UserProfile; error?: string }> {
+  return parts.length >= 3 ? parts[2] : "UNKNOWN";
+}
+
+export async function getUserProfile(): Promise<{
+  data?: UserProfile;
+  error?: string;
+}> {
   try {
     const headers = await getAuthHeader();
-    if (!headers) return { error: "Tidak ada sesi aktif" };
 
-    const response = await fetch(`${BASE_URL}/profile`, {
-      method: "GET",
-      headers,
-      cache: "no-store",
-    });
+    if (!headers) {
+      return {
+        error: "Tidak ada sesi aktif",
+      };
+    }
 
-    const resData = await response.json();
-    if (!response.ok) return { error: resData.message || "Gagal ambil profil" };
+    const response = await fetch(
+      `${BASE_URL}/me`,
+      {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      }
+    );
 
-    return { data: resData.data };
-  } catch (error) {
-    return { error: "Koneksi terputus." };
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        error:
+          result.message ||
+          "Gagal mengambil profil",
+      };
+    }
+
+    const user = result.data
+    return {
+      data: {
+        ...user,
+        customer: user.customer
+          ? {
+              ...user.customer,
+              role: getCustomerRole(
+                user.customer.id_role_customer
+              ),
+            }
+          : null,
+      } as UserProfile,
+    };
+  } catch {
+    return {
+      error: "Koneksi terputus.",
+    };
   }
 }
 
-export async function updateUserProfile(payload: {
-  customer_name?: string;
-  mobile_no?: string;
-  customer_group?: string;
-  new_password?: string;
-}): Promise<{ success: boolean; error?: string }> {
+export async function updateUserProfile(
+  payload: {
+    name?: string;
+    email?: string;
+    no_hp?: string;
+  }
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
   try {
     const headers = await getAuthHeader();
-    if (!headers) return { error: "Sesi habis", success: false };
 
-    const response = await fetch(`${BASE_URL}/profile`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(payload),
-    });
+    if (!headers) {
+      return {
+        success: false,
+        error: "Sesi habis",
+      };
+    }
 
-    const resData = await response.json();
-    if (!response.ok) return { error: resData.message || "Gagal update profil", success: false };
-    
-    return { success: true };
-  } catch (error) {
-    return { error: "Koneksi backend bermasalah.", success: false };
+    const response = await fetch(
+      `${BASE_URL}/profile`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error:
+          result.message ||
+          "Gagal update profil",
+      };
+    }
+
+    return {
+      success: true,
+    };
+  } catch {
+    return {
+      success: false,
+      error: "Koneksi backend bermasalah.",
+    };
   }
 }
 
-// --- ADDRESS ACTIONS ---
-
-export async function getUserAddresses() {
-  try {
-    const headers = await getAuthHeader();
-    if (!headers) return { error: "Sesi habis" };
-
-    const response = await fetch(`${BASE_URL}/address`, {
-      method: "GET",
-      headers,
-      cache: "no-store",
-    });
-
-    const resData = await response.json();
-    if (!response.ok) return { error: resData.message || "Gagal ambil alamat" };
-    return { data: resData.data || resData };
-  } catch (error) {
-    return { error: "Gagal terhubung." };
+export async function updatePassword(
+  payload: {
+    old_password: string;
+    password: string;
+    password_confirmation: string;
   }
-}
-
-export async function createAddress(payload: AddressItem) {
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
   try {
     const headers = await getAuthHeader();
-    if (!headers) return { error: "Sesi habis" };
 
-    const response = await fetch(`${BASE_URL}/address`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
+    if (!headers) {
+      return {
+        success: false,
+        error: "Sesi habis",
+      };
+    }
 
-    const resData = await response.json();
-    if (!response.ok) return { error: resData.message || "Gagal simpan alamat" };
-    return { data: resData, success: true };
-  } catch (error) {
-    return { error: "Terjadi kesalahan koneksi." };
-  }
-}
+    const response = await fetch(
+      `${BASE_URL}/profile/password`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(payload),
+      }
+    );
 
-export async function updateAddress(addressName: string, payload: AddressItem) {
-  try {
-    const headers = await getAuthHeader();
-    if (!headers) return { error: "Sesi habis", success: false };
+    const result = await response.json();
 
-    const url = `${BASE_URL}/address/${encodeURIComponent(addressName)}`;
+    if (!response.ok) {
+      return {
+        success: false,
+        error:
+          result.message ||
+          "Gagal mengganti password",
+      };
+    }
 
-    const response = await fetch(url, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(payload),
-    });
-
-    const resData = await response.json();
-    if (!response.ok) return { error: resData.message || "Gagal", success: false };
-    
-    return { success: true };
-  } catch (error) {
-    return { error: "Koneksi gagal", success: false };
+    return {
+      success: true,
+    };
+  } catch {
+    return {
+      success: false,
+      error: "Koneksi backend bermasalah.",
+    };
   }
 }

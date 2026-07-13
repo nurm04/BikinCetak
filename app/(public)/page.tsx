@@ -1,19 +1,51 @@
 import HeroCarousel from "@/components/shared/HeroCarousel";
 import ProductRow from "@/components/shared/ProductRow";
 import { getItems } from "@/services/itemService";
+import { getUserProfile } from "@/services/userService"; 
 
 export default async function Home() {
   const items = await getItems();
-  const dynamicCategories = items
-    .filter((group) => group.item_group_name.toLowerCase() !== "services")
-    .map((group) => ({
-      key: group.item_group_name,
-      label: group.item_group_name,
-      submenu: group.templates.map((t) => ({
-        name: t.item_name,
-        image: t.image_url || "/images/placeholder-product.jpg"
-      }))
-    }));
+  const { data: userProfile } = await getUserProfile();
+  const activeRoleId = userProfile?.customer?.id_role_customer || null;
+
+  const groupedItems: Record<
+    string,
+    Array<{
+      id: string;
+      name: string;
+      image: string[];
+      harga_mulai_dari?: number;
+      diskon_roles?: Record<string, number>;
+    }>
+  > = {};
+
+  items.forEach((item) => {
+    if (item.is_active === 0) return;
+
+    const categoryName = item.kategori || "Lainnya";
+
+    if (categoryName.toLowerCase() === "services" || categoryName.toLowerCase() === "jasa") {
+      return;
+    }
+
+    if (!groupedItems[categoryName]) {
+      groupedItems[categoryName] = [];
+    }
+
+    groupedItems[categoryName].push({
+      id: item.id_produk,
+      name: item.nama_produk,
+      image: item.gambar_urls || "/favicon.ico",
+      harga_mulai_dari: item.harga_mulai_dari,
+      diskon_roles: item.diskon_roles,
+    });
+  });
+
+  const dynamicCategories = Object.keys(groupedItems).map((categoryKey) => ({
+    key: categoryKey,
+    label: categoryKey,
+    submenu: groupedItems[categoryKey],
+  }));
 
   return (
     <main className="min-h-screen bg-base-200">
@@ -27,6 +59,7 @@ export default async function Home() {
             key={category.key} 
             title={category.label} 
             data={category.submenu} 
+            activeRoleId={activeRoleId}
           />
         ))}
       </div>

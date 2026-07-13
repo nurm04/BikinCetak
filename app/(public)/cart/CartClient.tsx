@@ -1,32 +1,44 @@
-// @/components/shared/CartClient.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, CreditCard } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCartItems, updateCartItemQty, deleteCartItem } from "@/services/cartService";
+import { getCartItems, updateCartItemQty, deleteCartItem, CartItemAPI, CartServiceResponse, FinishingItemAPI, RincianDiskonAPI } from "@/services/cartService";
 import AlertPopup from "@/components/ui/AlertPopup";
-import CartProductItem from "@/components/shared/CardProductItem";
+import CartProductItem from "@/components/shared/CardProductItem"; 
 
-interface VariantLainnyaAPI {
-  item_code: string;
-  price: number;
+// Interface yang lebih ketat tanpa "any"
+interface RawCartData {
+  pesanan_item: Array<{
+    id: number;
+    jumlah: number;
+    nama_produk_snapshot: string;
+    harga_satuan_snapshot: number;
+    harga_dasar_awal_snapshot?: number;
+    total_diskon_snapshot?: number;
+    rincian_diskon_snapshot?: string | RincianDiskonAPI[]; 
+    estimasi_pengerjaan_snapshot?: string;
+    harga_pengerjaan_snapshot?: number;
+    file_desain?: string | string[] | null; // <-- PERBAIKAN: Tambahkan dukungan array
+    catatan?: string | null;
+    pesanan_item_finishing?: Array<{
+      id: number;
+      nama_finishing_snapshot: string;
+      harga_finishing_snapshot: number;
+    }>;
+  }>;
 }
 
-interface CartItemAPI {
-  id: number;
-  item_code: string;
-  variant_name: string;
-  qty: number;
-  price: number;
-  image_url?: string;
-  variant_lainnya?: VariantLainnyaAPI[];
+// Tambahkan definisi properti tambahan agar Typescript tidak protes
+interface ExtendedCartItemAPI extends CartItemAPI {
+  file_desain?: string[];
 }
 
 export default function CartClient() {
   const router = useRouter();
-  const [cartItems, setCartItems] = useState<CartItemAPI[]>([]);
+  const [cartItems, setCartItems] = useState<ExtendedCartItemAPI[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,38 +59,104 @@ export default function CartClient() {
     idToDelete: null 
   });
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  const fetchCart = useCallback(async () => {
-    const res = await getCartItems();
-    
-    if (res.error) {
-      if (res.error.toLowerCase().includes("sesi") || res.error.toLowerCase().includes("login")) {
-        router.push("/login");
-        return;
+  useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        const res = (await getCartItems()) as CartServiceResponse<RawCartData>;
+        
+        if (res.error) {
+          if (res.error.toLowerCase().includes("sesi") || res.error.toLowerCase().includes("login")) {
+            router.push("/login");
+            return;
+          }
+          setError(res.error);
+        } else {
+          const rawData = res.data;
+          let itemsList: ExtendedCartItemAPI[] = [];
+
+          if (
+            rawData &&
+            typeof rawData === "object" &&
+            Array.isArray(rawData.pesanan_item)
+          ) {
+            itemsList = rawData.pesanan_item.map((item) => {
+                
+                // Parse rincian diskon JSON secara Type-Safe
+                let parsedRincianDiskon: RincianDiskonAPI[] = [];
+                if (item.rincian_diskon_snapshot) {
+                  try {
+                      parsedRincianDiskon = typeof item.rincian_diskon_snapshot === 'string' 
+                          ? JSON.parse(item.rincian_diskon_snapshot) 
+                          : item.rincian_diskon_snapshot;
+                  } catch (e) {
+                      console.error("Gagal parse rincian diskon", e);
+                  }
+                }
+
+                // PERBAIKAN: Parse file_desain JSON menjadi Array String
+                let parsedFileDesain: string[] = [];
+                if (item.file_desain) {
+                  try {
+                      parsedFileDesain = typeof item.file_desain === 'string' 
+                          ? JSON.parse(item.file_desain) 
+                          : item.file_desain;
+                  } catch (e) {
+                      console.error("Gagal parse file desain", e);
+                  }
+                }
+
+                return {
+                  id: item.id,
+                  id_pesan: "", 
+                  jumlah: item.jumlah,
+                  nama_sku: item.nama_produk_snapshot,
+                  harga_satuan: item.harga_satuan_snapshot, 
+                  
+                  harga_dasar_awal_snapshot: item.harga_dasar_awal_snapshot,
+                  total_diskon_snapshot: item.total_diskon_snapshot,
+                  rincian_diskon_snapshot: parsedRincianDiskon,
+                  estimasi_pengerjaan: item.estimasi_pengerjaan_snapshot,
+                  harga_pengerjaan_snapshot: item.harga_pengerjaan_snapshot,
+                  catatan: item.catatan,
+                  file_desain: parsedFileDesain, // <-- Masukkan array file_desain yang sudah di-parse
+
+                  finishing: item.pesanan_item_finishing?.map((fin) => ({
+                      id: fin.id,
+                      nama_finishing: fin.nama_finishing_snapshot,
+                      harga_tambahan: fin.harga_finishing_snapshot,
+                  })) ?? [],
+                };
+            });
+          }
+
+          setCartItems(itemsList); 
+          setError(null);
+        }
+      } catch (err) {
+        setError("Terjadi kesalahan saat mengambil data keranjang.");
+      } finally {
+        setLoading(false);
       }
-      setError(res.error);
-    } else {
-      setCartItems(res.data?.items || []); 
-      setError(null);
-    }
-    setLoading(false);
+    };
+
+    fetchCart();
   }, [router]);
 
-  useEffect(() => {
-    fetchCart();
-  }, [fetchCart]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
+  // KALKULASI TOTAL TERPILIH
   const selectedSubtotal = cartItems
-  .filter((item) => selectedIds.includes(item.id))
-  .reduce((total: number, item: CartItemAPI) => {
-    const totalTambahan = (item.variant_lainnya || []).reduce(
-      (acc: number, j: VariantLainnyaAPI) => acc + j.price, 
-      0
-    );
-    const unitPriceTotal = item.price + totalTambahan;
-    return total + (unitPriceTotal * item.qty);
-  }, 0);
+    .filter((item) => selectedIds.includes(item.id))
+    .reduce((total: number, item: ExtendedCartItemAPI) => {
+      const totalFinishing = (item.finishing || []).reduce(
+        (acc: number, f: FinishingItemAPI) => acc + (f.harga_tambahan || 0),
+        0
+      );
+
+      const hargaProdukPerPcs = (item.harga_satuan || 0) + totalFinishing;
+      const biayaPengerjaan = item.harga_pengerjaan_snapshot || 0;
+      const subtotalItem = (hargaProdukPerPcs * item.jumlah) + biayaPengerjaan;
+
+      return total + subtotalItem;
+    }, 0);
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -92,18 +170,16 @@ export default function CartClient() {
     if (newQty < 1) return;
     
     setActionLoading(id);
-
     const res = await updateCartItemQty(id, newQty);
     
     if (res.error) {
       setError(res.error);
     } else {
       const newCart = cartItems.map(item => 
-        item.id === id ? { ...item, qty: newQty } : item
+        item.id === id ? { ...item, jumlah: newQty } : item
       );
       setCartItems(newCart);
     }
-    
     setActionLoading(null);
   };
 
@@ -122,8 +198,6 @@ export default function CartClient() {
     if (!id) return;
 
     setActionLoading(id);
-    
-    // Panggil service tanpa token
     const res = await deleteCartItem(id);
 
     if (res.error) {
@@ -148,13 +222,24 @@ export default function CartClient() {
         autoClose: 2000
       });
     }
-
     setActionLoading(null);
   };
 
   const handleCheckout = () => {
-    const itemsToBuy = cartItems.filter(item => selectedIds.includes(item.id));
-    localStorage.setItem("checkout_items", JSON.stringify(itemsToBuy));
+    const selectedItems = cartItems.filter(item =>
+      selectedIds.includes(item.id)
+    );
+
+    localStorage.setItem(
+      "checkout_items",
+      JSON.stringify(selectedItems)
+    );
+
+    localStorage.setItem(
+      "checkout_item_ids",
+      JSON.stringify(selectedIds)
+    );
+
     router.push("/pesan/checkout");
   };
 
@@ -168,7 +253,6 @@ export default function CartClient() {
 
   return (
     <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 relative">
-      
       <AlertPopup 
         isOpen={popup.isOpen}
         type={popup.type}
@@ -183,7 +267,6 @@ export default function CartClient() {
       />
 
       <div className="max-w-7xl mx-auto">
-        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="breadcrumbs text-[10px] uppercase font-black opacity-40 tracking-widest">
             <ul>
@@ -197,10 +280,8 @@ export default function CartClient() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-base-100 rounded-2xl p-6 shadow-sm border border-base-content/5">
-              
               <div className="flex items-center justify-between mb-6 border-b border-base-content/5 pb-4">
                 <div className="flex items-center gap-3">
                   <input 
@@ -232,12 +313,18 @@ export default function CartClient() {
                     <CartProductItem
                       key={item.id}
                       id={item.id}
-                      variant_name={item.variant_name}
-                      price={item.price}
-                      qty={item.qty}
-                      image_url={item.image_url}
-                      // Oper field variant_lainnya ke prop jasa_tambahan
-                      jasa_tambahan={item.variant_lainnya || []} 
+                      nama_sku={item.nama_sku || "Produk Cetak"}
+                      harga_satuan={item.harga_satuan || 0}
+                      jumlah={item.jumlah}
+                      finishing={item.finishing || []} 
+
+                      total_diskon_snapshot={item.total_diskon_snapshot}
+                      rincian_diskon_snapshot={item.rincian_diskon_snapshot}
+                      estimasi_pengerjaan={item.estimasi_pengerjaan}
+                      harga_pengerjaan_snapshot={item.harga_pengerjaan_snapshot}
+                      catatan={item.catatan}
+                      file_desain={item.file_desain}
+
                       isSelected={selectedIds.includes(item.id)}
                       onToggleSelect={toggleSelect}
                       onUpdateQty={handleUpdateQty}
@@ -252,46 +339,42 @@ export default function CartClient() {
 
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-4">
-              <div className="card bg-base-100 border-2 border-base-content/10 rounded-2xl overflow-hidden">
-                <div className="p-8">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 flex items-center gap-2">
-                    <CreditCard size={14} /> Ringkasan Pesanan
-                  </h3>
-                  
-                  <div className="space-y-4 mb-8">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-[10px] font-bold uppercase opacity-60">Item Terpilih</span>
-                      <span className="text-xs font-black">{selectedIds.length} Produk</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-[10px] font-bold uppercase opacity-60">Subtotal</span>
-                      <span className="font-bold">Rp {selectedSubtotal.toLocaleString("id-ID")}</span>
-                    </div>
-                    <div className="divider opacity-10 my-0"></div>
-                    <div className="flex flex-col gap-1 pt-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Tagihan</span>
-                      <span className="text-3xl font-black text-primary tracking-tighter leading-none">
-                        Rp {selectedSubtotal.toLocaleString("id-ID")}
-                      </span>
-                    </div>
+              <div className="card bg-base-100 p-8 border-2 border-base-content/10 rounded-2xl shadow-sm">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 flex items-center gap-2">
+                  <CreditCard size={14} /> Ringkasan Pesanan
+                </h3>
+                
+                <div className="space-y-4 mb-8">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-[10px] font-bold uppercase opacity-60">Item Terpilih</span>
+                    <span className="text-xs font-black">{selectedIds.length} Produk</span>
                   </div>
-
-                  <button 
-                    disabled={selectedIds.length === 0}
-                    onClick={handleCheckout}
-                    className="btn btn-primary btn-block rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-16 text-xs"
-                  >
-                    Checkout Sekarang
-                  </button>
-
-                  <p className="text-[8px] text-center mt-4 opacity-40 font-bold uppercase tracking-tighter">
-                    Harga sudah termasuk pajak & biaya layanan cetak.
-                  </p>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-[10px] font-bold uppercase opacity-60">Subtotal Keranjang</span>
+                    <span className="font-bold">Rp {selectedSubtotal.toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="divider opacity-10 my-0"></div>
+                  <div className="flex flex-col gap-1 pt-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Tagihan</span>
+                    <span className="text-3xl font-black text-primary tracking-tighter leading-none">
+                      Rp {selectedSubtotal.toLocaleString("id-ID")}
+                    </span>
+                  </div>
                 </div>
+
+                <button 
+                  disabled={selectedIds.length === 0}
+                  onClick={handleCheckout}
+                  className="btn btn-primary btn-block rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-16 text-xs"
+                >
+                  Checkout Sekarang
+                </button>
+                <p className="text-[8px] text-center mt-4 opacity-40 font-bold uppercase tracking-tighter">
+                  Harga sudah termasuk pajak & biaya layanan cetak. Belum termasuk ongkos kirim.
+                </p>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </main>

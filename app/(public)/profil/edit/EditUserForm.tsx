@@ -10,37 +10,46 @@ export default function EditUserForm({ initialData }: { initialData: UserProfile
 	const [popup, setPopup] = useState<{
 		isOpen: boolean; title: string; message: string; type: "success" | "error" | "warning" | "info";
 	}>({ isOpen: false, title: "", message: "", type: "info" });
+
+	const [form, setForm] = useState({
+		name: initialData.name,
+		no_hp: initialData.customer?.no_hp ?? "",
+	});
+
+	const handleChange = (name: string, value: string) => {
+		setForm((prev) => ({...prev, [name]: value}));
+	};
 	
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    const formData = new FormData(e.currentTarget);
-    
-    // Ambil value dan paksa ke string, handle jika null dengan string kosong
-    const customer_name = formData.get("customer_name")?.toString() || "";
-    const mobile_no = formData.get("mobile_no")?.toString() || "";
+		e.preventDefault();
 
-    const res = await updateUserProfile({
-      customer_name,
-      mobile_no,
-    });
+		setLoading(true);
 
-		setPopup(res.success?
-			{ 
-				isOpen: true, 
-				title: "Berhasil!", 
-				message: "Data profil diperbarui!", 
-				type: "success" 
-			} : { 
-				isOpen: true, 
-				title: "Gagal!", 
-				message: `${res.error}`, 
-				type: "error" 
-			}
+		const res = await updateUserProfile({
+			name: form.name,
+			no_hp: form.no_hp,
+		});
+
+		setPopup(
+			res.success
+				? {
+						isOpen: true,
+						title: "Berhasil!",
+						message: "Data profil diperbarui!",
+						type: "success",
+					}
+				: {
+						isOpen: true,
+						title: "Gagal!",
+						message:
+							res.error ||
+							"Terjadi kesalahan.",
+						type: "error",
+					}
 		);
-    setLoading(false);
-  };
+
+		setLoading(false);
+	};
 
   return (
     <>
@@ -59,17 +68,19 @@ export default function EditUserForm({ initialData }: { initialData: UserProfile
 						<h2 className="text-sm font-black uppercase tracking-widest leading-none">Data Personal</h2>
 					</div>
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<FormInput 
-							label="Nama Lengkap" 
-							name="customer_name" 
-							defaultValue={initialData.customer_name || ""} 
-							icon={<User size={16}/>} 
+						<FormInput
+							label="Nama Lengkap"
+							name="name"
+							value={form.name}
+							onChange={handleChange}
+							icon={<User size={16} />}
 						/>
-						<FormInput 
-							label="WhatsApp" 
-							name="mobile_no" 
-							defaultValue={initialData.mobile_no || ""} 
-							icon={<Phone size={16}/>} 
+						<FormInput
+							label="WhatsApp"
+							name="no_hp"
+							value={form.no_hp || ""}
+							onChange={handleChange}
+							icon={<Phone size={16} />}
 						/>
 					</div>
 					<button disabled={loading} className="btn btn-primary rounded-xl mt-6 font-black uppercase tracking-widest">

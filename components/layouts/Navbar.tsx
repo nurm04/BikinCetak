@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import { User, LogOut, ShoppingBag, LogIn } from 'lucide-react';
+import { User, LogOut, ShoppingBag, LogIn, Package } from 'lucide-react';
 import SwapTheme from '../ui/SwapTheme';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -39,7 +39,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     
     if (res.data) {
       setIsLoggedIn(true);
-      setUserName(res.data.customer_name || res.data.email || "User");
+      setUserName(res.data.name || res.data.email || "User");
     } else {
       setIsLoggedIn(false);
       setUserName("Pelanggan");
@@ -56,13 +56,28 @@ const Navbar = ({ items = [] }: NavbarProps) => {
   const isHome = pathname === '/';
   const toggleMenu = (key: string) => setOpenMenu(openMenu === key ? null : key);
 
-  const dynamicCategories = items
-    .filter((group) => group.item_group_name.toLowerCase() !== "services")
-    .map((group) => ({
-      key: slugify(group.item_group_name),
-      label: group.item_group_name,
-      submenu: group.templates.map((t) => ({ name: t.item_name }))
-    }));
+  const groupedItems: Record<string, Array<{ name: string }>> = {};
+
+  items.forEach((item) => {
+    if (item.is_active === 0) return;
+
+    const categoryName = item.kategori || "Lainnya";
+    const lowerCat = categoryName.toLowerCase();
+
+    if (lowerCat === "services" || lowerCat === "jasa") return;
+
+    if (!groupedItems[categoryName]) {
+      groupedItems[categoryName] = [];
+    }
+
+    groupedItems[categoryName].push({ name: item.nama_produk });
+  });
+
+  const dynamicCategories = Object.keys(groupedItems).map((categoryKey) => ({
+    key: slugify(categoryKey),
+    label: categoryKey,
+    submenu: groupedItems[categoryKey],
+  }));
 
   return (
     <>
@@ -130,6 +145,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
                 </li>
                 
                 <li><Link href="/profil" className="py-2 font-bold flex items-center gap-3"><User size={16} className="opacity-70" /> Profil Saya</Link></li>
+                <li><Link href="/pesan" className="py-2 font-bold flex items-center gap-3"><Package size={16} className="opacity-70" /> Pesanan</Link></li>
                 <li><Link href="/cart" className="py-2 font-bold flex items-center gap-3"><ShoppingBag size={16} className="opacity-70" /> Keranjang</Link></li>
                 <div className="divider my-0 opacity-30"></div>
                 <li>
