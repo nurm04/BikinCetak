@@ -8,7 +8,7 @@ import { addCart, RincianDiskonAPI } from "@/services/cartService";
 import { useRouter } from "next/navigation";
 import ProductCarousel from "@/components/shared/ProductCarousel";
 import ProductRow from "@/components/shared/ProductRow";
-import FileUpload from "@/components/ui/FileUpload";
+import FileUpload, { FileDesainPayload } from "@/components/ui/FileUpload";
 import { ShoppingBag, CreditCard, Award, CheckCircle, Truck, ShieldCheck, Info, Clock } from "lucide-react";
 import AlertPopup from "@/components/ui/AlertPopup";
 
@@ -31,10 +31,19 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   const [cartLoading, setCartLoading] = useState<boolean>(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = { qty: "1", catatan: "" };
+    
+    const validPilihanIds = new Set<string>();
+    if (itemDetail?.skus) {
+      itemDetail.skus.forEach(sku => {
+        sku.kombinasi_pilihan.forEach(id => validPilihanIds.add(id));
+      });
+    }
+
     if (itemDetail?.varians) {
       itemDetail.varians.forEach(v => {
-        if (v.pilihan_varian && v.pilihan_varian.length > 0) {
-          initial[v.id_varian] = v.pilihan_varian[0].id_pilihan;
+        const validOptions = v.pilihan_varian?.filter(p => validPilihanIds.has(p.id_pilihan)) || [];
+        if (validOptions.length > 0) {
+          initial[v.id_varian] = validOptions[0].id_pilihan;
         }
       });
     }
@@ -43,12 +52,15 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   
   const [selectedFinishing, setSelectedFinishing] = useState<Record<string, OpsiFinishing | null>>({});
   const [selectedPengerjaanTitle, setSelectedPengerjaanTitle] = useState<string>("");
-  
-  // PERBAIKAN 1: Tambahkan state untuk menampung BANYAK file desain dari FileUpload
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); 
+
+  const [fileDesain, setFileDesain] = useState<FileDesainPayload>({
+    tipe_file: "upload",
+    file: null,
+    link_file: "",
+  });
   
   const [popup, setPopup] = useState<{
-    isOpen: boolean; title: string; message: string; type: "success" | "error" | "warning" | "info";
+    isOpen: boolean; title: string; message: string; type: "success" | "error" | "warning" | "info"; link?: string;
   }>({ isOpen: false, title: "", message: "", type: "info" });
 
   const currentQty = parseInt(selectedOptions.qty || "1", 10);
@@ -78,34 +90,65 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const availablePengerjaan = useMemo(() => sku?.harga_pengerjaan || [], [sku]);
   
-  const activePengerjaan = useMemo(() => {
-    if (availablePengerjaan.length === 0) return { pengerjaan: "Reguler", harga: 0 };
-    const found = availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle);
-    return found || availablePengerjaan[0];
+  useEffect(() => {
+    if (availablePengerjaan.length > 0) {
+        if (!availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle)) {
+            setSelectedPengerjaanTitle(availablePengerjaan[0].pengerjaan);
+        }
+    } else {
+        setSelectedPengerjaanTitle("Reguler");
+    }
   }, [availablePengerjaan, selectedPengerjaanTitle]);
 
-  const basePrice = useMemo<number>(() => {
-    if (!sku) return 0;
-    const tier = sku.harga_bertingkat?.find((h) => currentQty >= h.min && currentQty <= h.max);
-    return tier ? tier.harga : (sku.harga_dasar || 0);
-  }, [sku, currentQty]);
+  // ==========================================
+  // KALKULASI HARGA & DISKON (SINKRON DENGAN POS)
+  // ==========================================
+  
+  const hargaDasarAwal = useMemo(() => Number(sku?.harga_dasar) || 0, [sku]);
 
+  // 1. Hitung Harga Bertingkat (Grosir) sbg Potongan per pcs
+  const diskonGrosirPerPcs = useMemo(() => {
+      if (!sku) return 0;
+      const tier = [...(sku.harga_bertingkat || [])]
+          .sort((a, b) => b.min - a.min)
+          .find(t => currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max));
+
+      if (!tier) return 0;
+      return tier.tipe === "persen" ? hargaDasarAwal * (Number(tier.nilai) / 100) : Number(tier.nilai);
+  }, [sku, currentQty, hargaDasarAwal]);
+
+  // 2. Hitung Diskon Customer Role per pcs
   const activeDiscount = useMemo(() => {
     if (!sku || !sku.diskon_customer || !activeRoleId) return null;
     return sku.diskon_customer.find(d => String(d.id_role_customer) === String(activeRoleId)) || null;
   }, [sku, activeRoleId]);
 
-  const finalBasePrice = useMemo<number>(() => {
-    let price = basePrice;
-    if (activeDiscount) {
-      if (activeDiscount.tipe === "persen") {
-        price = price - (price * (activeDiscount.nilai / 100));
-      } else if (activeDiscount.tipe === "nominal") {
-        price = price - activeDiscount.nilai;
-      }
-    }
-    return Math.max(0, price); 
-  }, [basePrice, activeDiscount]);
+  const diskonMemberPerPcs = useMemo(() => {
+      if (!activeDiscount) return 0;
+      return activeDiscount.tipe === "persen" ? hargaDasarAwal * (Number(activeDiscount.nilai) / 100) : Number(activeDiscount.nilai);
+  }, [activeDiscount, hargaDasarAwal]);
+
+  // 3. Harga Net Satuan & Total Produk
+  const totalDiskonSatuan = useMemo(() => diskonGrosirPerPcs + diskonMemberPerPcs, [diskonGrosirPerPcs, diskonMemberPerPcs]);
+  const hargaSatuanNet = useMemo(() => Math.max(0, hargaDasarAwal - totalDiskonSatuan), [hargaDasarAwal, totalDiskonSatuan]);
+  
+  const addonTotal = useMemo(() => Object.values(selectedFinishing).reduce((acc, curr) => acc + (curr?.harga_tambahan || 0), 0), [selectedFinishing]);
+  const totalProduk = useMemo(() => (hargaSatuanNet + addonTotal) * currentQty, [hargaSatuanNet, addonTotal, currentQty]);
+
+  // 4. Kalkulasi nominal total SLA (Mendukung Persen / Nominal)
+  const activePengerjaanObj = useMemo(() => {
+    if (availablePengerjaan.length === 0) return null;
+    return availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle) || availablePengerjaan[0];
+  }, [availablePengerjaan, selectedPengerjaanTitle]);
+
+  const slaPrice = useMemo(() => {
+      if (!activePengerjaanObj) return 0;
+      return activePengerjaanObj.tipe === 'persen' ? totalProduk * (Number(activePengerjaanObj.nilai) / 100) : Number(activePengerjaanObj.nilai);
+  }, [activePengerjaanObj, totalProduk]);
+
+  const totalPrice = totalProduk + slaPrice;
+
+  // ==========================================
 
   const groupedAddons = useMemo(() => {
     const groups: Record<string, OpsiFinishing[]> = {};
@@ -132,16 +175,25 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     });
   }, [minimumQty]);
 
-  const addonTotal = Object.values(selectedFinishing).reduce((acc, curr) => acc + (curr?.harga_tambahan || 0), 0);
-  const totalPrice = ((finalBasePrice + addonTotal) * currentQty) + activePengerjaan.harga;
-
   const dynamicFields = useMemo(() => {
-    if (!itemDetail?.varians) return [];
-    return itemDetail.varians.map(v => ({
-      name: v.id_varian,
-      label: v.nama_varian,
-      options: v.pilihan_varian.map(p => ({ label: p.nama_pilihan, value: p.id_pilihan }))
-    }));
+    if (!itemDetail?.varians || !itemDetail?.skus) return [];
+
+    const validPilihanIds = new Set<string>();
+    itemDetail.skus.forEach(sku => {
+      sku.kombinasi_pilihan.forEach(id_pilihan => {
+        validPilihanIds.add(id_pilihan);
+      });
+    });
+
+    return itemDetail.varians.map(v => {
+      const filteredOptions = v.pilihan_varian.filter(p => validPilihanIds.has(p.id_pilihan));
+
+      return {
+        name: v.id_varian,
+        label: v.nama_varian,
+        options: filteredOptions.map(p => ({ label: p.nama_pilihan, value: p.id_pilihan }))
+      };
+    }).filter(v => v.options.length > 0);
   }, [itemDetail]);
 
   const handleAttributeChange = (name: string, value: string) => {
@@ -174,12 +226,27 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     if (!idAlamatUtama) {
       setPopup({ 
         isOpen: true, title: "Alamat Kosong", 
-        message: "Silakan tambahkan alamat pengiriman di menu Profil terlebih dahulu sebelum memesan.", type: "warning" 
+        message: "Silakan tambahkan alamat pengiriman di menu Profil terlebih dahulu sebelum memesan.", type: "warning",
+        link: '/profil/alamat/tambah'
       });
       return;
     }
 
     if (!sku) return;
+
+    if (fileDesain.tipe_file === "upload" && fileDesain.file) {
+      const MAX_FILE_SIZE = 200 * 1024 * 1024;
+      if (fileDesain.file.size > MAX_FILE_SIZE) {
+        setPopup({ 
+          isOpen: true, 
+          title: "File Terlalu Besar!", 
+          message: "Maksimal ukuran file untuk di-upload langsung adalah 200MB. Untuk file yang lebih besar, silakan gunakan opsi pengiriman via Link (Google Drive / Cloud).", 
+          type: "warning" 
+        });
+        return;
+      }
+    }
+
     setCartLoading(true);
 
     try {
@@ -193,15 +260,25 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         }));
 
       const rincianDiskon: RincianDiskonAPI[] = [];
-      let totalDiskonSnapshot = 0;
+      
+      // Simpan history Grosir
+      if (diskonGrosirPerPcs > 0) {
+        const tier = [...(sku.harga_bertingkat || [])]
+            .sort((a, b) => b.min - a.min)
+            .find(t => currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max));
 
-      if (activeDiscount) {
-         const diskonNominal = basePrice - finalBasePrice;
-         totalDiskonSnapshot = diskonNominal;
-         rincianDiskon.push({
-             nama: activeDiscount.tipe === 'persen' ? `Diskon Member (${activeDiscount.nilai}%)` : `Diskon Member (Nominal)`,
-             nominal: diskonNominal
-         });
+        rincianDiskon.push({
+            nama: tier?.tipe === 'persen' ? `Harga Grosir Qty ${currentQty} (${tier.nilai}%)` : `Harga Grosir Qty ${currentQty}`,
+            nominal: diskonGrosirPerPcs
+        });
+      }
+
+      // Simpan history Diskon Member
+      if (diskonMemberPerPcs > 0 && activeDiscount) {
+        rincianDiskon.push({
+            nama: activeDiscount.tipe === 'persen' ? `Diskon Member (${activeDiscount.nilai}%)` : `Diskon Member (Nominal)`,
+            nominal: diskonMemberPerPcs
+        });
       }
 
       const result = await addCart(
@@ -211,31 +288,29 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             id_sku: sku.id_sku,
             jumlah: currentQty,
             nama_produk_snapshot: sku.nama_sku,
-            harga_satuan_snapshot: finalBasePrice, 
-            harga_dasar_awal_snapshot: basePrice,
-            total_diskon_snapshot: totalDiskonSnapshot,
+            harga_satuan_snapshot: hargaSatuanNet, 
+            harga_dasar_awal_snapshot: hargaDasarAwal,
+            total_diskon_snapshot: totalDiskonSatuan,
             rincian_diskon_snapshot: rincianDiskon,
-            estimasi_pengerjaan: activePengerjaan.pengerjaan,
-            harga_pengerjaan_snapshot: activePengerjaan.harga,
+            estimasi_pengerjaan: activePengerjaanObj?.pengerjaan || "Reguler",
+            harga_pengerjaan_snapshot: slaPrice,
             catatan: selectedOptions.catatan || "",
             finishings,
-            
-            // PERBAIKAN 2: Sisipkan array file desain yang udah dipilih user
-            file_desain: selectedFiles.length > 0 ? selectedFiles : undefined, 
+            tipe_file: fileDesain.tipe_file,
+            file_desain: fileDesain.file || undefined, 
+            link_file: fileDesain.link_file,
           },
         ]
       );
       
       if (result.error) {
         if (result.error.toLowerCase().includes("login") || result.error.toLowerCase().includes("sesi")) {
-          setPopup({ isOpen: true, title: "Perlu Login", message: "Silakan login terlebih dahulu.", type: "warning" });
+          setPopup({ isOpen: true, title: "Perlu Login", message: "Silakan login terlebih dahulu.", type: "warning", link: "/login" });
           return;
         }
         throw new Error(result.error);
       }
 
-      // Reset pilihan file setelah sukses add to cart
-      setSelectedFiles([]); 
       setPopup({ isOpen: true, title: "Berhasil!", message: "Produk berhasil dimasukkan ke keranjang.", type: "success" });
 
     } catch (err) {
@@ -251,7 +326,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         isOpen={popup.isOpen} type={popup.type} title={popup.title} message={popup.message}
         autoClose={popup.type === "success" ? 3000 : undefined} 
         onCancel={() => setPopup({ ...popup, isOpen: false })}
-        onConfirm={popup.type === "warning" ? () => router.push("/login") : undefined} 
+        onConfirm={popup.link ? () => router.push(popup.link!) : undefined} 
       />
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8 mt-2">
@@ -294,12 +369,17 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                       <tbody className="font-bold">
                         {sku ? (
                           sku.harga_bertingkat && sku.harga_bertingkat.length > 0 ? (
-                            sku.harga_bertingkat.map((rule, idx) => (
-                              <tr key={idx} className={currentQty >= rule.min && currentQty <= rule.max ? "bg-primary/10 text-primary" : ""}>
-                                <td className="py-3">{rule.min} - {rule.max} pcs</td>
-                                <td className="py-3 text-right">Rp {rule.harga.toLocaleString("id-ID")}</td>
-                              </tr>
-                            ))
+                            sku.harga_bertingkat.map((rule, idx) => {
+                              const discount = rule.tipe === 'persen' ? hargaDasarAwal * (rule.nilai / 100) : rule.nilai;
+                              const pricePerPcs = Math.max(0, hargaDasarAwal - discount);
+
+                              return (
+                                <tr key={idx} className={currentQty >= rule.min && (rule.max === 0 || currentQty <= rule.max) ? "bg-primary/10 text-primary" : ""}>
+                                  <td className="py-3">{rule.min} - {rule.max === 0 ? "Lebih" : rule.max} pcs</td>
+                                  <td className="py-3 text-right">Rp {pricePerPcs.toLocaleString("id-ID")}</td>
+                                </tr>
+                              );
+                            })
                           ) : (
                             <tr><td colSpan={2} className="py-4 text-center opacity-50 font-normal normal-case">Tidak ada jatah harga grosir khusus.</td></tr>
                           )
@@ -325,60 +405,69 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <div className="space-y-4">
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Kecepatan Pengerjaan</p>
                     <div className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 flex flex-col gap-3">
-                      {availablePengerjaan.map((p, idx) => (
-                        <label
-                          key={p.id || idx}
-                          className={`flex items-center justify-between p-3 md:p-4 border rounded-xl cursor-pointer transition-all ${
-                            activePengerjaan.pengerjaan === p.pengerjaan
-                              ? "border-primary bg-primary/5 shadow-sm"
-                              : "border-base-content/10 hover:border-base-content/30"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="pengerjaan"
-                              className="radio radio-primary radio-sm"
-                              checked={activePengerjaan.pengerjaan === p.pengerjaan}
-                              onChange={() => setSelectedPengerjaanTitle(p.pengerjaan)}
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold flex items-center gap-2">
-                                <Clock size={14} className={activePengerjaan.pengerjaan === p.pengerjaan ? "text-primary" : "opacity-50"} />
-                                {p.pengerjaan}
-                              </span>
+                      {availablePengerjaan.map((p, idx) => {
+                        const calcPrice = p.tipe === 'persen' ? totalProduk * (p.nilai / 100) : p.nilai;
+                        
+                        return (
+                          <label
+                            key={p.id || idx}
+                            className={`flex items-center justify-between p-3 md:p-4 border rounded-xl cursor-pointer transition-all ${
+                              activePengerjaanObj?.pengerjaan === p.pengerjaan
+                                ? "border-primary bg-primary/5 shadow-sm"
+                                : "border-base-content/10 hover:border-base-content/30"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="radio"
+                                name="pengerjaan"
+                                className="radio radio-primary radio-sm"
+                                checked={activePengerjaanObj?.pengerjaan === p.pengerjaan}
+                                onChange={() => setSelectedPengerjaanTitle(p.pengerjaan)}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold flex items-center gap-2">
+                                  <Clock size={14} className={activePengerjaanObj?.pengerjaan === p.pengerjaan ? "text-primary" : "opacity-50"} />
+                                  {p.pengerjaan}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          <span className="text-xs font-black text-primary">
-                            {p.harga > 0 ? `+ Rp ${p.harga.toLocaleString("id-ID")}` : "Gratis"}
-                          </span>
-                        </label>
-                      ))}
+                            <span className="text-xs font-black text-primary">
+                              {calcPrice > 0 ? `+ Rp ${calcPrice.toLocaleString("id-ID")}` : "Gratis"}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
                 {/* MOBILE VIEW SUMMARY */}
                 <div className="block lg:hidden space-y-6 pt-4 border-t border-base-content/10">
-                  {/* PERBAIKAN 3: Kirim onChange ke FileUpload agar state tersinkron */}
-                  <FileUpload variant="minimal" onChange={setSelectedFiles} />
+                  <div className="space-y-2">
+                    <FileUpload variant="minimal" onChange={setFileDesain} />
+                    <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
+                      <Info size={14} className="shrink-0" />
+                      <p>Max upload file 200MB. Jika file lebih besar, mohon pilih opsi kirim via <b>Link Google Drive / Cloud</b>.</p>
+                    </div>
+                  </div>
                   <div className="bg-base-200/50 p-5 rounded-2xl border border-base-content/5">
                     <h3 className="text-[10px] font-black uppercase opacity-40 mb-4 flex items-center gap-2"><CreditCard size={14}/> Ringkasan</h3>
                     <div className="space-y-3 text-xs font-bold uppercase">
                       <div className="flex justify-between items-center">
                         <span className="opacity-60">Harga ({currentQty} pcs)</span>
-                        <div className="text-right">
-                           {activeDiscount && (
-                             <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {basePrice.toLocaleString("id-ID")}</span>
+                        <div className="text-right flex items-center">
+                           {(diskonMemberPerPcs > 0 || diskonGrosirPerPcs > 0) && (
+                             <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarAwal.toLocaleString("id-ID")}</span>
                            )}
-                           <span>Rp {finalBasePrice.toLocaleString("id-ID")}</span>
+                           <span>Rp {hargaSatuanNet.toLocaleString("id-ID")}</span>
                         </div>
                       </div>
                       
                       {activeDiscount && (
                         <div className="flex justify-end">
                           <span className="text-[9px] font-black uppercase tracking-widest text-success bg-success/10 px-2 py-0.5 rounded">
-                              ✨ Diskon Member {activeDiscount.tipe === 'persen' ? `${activeDiscount.nilai}%` : `Rp ${activeDiscount.nilai.toLocaleString("id-ID")}`}
+                            ✨ Diskon Member {activeDiscount.tipe === 'persen' ? `${activeDiscount.nilai}%` : `Rp ${activeDiscount.nilai.toLocaleString("id-ID")}`}
                           </span>
                         </div>
                       )}
@@ -390,10 +479,10 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                         </div>
                       )}
 
-                      {activePengerjaan.harga > 0 && (
+                      {slaPrice > 0 && (
                         <div className="flex justify-between items-center text-primary mt-2">
-                          <span className="opacity-60">Biaya {activePengerjaan.pengerjaan}</span>
-                          <span>+ Rp {activePengerjaan.harga.toLocaleString("id-ID")}</span>
+                          <span className="opacity-60">Biaya {activePengerjaanObj?.pengerjaan}</span>
+                          <span>+ Rp {slaPrice.toLocaleString("id-ID")}</span>
                         </div>
                       )}
                       
@@ -425,11 +514,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
              <div className="space-y-3 text-xs font-bold uppercase">
                 <div className="flex justify-between items-center">
                   <span className="opacity-60">Harga ({currentQty} pcs)</span>
-                  <div className="text-right">
-                     {activeDiscount && (
-                       <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {basePrice.toLocaleString("id-ID")}</span>
+                  <div className="text-right flex items-center">
+                     {(diskonMemberPerPcs > 0 || diskonGrosirPerPcs > 0) && (
+                       <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarAwal.toLocaleString("id-ID")}</span>
                      )}
-                     <span>Rp {finalBasePrice.toLocaleString("id-ID")}</span>
+                     <span>Rp {hargaSatuanNet.toLocaleString("id-ID")}</span>
                   </div>
                 </div>
 
@@ -448,11 +537,10 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                 )}
 
-                {/* UI BIAYA PENGERJAAN DESKTOP */}
-                {activePengerjaan.harga > 0 && (
+                {slaPrice > 0 && (
                   <div className="flex justify-between items-center text-primary mt-2">
-                    <span className="opacity-60">Biaya {activePengerjaan.pengerjaan}</span>
-                    <span>+ Rp {activePengerjaan.harga.toLocaleString("id-ID")}</span>
+                    <span className="opacity-60">Biaya {activePengerjaanObj?.pengerjaan}</span>
+                    <span>+ Rp {slaPrice.toLocaleString("id-ID")}</span>
                   </div>
                 )}
                 
@@ -464,8 +552,13 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
              </div>
             </div>
             
-            {/* PERBAIKAN 4: Kirim onChange ke FileUpload agar state tersinkron (Desktop) */}
-            <FileUpload onChange={setSelectedFiles} />
+            <div className="space-y-2">
+              <FileUpload onChange={setFileDesain} />
+              <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
+                <Info size={14} className="shrink-0" />
+                <p>Max upload file 200MB. Jika file lebih besar, mohon pilih opsi kirim via <b>Link Google Drive / Cloud</b>.</p>
+              </div>
+            </div>
             
             <div className="card bg-primary text-primary-content shadow-xl shadow-primary/20 rounded-2xl">
               <div className="card-body p-6 gap-4">

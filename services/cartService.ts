@@ -71,8 +71,10 @@ export interface AddCartItem {
   estimasi_pengerjaan?: string;
   harga_pengerjaan_snapshot?: number;
   catatan?: string;
-  file_desain?: File[]; 
   finishings?: AddCartFinishing[];
+  file_desain?: File | null; 
+  tipe_file?: "upload" | "link" | "email";
+  link_file?: string;
 }
 
 export interface CartServiceResponse<T = unknown> {
@@ -164,10 +166,16 @@ export async function addCart(id_alamat: string, items: AddCartItem[]): Promise<
         formData.append(`items[${index}][catatan]`, item.catatan);
       }
 
-      if (item.file_desain && item.file_desain.length > 0) {
-        item.file_desain.forEach((file, fIdx) => {
-           formData.append(`items[${index}][file_desain][${fIdx}]`, file);
-        });
+      if (item.tipe_file) {
+        formData.append(`items[${index}][tipe_file]`, item.tipe_file);
+      }
+
+      if (item.tipe_file === "upload" && item.file_desain) {
+        formData.append(`items[${index}][file_desain]`, item.file_desain);
+      }
+      
+      if (item.tipe_file === "link" && item.link_file) {
+        formData.append(`items[${index}][link_file]`, item.link_file);
       }
 
       if (item.finishings && item.finishings.length > 0) {
@@ -258,7 +266,7 @@ export async function deleteCartItem(id: number): Promise<CartServiceResponse<nu
   }
 }
 
-export async function checkoutCart(payload: CheckoutPayload): Promise<CartServiceResponse<{ id_pesan: string }>> {
+export async function checkoutCart(payload: CheckoutPayload): Promise<CartServiceResponse<{ id_pesan: string, kode_transaksi: string }>> {
   try {
     const headers = await getAuthHeader();
 

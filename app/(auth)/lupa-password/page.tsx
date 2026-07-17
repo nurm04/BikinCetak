@@ -2,6 +2,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import LupaPasswordForm from "./LupaPasswordForm";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Lupa Password",
+  description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
+};
 
 export default function ForgotPasswordPage() {
   return (

@@ -1,191 +1,192 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Upload, File, X, Paperclip, AlertCircle } from "lucide-react";
+import { Upload, File, X, Paperclip, AlertCircle, Link as LinkIcon, Mail } from "lucide-react";
+
+export type TipeFileDesain = "upload" | "link" | "email";
+
+export interface FileDesainPayload {
+  tipe_file: TipeFileDesain;
+  file: File | null;
+  link_file: string;
+}
 
 interface FileUploadProps {
   variant?: "box" | "minimal";
-  onChange?: (files: File[]) => void;
+  onChange?: (payload: FileDesainPayload) => void;
 }
 
 export default function FileUpload({ variant = "box", onChange }: FileUploadProps) {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [activeTab, setActiveTab] = useState<TipeFileDesain>("upload");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [linkDrive, setLinkDrive] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const MAX_FILE_SIZE = 200 * 1024 * 1024;
 
   useEffect(() => {
     if (onChange) {
-      onChange(selectedFiles);
+      onChange({
+        tipe_file: activeTab,
+        file: activeTab === "upload" ? selectedFile : null,
+        link_file: activeTab === "link" ? linkDrive : "",
+      });
     }
-  }, [selectedFiles, onChange]);
+  }, [activeTab, selectedFile, linkDrive, onChange]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     setError(null);
 
     if (files && files.length > 0) {
-      const allowedExtensions = ["pdf", "ai", "jpg", "jpeg", "png", "zip"];
-      const validFiles: File[] = [];
+      const allowedExtensions = ["pdf", "ai", "jpg", "jpeg", "png", "zip", "rar"];
+      const file = files[0];
+      const fileExtension = file.name.split(".").pop()?.toLowerCase();
+
       let hasError = false;
 
-      Array.from(files).forEach((file) => {
-        const fileExtension = file.name.split(".").pop()?.toLowerCase();
+      if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+        setError("FORMAT FILE TIDAK DIDUKUNG (PDF, AI, JPG, PNG, ZIP)");
+        hasError = true;
+      }
 
-        // 1. Validasi Ekstensi
-        if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-          setError("ADA FILE FORMAT TIDAK DIDUKUNG (PDF, AI, JPG, PNG, ZIP)");
-          hasError = true;
-          return;
-        }
-
-        // 2. Validasi Ukuran (Maks 200MB)
-        if (file.size > MAX_FILE_SIZE) {
-          setError("ADA FILE UKURAN TERLALU BESAR (MAKSIMAL 200MB)");
-          hasError = true;
-          return;
-        }
-
-        validFiles.push(file);
-      });
+      if (!hasError && file.size > MAX_FILE_SIZE) {
+        setError("UKURAN FILE TERLALU BESAR (MAKSIMAL 200MB)");
+        hasError = true;
+      }
 
       if (!hasError) {
-        // Gabungkan file baru dengan file yang sudah dipilih sebelumnya
-        setSelectedFiles((prev) => [...prev, ...validFiles]);
+        setSelectedFile(file);
       }
       
-      // Reset input agar bisa pilih file yang sama berulang kali
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const removeFile = (e: React.MouseEvent, indexToRemove: number) => {
+  const removeFile = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setSelectedFile(null);
     setError(null);
   };
 
-  const clearAllFiles = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedFiles([]);
-    setError(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  // ==============================
-  // UI MINIMAL (Untuk Tampilan HP)
-  // ==============================
+  // Tampilan Minimal (Mobile)
   if (variant === "minimal") {
     return (
-      <div className="w-full min-w-0 max-w-full overflow-hidden space-y-3">
-        <input 
-          type="file" 
-          multiple // <-- Wajib ada biar bisa pilih banyak file
-          className="hidden" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          accept=".pdf,.ai,.jpg,.jpeg,.png,.zip" 
-        />
+      <div className="w-full min-w-0 max-w-full overflow-hidden space-y-3 bg-base-100 p-4 border border-base-content/5 rounded-2xl">
+        <div className="text-[10px] font-black uppercase opacity-40 mb-2 flex items-center gap-1"><Upload size={12}/> Kirim File Desain</div>
         
-        {/* Tombol Upload (Selalu Muncul) */}
-        <button 
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className={`btn btn-outline border-dashed border-2 w-full flex items-center justify-start gap-3 rounded-2xl h-14 bg-base-200/30 hover:bg-base-200 min-w-0 px-4 overflow-hidden ${error ? 'border-error bg-error/5 text-error' : 'border-base-300'}`}
-        >
-          {error ? <AlertCircle size={18} /> : <Paperclip size={18} className="text-primary shrink-0" />}
-          <span className={`font-black uppercase text-[10px] tracking-tighter truncate w-full text-left ${error ? 'opacity-100' : 'opacity-50'}`}>
-            {error || "Lampirkan File Desain"}
-          </span>
-        </button>
+        <div className="join w-full grid grid-cols-3 bg-base-200 rounded-lg p-1">
+          <button onClick={() => setActiveTab('upload')} className={`join-item btn btn-xs border-none font-black text-[9px] uppercase ${activeTab === 'upload' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Upload</button>
+          <button onClick={() => setActiveTab('link')} className={`join-item btn btn-xs border-none font-black text-[9px] uppercase ${activeTab === 'link' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Link</button>
+          <button onClick={() => setActiveTab('email')} className={`join-item btn btn-xs border-none font-black text-[9px] uppercase ${activeTab === 'email' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Email</button>
+        </div>
 
-        {/* List File yang Dipilih */}
-        {selectedFiles.length > 0 && (
-          <div className="space-y-2">
-            {selectedFiles.map((file, idx) => (
-              <div key={idx} className="flex items-center gap-3 bg-primary/5 p-3 rounded-2xl border border-primary/20 w-full min-w-0 overflow-hidden">
-                <div className="bg-primary text-white p-2 rounded-xl shadow-lg shadow-primary/20 shrink-0">
-                  <File size={16} />
-                </div>
-                <div className="flex-1 min-w-0 overflow-hidden">
-                   <p className="text-[11px] font-black truncate uppercase tracking-tighter leading-none w-full block">
-                     {file.name}
-                   </p>
-                </div>
-                <button onClick={(e) => removeFile(e, idx)} className="btn btn-ghost btn-circle btn-xs text-error shrink-0">
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
+        {activeTab === "upload" && (
+          <div className="mt-3">
+             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.ai,.jpg,.jpeg,.png,.zip" />
+             {!selectedFile ? (
+               <button type="button" onClick={() => fileInputRef.current?.click()} className={`btn btn-outline border-dashed border-2 w-full flex items-center justify-start gap-3 rounded-2xl h-12 bg-base-200/30 hover:bg-base-200 min-w-0 px-4 overflow-hidden ${error ? 'border-error bg-error/5 text-error' : 'border-base-300'}`}>
+                 {error ? <AlertCircle size={16} /> : <Paperclip size={16} className="text-primary shrink-0" />}
+                 <span className={`font-black uppercase text-[9px] tracking-tighter truncate w-full text-left ${error ? 'opacity-100' : 'opacity-50'}`}>{error || "Pilih File"}</span>
+               </button>
+             ) : (
+               <div className="flex items-center gap-3 bg-primary/5 p-2.5 rounded-xl border border-primary/20 w-full min-w-0">
+                 <div className="bg-primary text-white p-1.5 rounded-lg shrink-0"><File size={14} /></div>
+                 <div className="flex-1 min-w-0 overflow-hidden">
+                    <p className="text-[10px] font-black truncate uppercase tracking-tighter leading-none w-full block">{selectedFile.name}</p>
+                 </div>
+                 <button onClick={(e) => removeFile(e)} className="btn btn-ghost btn-circle btn-xs text-error shrink-0"><X size={14} /></button>
+               </div>
+             )}
+          </div>
+        )}
+
+        {activeTab === "link" && (
+          <div className="mt-3">
+            <input type="url" placeholder="Paste link Google Drive/Dropbox di sini..." value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="input input-bordered w-full h-12 rounded-2xl text-xs font-bold bg-base-200/50" />
+          </div>
+        )}
+
+        {activeTab === "email" && (
+          <div className="mt-3 bg-base-200/50 border border-base-300 p-3 rounded-2xl text-center flex flex-col items-center gap-1">
+             <Mail size={16} className="text-primary opacity-50" />
+             <p className="text-[9px] font-bold uppercase opacity-60">Kirim file pesanan ke email:</p>
+             <p className="text-xs font-black text-primary select-all">cs@bikincetak.com</p>
           </div>
         )}
       </div>
     );
   }
 
+  // Tampilan Box (Desktop) - DIPERBAIKI
   return (
-    <div className="bg-base-100 border-base-content/5 rounded-2xl border w-full max-w-full min-w-0 p-6 shadow-sm flex flex-col overflow-hidden box-border">
+    <div className="bg-base-100 border-base-content/5 rounded-2xl border w-full max-w-full min-w-0 p-5 shadow-sm flex flex-col overflow-hidden box-border">
       
-      <div className="text-primary font-black uppercase tracking-widest text-[10px] mb-4 flex items-center justify-between shrink-0">
-        <span className="flex items-center">
+      <div className="flex flex-col gap-3 mb-5">
+        <span className="text-primary font-black uppercase tracking-widest text-[10px] flex items-center shrink-0">
           <Upload size={14} className="mr-2 shrink-0" /> File Desain
         </span>
-        {selectedFiles.length > 0 && (
-          <button onClick={clearAllFiles} className="text-error hover:underline">
-            Hapus Semua
-          </button>
-        )}
+        
+        {/* TABS DESKTOP: Disusun grid supaya rata dan tidak memanjang ke samping */}
+        <div className="grid grid-cols-3 bg-base-200 p-1 rounded-xl gap-1 w-full">
+          <button onClick={() => setActiveTab('upload')} className={`btn btn-xs border-none font-black text-[9px] uppercase h-8 ${activeTab === 'upload' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Upload</button>
+          <button onClick={() => setActiveTab('link')} className={`btn btn-xs border-none font-black text-[9px] uppercase h-8 ${activeTab === 'link' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Link</button>
+          <button onClick={() => setActiveTab('email')} className={`btn btn-xs border-none font-black text-[9px] uppercase h-8 ${activeTab === 'email' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Email</button>
+        </div>
       </div>
 
-      <div
-        onClick={() => fileInputRef.current?.click()}
-        className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl py-8 px-4 transition-all cursor-pointer group w-full max-w-full min-w-0 overflow-hidden box-border ${
-          error ? "border-error bg-error/5" : "border-base-300 bg-base-200/50 hover:bg-base-200 hover:border-primary"
-        }`}
-      >
-        <input 
-          type="file" 
-          multiple
-          className="hidden" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          accept=".pdf,.ai,.jpg,.jpeg,.png,.zip" 
-        />
-
-        {error ? (
-          <AlertCircle className="mb-4 text-error animate-bounce" size={32} />
-        ) : (
-          <Upload className="mb-4 opacity-20 group-hover:text-primary group-hover:opacity-100 transition-all shrink-0" size={32} />
-        )}
-        <p className={`text-[10px] text-center font-black uppercase tracking-tighter px-2 ${error ? 'text-error' : 'opacity-50'}`}>
-          {error || "Klik atau seret banyak file desain ke sini"}
-        </p>
-      </div>
-      
-      {/* List File yang Dipilih */}
-      {selectedFiles.length > 0 && (
-        <div className="mt-4 space-y-2 max-h-48 overflow-y-auto pr-1">
-          {selectedFiles.map((file, idx) => (
-            <div key={idx} className="flex items-center gap-3 bg-base-100 p-3 rounded-xl shadow-sm border border-primary/20 w-full max-w-full min-w-0 overflow-hidden box-border">
-              <File className="text-primary shrink-0" size={20} />
-              <div className="flex-1 min-w-0 overflow-hidden text-left">
-                <p className="text-[11px] font-black truncate uppercase mb-0.5 block w-full">{file.name}</p>
-                <p className="text-[9px] uppercase font-bold opacity-40 truncate">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              </div>
-              <button onClick={(e) => removeFile(e, idx)} className="btn btn-circle btn-ghost btn-xs text-error shrink-0 relative z-10">
-                <X size={16} />
-              </button>
+      {activeTab === "upload" && (
+        <>
+          {!selectedFile ? (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl py-8 px-4 transition-all cursor-pointer group w-full max-w-full min-w-0 overflow-hidden box-border ${error ? "border-error bg-error/5" : "border-base-300 bg-base-200/50 hover:bg-base-200 hover:border-primary"}`}
+            >
+              <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.ai,.jpg,.jpeg,.png,.zip" />
+              {error ? <AlertCircle className="mb-4 text-error animate-bounce" size={28} /> : <Upload className="mb-4 opacity-20 group-hover:text-primary group-hover:opacity-100 transition-all shrink-0" size={28} />}
+              <p className={`text-[10px] text-center font-black uppercase tracking-tighter px-2 leading-tight ${error ? 'text-error' : 'opacity-50'}`}>{error || "Klik/Seret File ke Sini"}</p>
             </div>
-          ))}
+          ) : (
+            <div className="flex items-center gap-3 bg-base-100 p-3 rounded-xl shadow-sm border border-primary/20 w-full max-w-full min-w-0 overflow-hidden box-border">
+              <File className="text-primary shrink-0" size={18} />
+              <div className="flex-1 min-w-0 overflow-hidden text-left">
+                <p className="text-[10px] font-black truncate uppercase mb-0.5 block w-full">{selectedFile.name}</p>
+                <p className="text-[9px] uppercase font-bold opacity-40 truncate">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+              <button onClick={removeFile} className="btn btn-circle btn-ghost btn-xs text-error shrink-0 relative z-10"><X size={14} /></button>
+            </div>
+          )}
+          <p className={`text-[8px] mt-3 uppercase font-black text-center tracking-widest truncate w-full shrink-0 ${error ? 'text-error' : 'opacity-30'}`}>
+            {error ? `* ${error}` : "* PDF, AI, JPG, PNG, ZIP (MAKS 200MB)"}
+          </p>
+        </>
+      )}
+
+      {activeTab === "link" && (
+        <div className="flex flex-col items-center justify-center border-2 border-dashed border-base-300 bg-base-200/50 rounded-2xl py-6 px-4 transition-all group w-full max-w-full min-w-0 box-border">
+          <LinkIcon className="mb-3 opacity-20 text-primary transition-all shrink-0" size={28} />
+          <input 
+            type="url" 
+            placeholder="Paste link Drive/Canva..." 
+            value={linkDrive} 
+            onChange={(e) => setLinkDrive(e.target.value)} 
+            className="input input-bordered w-full h-10 rounded-xl font-bold bg-base-100 text-[10px] text-center" 
+          />
+          <p className="text-[8px] mt-3 uppercase font-black text-center tracking-widest opacity-30 w-full shrink-0">Pastikan link bisa diakses publik</p>
         </div>
       )}
 
-      <p className={`text-[9px] mt-4 uppercase font-black text-center tracking-widest truncate w-full shrink-0 ${error ? 'text-error' : 'opacity-30'}`}>
-        {error ? `* ${error}` : "* PDF, AI, JPG, PNG, ZIP (MAKS 200MB)"}
-      </p>
+      {activeTab === "email" && (
+        <div className="flex flex-col items-center justify-center border-2 border-dashed border-base-300 bg-base-200/50 rounded-2xl py-6 px-4 transition-all group w-full max-w-full min-w-0 box-border">
+          <Mail className="mb-3 opacity-20 text-primary transition-all shrink-0" size={28} />
+          <p className="text-[10px] font-bold opacity-70 text-center mb-2">Kirim file desain ke email:</p>
+          <div className="bg-base-100 px-4 py-2 rounded-xl border border-base-300 shadow-sm">
+             <span className="text-sm font-black text-primary select-all">cs@bikincetak.com</span>
+          </div>
+          <p className="text-[8px] mt-3 uppercase font-black text-center tracking-widest opacity-30 w-full shrink-0">Sertakan Kode Transaksi pada subjek</p>
+        </div>
+      )}
     </div>
   );
 }

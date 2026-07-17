@@ -81,6 +81,7 @@ export interface AlamatPesanan {
 
 export interface Pesanan {
   id_pesan: string;
+  kode_transaksi: string;
 
   id_customer: string;
   id_alamat: string;
@@ -105,7 +106,7 @@ export interface Pesanan {
   ekspedisi_layanan?: string | null;
   harga_ongkir?: number;
   ekspedisi_estimasi?: string | null;
-  nomor_resi?: string | null; // <-- Tipe data baru ditambahkan
+  nomor_resi?: string | null;
   kode_unik?: number;
 
   kode_voucher?: string | null;
@@ -169,8 +170,8 @@ export async function getPesanan(): Promise<PesanServiceResponse<Pesanan[]>> {
   }
 }
 
-export async function getPesananById(
-  id_pesan: string
+export async function getPesananByKodeTransaksi(
+  kode_transaksi: string
 ): Promise<PesanServiceResponse<Pesanan>> {
   try {
     const headers = await getAuthHeader();
@@ -182,7 +183,7 @@ export async function getPesananById(
     }
 
     const response = await fetch(
-      `${API_URL}/pesanan/${id_pesan}`,
+      `${API_URL}/pesanan/${kode_transaksi}`,
       {
         method: "GET",
         headers,

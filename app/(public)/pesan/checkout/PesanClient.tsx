@@ -273,7 +273,6 @@ export default function PesanClient() {
 
         const voucher = response.data;
 
-        // Cek Syarat Minimal Transaksi
         if (subTotal < Number(voucher.minimal_transaksi_rupiah)) {
             setPopup({ isOpen: true, title: "Belum Memenuhi Syarat", message: `Voucher ini membutuhkan minimal belanja Rp ${Number(voucher.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, type: "warning" });
             setAppliedVoucher(null);
@@ -358,11 +357,11 @@ export default function PesanClient() {
         return;
       }
 
-      const idPesan = (result.data as {id_pesan: string})?.id_pesan;
+      const kodeTransaksi = (result.data as {kode_transaksi: string})?.kode_transaksi;
       localStorage.removeItem("checkout_items");
       localStorage.removeItem("checkout_item_ids");
 
-      router.push(`/pesan/status/${idPesan}`);
+      router.push(`/pesan/status/${kodeTransaksi}`);
 
     } catch {
       setPopup({ isOpen: true, title: "Checkout Gagal", message: "Terjadi kesalahan saat melakukan checkout.", type: "error" });

@@ -32,21 +32,23 @@ export interface HargaBertingkat {
   id_sku: string;
   min: number;
   max: number;
-  harga: number;
+  tipe: "nominal" | "persen"; // REVISI: Menggantikan harga
+  nilai: number;              // REVISI: Menggantikan harga
 }
 
 export interface HargaPengerjaan {
   id: number;
   id_sku: string;
   pengerjaan: string;
-  harga: number;
+  tipe: "nominal" | "persen"; // REVISI: Menggantikan harga
+  nilai: number;              // REVISI: Menggantikan harga
 }
 
 export interface DiskonCustomer {
   id: number;
   id_sku: string;
   id_role_customer: string;
-  tipe: string;
+  tipe: "nominal" | "persen";
   nilai: number;
 }
 

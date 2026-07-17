@@ -17,20 +17,10 @@ interface Props {
 export default function CardPesanan({ pesanan }: Props) {
   const totalItem = pesanan.pesanan_item?.reduce((sum, item) => sum + (Number(item.jumlah) || 0), 0) ?? 0;
 
-  const totalHargaProduk = pesanan.pesanan_item?.reduce((sum, item) => {
-    const finishingTotal = item.pesanan_item_finishing?.reduce((acc, f) => acc + (Number(f.harga_finishing_snapshot) || 0), 0) ?? 0;
-    
-    const hargaPerPcs = Number(item.harga_satuan_snapshot || 0) + finishingTotal;
-    const biayaSla = Number(item.harga_pengerjaan_snapshot || 0);
-
-    return sum + biayaSla + (hargaPerPcs * Number(item.jumlah || 1));
-  }, 0) ?? 0;
-
   const ongkir = Number(pesanan.harga_ongkir || 0);
   const diskon = Number(pesanan.diskon_voucher_nominal || 0);
 
-  const rawTotalTagihan = totalHargaProduk + ongkir - diskon;
-  const totalTagihan = rawTotalTagihan > 0 ? rawTotalTagihan : 0;
+  const totalTagihan = Number(pesanan.total_tagihan || 0);
 
   return (
     <div className="flex flex-col overflow-hidden transition-all bg-base-100 border border-base-300 rounded-3xl hover:border-primary/50 hover:shadow-md">
@@ -116,7 +106,7 @@ export default function CardPesanan({ pesanan }: Props) {
         </div>
 
         <Link
-          href={`/pesan/${pesanan.id_pesan}`}
+          href={`/pesan/${pesanan.kode_transaksi}`}
           className="w-full shrink-0 sm:ml-auto font-black tracking-widest uppercase shadow-sm btn btn-primary sm:w-auto rounded-xl"
         >
           <Eye size={16} /> Lihat Detail

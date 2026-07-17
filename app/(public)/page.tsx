@@ -2,6 +2,12 @@ import HeroCarousel from "@/components/shared/HeroCarousel";
 import ProductRow from "@/components/shared/ProductRow";
 import { getItems } from "@/services/itemService";
 import { getUserProfile } from "@/services/userService"; 
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Percetakan Online Terlengkap & Termurah",
+  description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
+};
 
 export default async function Home() {
   const items = await getItems();

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import Image from "next/image";
-import { Trash2, Plus, Minus, Clock, Paperclip } from "lucide-react";
+import { Trash2, Plus, Minus, Clock, Paperclip, Link as LinkIcon, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { RincianDiskonAPI } from "@/services/cartService";
 
@@ -10,6 +11,12 @@ interface FinishingItem {
   nama_pilihan?: string;
   nama_finishing?: string;
   harga_tambahan: number;
+}
+
+// Interface baru untuk parsing file_desain dari backend
+export interface DataFileDesain {
+  tipe: "upload" | "link" | "email";
+  nilai: string;
 }
 
 interface CartProductItemProps {
@@ -25,7 +32,9 @@ interface CartProductItemProps {
   estimasi_pengerjaan?: string;
   harga_pengerjaan_snapshot?: number;
   catatan?: string | null;
-  file_desain?: string[];
+  
+  // Ubah tipe data file_desain agar bisa nerima Object, String JSON, atau Array lama
+  file_desain?: DataFileDesain | string | string[] | null;
 
   isReadOnly?: boolean; 
   isSelected?: boolean;
@@ -46,7 +55,7 @@ export default function CartProductItem({
   estimasi_pengerjaan,
   harga_pengerjaan_snapshot = 0,
   catatan,
-  file_desain = [],
+  file_desain = null,
 
   isReadOnly = false,
   isSelected = false,
@@ -60,13 +69,8 @@ export default function CartProductItem({
   const rowTotal = (unitPriceTotal * jumlah) + harga_pengerjaan_snapshot;
 
   const productName = nama_sku;
-
-  // =========================================
-  // STATE LOKAL UNTUK INPUT JUMLAH (QTY)
-  // =========================================
   const [localQty, setLocalQty] = useState<string>(jumlah.toString());
 
-  // Sinkronisasi jika jumlah dari backend/props berubah
   useEffect(() => {
     setLocalQty(jumlah.toString());
   }, [jumlah]);
@@ -77,12 +81,12 @@ export default function CartProductItem({
 
   const submitQty = () => {
     const newQty = parseInt(localQty, 10);
-    // Kalau yang diketik bukan angka atau kurang dari 1, kembalikan ke angka semula
+  
     if (isNaN(newQty) || newQty < 1) {
       setLocalQty(jumlah.toString());
       return;
     }
-    // Jika angka berubah, jalankan update ke backend
+  
     if (newQty !== jumlah) {
       onUpdateQty?.(id, newQty);
     }
@@ -90,9 +94,24 @@ export default function CartProductItem({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      e.currentTarget.blur(); // Memicu onBlur yang otomatis ngejalanin submitQty()
+      e.currentTarget.blur();
     }
   };
+
+  let parsedFileDesain: DataFileDesain | null = null;
+  
+  if (file_desain) {
+    if (typeof file_desain === "string") {
+      try {
+        parsedFileDesain = JSON.parse(file_desain);
+      } catch (e) {
+      }
+    } else if (Array.isArray(file_desain) && file_desain.length > 0) {
+      parsedFileDesain = { tipe: "upload", nilai: file_desain[0] };
+    } else if (typeof file_desain === "object" && !Array.isArray(file_desain)) {
+      parsedFileDesain = file_desain as DataFileDesain;
+    }
+  }
 
   return (
     <div className={`py-6 flex flex-col sm:flex-row gap-6 items-start transition-all ${!isReadOnly && !isSelected ? "opacity-60" : "opacity-100"}`}>
@@ -122,12 +141,12 @@ export default function CartProductItem({
       </div>
 
       {/* 3. INFO PRODUK */}
-      <div className="flex-1 space-y-1 min-w-0">
+      <div className="flex-1 space-y-1 min-w-0 w-full">
         <h3 className="font-black uppercase text-sm tracking-tight leading-tight truncate">
           {productName}
         </h3>
         
-        {/* HARGA SATUAN DENGAN CORETAN DISKON */}
+        {/* HARGA SATUAN */}
         <div className="flex items-center gap-2">
            <p className="text-xs font-bold text-primary">
              Rp {unitPriceTotal.toLocaleString("id-ID")} / pcs
@@ -173,28 +192,43 @@ export default function CartProductItem({
                </p>
             )}
 
-            {/* BADGE LIST FILE DESAIN YANG BISA DI KLIK */}
-            {file_desain.length > 0 && (
+            {/* BADGE TIPE FILE DESAIN */}
+            {parsedFileDesain && (
               <div className="pt-2 border-t border-base-content/10">
-                <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1.5">File Desain Terlampir:</p>
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1.5">File Desain:</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {file_desain.map((file, idx) => {
-                    const fileName = file.split('/').pop() || `File ${idx + 1}`;
-                    // Buat link ke storage Laravel lu
-                    const fileUrl = `http://127.0.0.1:8000/storage/${file}`; 
-                    return (
-                      <a 
-                        key={idx} 
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 bg-base-100 hover:bg-base-200 transition-colors border border-base-content/10 hover:border-primary/50 px-2 py-1 rounded text-[9px] font-bold shadow-sm cursor-pointer group"
-                      >
-                        <Paperclip size={10} className="text-primary group-hover:text-primary-focus"/>
-                        <span className="truncate max-w-30 group-hover:underline">{fileName}</span>
-                      </a>
-                    )
-                  })}
+                  
+                  {parsedFileDesain.tipe === "upload" && (
+                    <a 
+                      href={`http://127.0.0.1:8000/storage/${parsedFileDesain.nilai}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 bg-base-100 hover:bg-base-200 transition-colors border border-base-content/10 hover:border-primary/50 px-2.5 py-1.5 rounded-lg text-[9px] font-bold shadow-sm cursor-pointer group"
+                    >
+                      <Paperclip size={12} className="text-primary group-hover:text-primary-focus"/>
+                      <span className="truncate max-w-30 group-hover:underline">Lampiran File</span>
+                    </a>
+                  )}
+
+                  {parsedFileDesain.tipe === "link" && (
+                    <a 
+                      href={parsedFileDesain.nilai.startsWith('http') ? parsedFileDesain.nilai : `https://${parsedFileDesain.nilai}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 bg-base-100 hover:bg-base-200 transition-colors border border-base-content/10 hover:border-primary/50 px-2.5 py-1.5 rounded-lg text-[9px] font-bold shadow-sm cursor-pointer group"
+                    >
+                      <LinkIcon size={12} className="text-primary group-hover:text-primary-focus"/>
+                      <span className="truncate max-w-30 group-hover:underline">Buka Link Drive</span>
+                    </a>
+                  )}
+
+                  {parsedFileDesain.tipe === "email" && (
+                    <div className="flex items-center gap-1.5 bg-base-100 border border-base-content/10 px-2.5 py-1.5 rounded-lg text-[9px] font-bold shadow-sm opacity-80 cursor-default">
+                      <Mail size={12} className="text-primary"/>
+                      <span className="truncate max-w-30">Dikirim via Email</span>
+                    </div>
+                  )}
+
                 </div>
               </div>
             )}
@@ -203,7 +237,6 @@ export default function CartProductItem({
         </div>
       </div>
 
-      {/* 4. ACTIONS QTY & TOTAL BILL */}
       <div className="flex flex-row sm:flex-col justify-between items-center sm:items-end w-full sm:w-auto gap-4 shrink-0">
         {!isReadOnly ? (
           <div className="flex items-center bg-base-200 rounded-xl p-1 relative">
@@ -215,7 +248,6 @@ export default function CartProductItem({
               <Minus size={12}/>
             </button>
             
-            {/* AREA INPUT ANGKA & SPINNER */}
             <div className="relative w-12 h-6 flex justify-center items-center">
               {isLoading ? (
                 <span className="loading loading-spinner loading-xs absolute text-primary"></span>

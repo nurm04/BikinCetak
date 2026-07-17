@@ -84,7 +84,7 @@ export default async function ProfilePage() {
               </div>
 
               <Link href="/profil/edit" className="btn btn-primary btn-block btn-sm rounded-xl font-black uppercase text-[10px] tracking-widest mt-4">
-                Edit Profil
+                Edit Profil & Ubah Password
               </Link>
             </div>
           </div>

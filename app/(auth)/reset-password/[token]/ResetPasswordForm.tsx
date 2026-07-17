@@ -6,12 +6,15 @@ import AuthInput from "@/components/ui/AuthInput";
 import Alert from "@/components/ui/Alert";
 import Link from "next/link";
 import { resetPassword } from "@/services/authService";
-// 1. IMPORT HOOKS DARI NEXT.JS
 import { useParams, useSearchParams } from "next/navigation";
+import { Metadata } from "next";
 
-// 2. KOSONGKAN PARAMETER PROPS
+export const metadata: Metadata = {
+  title: "Reset Password",
+  description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
+};
+
 export default function ResetPasswordForm() {
-  // 3. AMBIL DATA LANGSUNG DARI URL BROWSER
   const params = useParams();
   const searchParams = useSearchParams();
   

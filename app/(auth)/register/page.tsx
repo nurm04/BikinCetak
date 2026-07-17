@@ -2,6 +2,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import RegisterForm from "@/app/(auth)/register/RegisterForm";
 import Image from "next/image";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Register",
+  description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
+};
 
 export default function RegisterPage() {
   return (

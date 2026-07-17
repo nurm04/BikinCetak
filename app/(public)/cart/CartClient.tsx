@@ -9,7 +9,6 @@ import { getCartItems, updateCartItemQty, deleteCartItem, CartItemAPI, CartServi
 import AlertPopup from "@/components/ui/AlertPopup";
 import CartProductItem from "@/components/shared/CardProductItem"; 
 
-// Interface yang lebih ketat tanpa "any"
 interface RawCartData {
   pesanan_item: Array<{
     id: number;
@@ -21,7 +20,7 @@ interface RawCartData {
     rincian_diskon_snapshot?: string | RincianDiskonAPI[]; 
     estimasi_pengerjaan_snapshot?: string;
     harga_pengerjaan_snapshot?: number;
-    file_desain?: string | string[] | null; // <-- PERBAIKAN: Tambahkan dukungan array
+    file_desain?: string | string[] | null;
     catatan?: string | null;
     pesanan_item_finishing?: Array<{
       id: number;
@@ -31,7 +30,6 @@ interface RawCartData {
   }>;
 }
 
-// Tambahkan definisi properti tambahan agar Typescript tidak protes
 interface ExtendedCartItemAPI extends CartItemAPI {
   file_desain?: string[];
 }
@@ -81,7 +79,6 @@ export default function CartClient() {
           ) {
             itemsList = rawData.pesanan_item.map((item) => {
                 
-                // Parse rincian diskon JSON secara Type-Safe
                 let parsedRincianDiskon: RincianDiskonAPI[] = [];
                 if (item.rincian_diskon_snapshot) {
                   try {
@@ -93,7 +90,6 @@ export default function CartClient() {
                   }
                 }
 
-                // PERBAIKAN: Parse file_desain JSON menjadi Array String
                 let parsedFileDesain: string[] = [];
                 if (item.file_desain) {
                   try {
@@ -107,7 +103,7 @@ export default function CartClient() {
 
                 return {
                   id: item.id,
-                  id_pesan: "", 
+                  id_pesan: "",
                   jumlah: item.jumlah,
                   nama_sku: item.nama_produk_snapshot,
                   harga_satuan: item.harga_satuan_snapshot, 
@@ -118,7 +114,7 @@ export default function CartClient() {
                   estimasi_pengerjaan: item.estimasi_pengerjaan_snapshot,
                   harga_pengerjaan_snapshot: item.harga_pengerjaan_snapshot,
                   catatan: item.catatan,
-                  file_desain: parsedFileDesain, // <-- Masukkan array file_desain yang sudah di-parse
+                  file_desain: parsedFileDesain,
 
                   finishing: item.pesanan_item_finishing?.map((fin) => ({
                       id: fin.id,

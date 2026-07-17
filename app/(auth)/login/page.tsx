@@ -1,7 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
-import LoginForm from "@/app/(auth)/login/LoginForm"; // 💡 Pastikan lokasi file sesuai struktur folder proyekmu
+import LoginForm from "@/app/(auth)/login/LoginForm";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Login",
+  description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
+};
 
 export default function LoginPage() {
   return (
