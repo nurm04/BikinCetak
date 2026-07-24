@@ -34,12 +34,14 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
 
       <div className="flex gap-4 md:gap-5 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
         {data.map((item, i) => {
-          const maxDiskon = activeRoleId && item.diskon_roles ? item.diskon_roles[activeRoleId] : 0;
+          const maxDiskon =
+            activeRoleId && item.diskon_roles ? item.diskon_roles[activeRoleId] : 0;
 
           return (
-            <div 
-              key={i} 
-              className="card min-w-40 md:min-w-60 bg-base-100 shadow-sm border border-primary/20 group overflow-hidden snap-start transition-all hover:shadow-md relative"
+            <Link
+              key={i}
+              href={`/produk/${slugify(item.name)}`}
+              className="card block min-w-40 md:min-w-60 bg-base-100 shadow-sm border border-primary/20 group overflow-hidden snap-start transition-all duration-300 hover:shadow-md hover:border-primary/50 relative cursor-pointer"
             >
               {maxDiskon > 0 && (
                 <div className="absolute top-2 right-2 z-10 bg-primary text-primary-content text-[9px] md:text-[10px] font-black px-2 py-1 rounded shadow-sm">
@@ -55,21 +57,13 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
                   src={item.image?.[0] || "/favicon.ico"}
                   className="object-cover transition-transform duration-500 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px] z-20">
-                  <Link 
-                    href={`/produk/${slugify(item.name)}`}
-                    className="btn btn-primary btn-sm text-white shadow-lg scale-90 group-hover:scale-100 transition-transform"
-                  >
-                    Detail
-                  </Link>
-                </div>
               </figure>
 
               <div className="card-body p-3 md:p-4">
-                <h2 className="card-title text-sm md:text-base leading-tight h-10 line-clamp-2">
+                <h2 className="card-title text-sm md:text-base leading-tight h-10 line-clamp-2 transition-colors group-hover:text-primary">
                   {item.name}
                 </h2>
-                
+
                 <div className="flex flex-col mt-1 md:mt-2">
                   <span className="text-[9px] md:text-[10px] opacity-60 font-bold uppercase tracking-wider">
                     Mulai dari
@@ -79,7 +73,7 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
