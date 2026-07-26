@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle2, CircleDot, Clock, CreditCard, Package, Truck, XCircle, Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, use } from "react";
-import { getPesananByKodeTransaksi, Pesanan } from "@/services/pesanService";
+import { getStatusPesanan, Pesanan } from "@/services/pesanService";
 
 interface Props {params: Promise<{kode_transaksi: string}>}
 
@@ -26,7 +26,7 @@ export default function StatusPesananPage({params}: Props) {
     if (!kode_transaksi) return;
 
     const loadData = async () => {
-      const result = await getPesananByKodeTransaksi(kode_transaksi);
+      const result = await getStatusPesanan(kode_transaksi);
       if (result.success && result.data) {
         setPesanan(result.data as Pesanan);
       }

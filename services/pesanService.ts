@@ -211,6 +211,33 @@ export async function getPesananByKodeTransaksi(
   }
 }
 
+export async function getStatusPesanan(
+    kode_transaksi: string
+): Promise<PesanServiceResponse<Pesanan>> {
+    try {
+        const response = await fetch(
+            `${API_URL}/pesanan/status/${kode_transaksi}`,
+            {
+                cache: "no-store",
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            return {
+                error: result.message,
+            };
+        }
+
+        return result;
+    } catch {
+        return {
+            error: "Terjadi kesalahan.",
+        };
+    }
+}
+
 export async function cancelPesanan(
   id_pesan: string
 ): Promise<PesanServiceResponse<Pesanan>> {

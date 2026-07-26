@@ -181,65 +181,79 @@ export default function PesanClient() {
       setSelectedShipping(null);
       setOngkirError(null);
       setCouriers([]);
+
+      const manualPickup: CourierOption = {
+        code: "toko",
+        name: "Ambil di Toko",
+        costs: [{
+          service: "Ambil Sendiri",
+          description: "Ambil pesanan langsung di toko kami",
+          cost: 0,
+          etd: "0"
+        }]
+      };
+
+      let normalizedCouriers: CourierOption[] = [manualPickup];
       
       try {
         const result = await getShippingCost(alamatUtama.id_alamat);
         
         if (result.error) {
-            setOngkirError(result.error);
-            return;
+          setOngkirError(result.error);
+          setCouriers(normalizedCouriers);
+          return;
         }
 
         const rawData = result.data as OngkirAPIResponse;
 
         if (rawData?.meta?.status === 'error') {
-            setOngkirError(rawData.meta.message || "Gagal mendapatkan ongkos kirim.");
-            return;
+          setOngkirError(rawData.meta.message || "Gagal mendapatkan ongkos kirim.");
+          return;
         }
         if (rawData?.rajaongkir?.status?.code && rawData.rajaongkir.status.code >= 400) {
-            setOngkirError(rawData.rajaongkir.status.description || "Gagal mendapatkan ongkos kirim.");
-            return;
+          setOngkirError(rawData.rajaongkir.status.description || "Gagal mendapatkan ongkos kirim.");
+          return;
         }
-
-        let normalizedCouriers: CourierOption[] = [];
 
         if (rawData?.meta && Array.isArray(rawData?.data)) {
-            const couriersMap: Record<string, CourierOption> = {};
-            
-            rawData.data.forEach((item: KomerceCostItem) => {
-                if (!couriersMap[item.code]) {
-                    couriersMap[item.code] = { code: item.code, name: item.name, costs: [] };
-                }
-                couriersMap[item.code].costs.push({
-                    service: item.service,
-                    description: item.description || item.service,
-                    cost: item.cost,
-                    etd: item.etd || item.estimation || "-"
-                });
+          const couriersMap: Record<string, CourierOption> = {};
+          
+          rawData.data.forEach((item: KomerceCostItem) => {
+            if (!couriersMap[item.code]) {
+              couriersMap[item.code] = { code: item.code, name: item.name, costs: [] };
+            }
+            couriersMap[item.code].costs.push({
+              service: item.service,
+              description: item.description || item.service,
+              cost: item.cost,
+              etd: item.etd || item.estimation || "-"
             });
-            normalizedCouriers = Object.values(couriersMap);
+          });
+          normalizedCouriers = [...normalizedCouriers, ...Object.values(couriersMap)];
         } 
         else if (rawData?.rajaongkir?.results && Array.isArray(rawData.rajaongkir.results)) {
-            normalizedCouriers = rawData.rajaongkir.results.map((c: RajaOngkirResult) => ({
-                code: c.code,
-                name: c.name,
-                costs: c.costs.map((srv: RajaOngkirServiceCost) => ({
-                    service: srv.service,
-                    description: srv.description,
-                    cost: srv.cost[0]?.value || 0,
-                    etd: srv.cost[0]?.etd || "-"
-                }))
-            }));
+          const apiCouriers = rawData.rajaongkir.results.map((c: RajaOngkirResult) => ({
+            code: c.code,
+            name: c.name,
+            costs: c.costs.map((srv: RajaOngkirServiceCost) => ({
+              service: srv.service,
+              description: srv.description,
+              cost: srv.cost[0]?.value || 0,
+              etd: srv.cost[0]?.etd || "-"
+            }))
+          }));
+          normalizedCouriers = [...normalizedCouriers, ...apiCouriers];
         }
 
-        if (normalizedCouriers.length === 0) {
-            setOngkirError("Tidak ada layanan kurir yang tersedia untuk alamat ini.");
-        } else {
-            setCouriers(normalizedCouriers);
-        }
+        if (normalizedCouriers.length === 1) {
+            setOngkirError("Tidak ada layanan pengiriman ke alamat ini.");
+        } 
+        
+        setCouriers(normalizedCouriers);
         
       } catch (error) {
         setOngkirError("Terjadi kesalahan sistem saat mengambil tarif logistik.");
+        setCouriers(normalizedCouriers);
       } finally {
         setLoadingOngkir(false);
       }
@@ -464,56 +478,67 @@ export default function PesanClient() {
                   <Loader2 className="animate-spin" size={24} />
                   <span className="text-xs font-bold uppercase tracking-widest">Menghitung Ongkos Kirim...</span>
                 </div>
-              ) : ongkirError ? (
-                <div className="py-6 px-4 text-center text-xs font-bold text-error uppercase tracking-wider bg-error/10 rounded-xl border border-dashed border-error/30">
-                  {ongkirError}
-                </div>
-              ) : couriers.length === 0 ? (
-                <div className="py-6 text-center text-xs font-bold text-base-content/50 uppercase tracking-wider bg-base-200/50 rounded-xl border border-dashed border-base-300">
-                  {alamatUtama 
-                    ? "Tidak ada opsi pengiriman tersedia. Pastikan alamat valid atau coba lagi nanti." 
-                    : "Pilih alamat terlebih dahulu untuk melihat ongkos kirim."}
-                </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4">
-                  {couriers.map((courier) => (
-                    courier.costs.map((srv, idx) => {
-                      const isSelected = selectedShipping?.courier_code === courier.code && selectedShipping?.service === srv.service;
-                      
-                      return (
-                        <div 
-                          key={`${courier.code}-${idx}`}
-                          onClick={() => setSelectedShipping({
-                            courier_code: courier.code,
-                            courier_name: courier.name,
-                            service: srv.service,
-                            cost: srv.cost,
-                            etd: srv.etd
-                          })}
-                          className={`cursor-pointer transition-all p-4 rounded-xl border-2 flex items-center justify-between ${
-                            isSelected ? 'border-primary bg-primary/5' : 'border-base-200 hover:border-primary/30'
-                          }`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="radio-input">
-                              <input type="radio" name="shipping" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
+                <div className="flex flex-col gap-4">
+                  
+                  {/* Peringatan error tetap muncul jika ongkir gagal, tapi pilihan kurir tidak disembunyikan */}
+                  {ongkirError && (
+                    <div className="py-4 px-4 text-center text-xs font-bold text-warning uppercase tracking-wider bg-warning/10 rounded-xl border border-dashed border-warning/30">
+                      {ongkirError}
+                    </div>
+                  )}
+
+                  {couriers.length === 0 ? (
+                    <div className="py-6 text-center text-xs font-bold text-base-content/50 uppercase tracking-wider bg-base-200/50 rounded-xl border border-dashed border-base-300">
+                      {alamatUtama 
+                        ? "Tidak ada opsi pengiriman tersedia. Pastikan alamat valid atau coba lagi nanti." 
+                        : "Pilih alamat terlebih dahulu untuk melihat opsi."}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {couriers.map((courier) => (
+                        courier.costs.map((srv, idx) => {
+                          const isSelected = selectedShipping?.courier_code === courier.code && selectedShipping?.service === srv.service;
+                          const isPickup = courier.code === "toko";
+                          
+                          return (
+                            <div 
+                              key={`${courier.code}-${idx}`}
+                              onClick={() => setSelectedShipping({
+                                courier_code: courier.code,
+                                courier_name: courier.name,
+                                service: srv.service,
+                                cost: srv.cost,
+                                etd: srv.etd
+                              })}
+                              className={`cursor-pointer transition-all p-4 rounded-xl border-2 flex items-center justify-between ${
+                                isSelected ? 'border-primary bg-primary/5' : 'border-base-200 hover:border-primary/30'
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="radio-input">
+                                  <input type="radio" name="shipping" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
+                                </div>
+                                <div>
+                                  <p className="font-black text-sm uppercase tracking-tight">
+                                    {courier.name} - {srv.service}
+                                  </p>
+                                  <p className="text-[10px] font-bold opacity-60 mt-1">
+                                    {/* Jika Ambil di Toko, tampilkan deskripsi. Jika reguler, tampilkan estimasi hari */}
+                                    {isPickup ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right font-black text-primary">
+                                {/* Format nominal 0 rupiah menjadi GRATIS */}
+                                {srv.cost === 0 ? "GRATIS" : `Rp ${srv.cost.toLocaleString("id-ID")}`}
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-black text-sm uppercase tracking-tight">
-                                {courier.name} - {srv.service}
-                              </p>
-                              <p className="text-[10px] font-bold opacity-60 mt-1">
-                                Estimasi sampai: {srv.etd} Hari
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right font-black text-primary">
-                            Rp {srv.cost.toLocaleString("id-ID")}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ))}
+                          );
+                        })
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

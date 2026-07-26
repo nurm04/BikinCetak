@@ -1,6 +1,8 @@
 "use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from 'next/link';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, Search, MapPin } from 'lucide-react';
 import { ItemData } from "@/services/itemService";
 import { slugify } from "@/lib/utils";
 
@@ -39,6 +41,16 @@ const Footer = ({ items = [] }: FooterProps) => {
     label: categoryKey,
     submenu: groupedItems[categoryKey],
   }));
+
+  const router = useRouter();
+  const [kodeTransaksi, setKodeTransaksi] = useState("");
+
+  const handleCheckOrder = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const kode = kodeTransaksi.trim();
+    if (!kode) return;
+    router.push(`/pesan/status/${encodeURIComponent(kode)}`);
+  };
   // --------------------------------------------------
 
   return (
@@ -86,15 +98,47 @@ const Footer = ({ items = [] }: FooterProps) => {
           <div className="flex flex-col gap-4">
             <h6 className="footer-title opacity-100 text-white font-bold">Hubungi Kami</h6>
             <div className="flex flex-col gap-3 text-sm">
-              <div className="flex items-center gap-3">
-                <Phone size={16} /> <span>0838-3186-2770</span>
-              </div>
+              <a
+                href="https://wa.me/6283831862770?text=Halo%20Admin%20BikinCetak,%20saya%20ingin%20bertanya."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 hover:text-black transition-colors"
+              >
+                <Phone size={16} />
+                <span>0838-3186-2770</span>
+              </a>
               <div className="flex items-center gap-3">
                 <Mail size={16} /> <span>bikincetak@gmail.com</span>
               </div>
               <div className="flex items-center gap-3">
                 <MapPin size={16} /> <span>Layanan Online - Seluruh Indonesia</span>
               </div>
+            </div>
+            <div className="mt-8">
+              <h6 className="footer-title opacity-100 text-white font-bold mb-3">
+                Cek Status Pesanan
+              </h6>
+
+              <form onSubmit={handleCheckOrder} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Kode Transaksi"
+                  value={kodeTransaksi}
+                  onChange={(e) => setKodeTransaksi(e.target.value)}
+                  className="input input-bordered input-sm w-full text-base-content"
+                />
+
+                <button
+                  type="submit"
+                  className="btn btn-sm bg-black text-white border-black hover:bg-black/80"
+                >
+                  <Search size={16} />
+                </button>
+              </form>
+
+              <p className="text-xs opacity-70 mt-2">
+                Masukkan kode transaksi untuk melihat status pesanan.
+              </p>
             </div>
           </div>
         </div>

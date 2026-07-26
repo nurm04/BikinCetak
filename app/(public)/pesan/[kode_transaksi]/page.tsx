@@ -53,6 +53,7 @@ export default async function DetailPesananPage({ params }: {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Asia/Jakarta"
   }) + " WIB";
 
   return (

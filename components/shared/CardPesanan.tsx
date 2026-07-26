@@ -30,8 +30,13 @@ export default function CardPesanan({ pesanan }: Props) {
           <h3 className="text-xs font-black tracking-widest text-primary uppercase">{pesanan.id_pesan}</h3>
           <div className="flex items-center gap-1 mt-1 text-[10px] font-bold opacity-60">
             <CalendarDays size={12} />
-            {new Date(pesanan.tanggal_pesan).toLocaleDateString("id-ID", {
-              day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+            {new Date(pesanan.tanggal_pesan).toLocaleString("id-ID", {
+              day: "2-digit", 
+              month: "short", 
+              year: "numeric", 
+              hour: "2-digit", 
+              minute: "2-digit",
+              timeZone: "Asia/Jakarta"
             })} WIB
           </div>
         </div>
