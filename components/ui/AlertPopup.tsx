@@ -76,14 +76,14 @@ export default function AlertPopup({
   const style = config[type];
 
   return (
-    <div className="modal modal-open modal-bottom sm:modal-middle bg-base-300/60 backdrop-blur-sm z-[999]">
-      <div className="modal-box rounded-[2rem] border border-base-content/5 shadow-2xl relative overflow-hidden">
+    <div className="modal modal-open modal-bottom sm:modal-middle bg-base-300/60 backdrop-blur-sm z-999">
+      <div className="modal-box rounded-2xl border border-base-content/5 shadow-2xl relative overflow-hidden">
         
         {/* Progress bar kecil kalau autoClose aktif */}
         {autoClose && !onConfirm && (
           <div className="absolute top-0 left-0 h-1 bg-base-content/10 w-full">
             <div 
-              className={`h-full ${style.color.replace('text', 'bg')} transition-all duration-[3000ms] ease-linear`}
+              className={`h-full ${style.color.replace('text', 'bg')} transition-all duration-3000 ease-linear`}
               style={{ width: isOpen ? '100%' : '0%' }}
             />
           </div>
