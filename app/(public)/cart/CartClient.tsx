@@ -138,7 +138,6 @@ export default function CartClient() {
     fetchCart();
   }, [router]);
 
-  // KALKULASI TOTAL TERPILIH
   const selectedSubtotal = cartItems
     .filter((item) => selectedIds.includes(item.id))
     .reduce((total: number, item: ExtendedCartItemAPI) => {
@@ -248,7 +247,8 @@ export default function CartClient() {
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 relative">
+    // Tambahan pb-36 di mobile biar produk ga ketutup summary yg ngambang
+    <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 pb-36 lg:pb-8 relative">
       <AlertPopup 
         isOpen={popup.isOpen}
         type={popup.type}
@@ -334,40 +334,56 @@ export default function CartClient() {
           </div>
 
           <div className="lg:col-span-4">
-            <div className="sticky top-24 space-y-4">
-              <div className="card bg-base-100 p-8 border-2 border-base-content/10 rounded-2xl shadow-sm">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 flex items-center gap-2">
+            {/* CONTAINER YANG DI-FIXED KE BAWAH SAAT MOBILE */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-base-100 border-t border-base-content/10 px-4 pt-4 pb-20 shadow-[0_-10px_20px_rgba(0,0,0,0.08)] lg:static lg:bg-transparent lg:border-none lg:p-0 lg:shadow-none lg:z-auto">
+              
+              <div className="lg:sticky lg:top-24 lg:card lg:bg-base-100 lg:p-8 lg:border-2 lg:border-base-content/10 lg:rounded-2xl lg:shadow-sm">
+                
+                {/* Judul: Hanya Desktop */}
+                <h3 className="hidden lg:flex text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 items-center gap-2">
                   <CreditCard size={14} /> Ringkasan Pesanan
                 </h3>
                 
-                <div className="space-y-4 mb-8">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-[10px] font-bold uppercase opacity-60">Item Terpilih</span>
-                    <span className="text-xs font-black">{selectedIds.length} Produk</span>
+                <div className="flex flex-row justify-between items-center lg:flex-col lg:items-stretch lg:space-y-4">
+                  
+                  {/* Rincian Detail: Hanya Desktop */}
+                  <div className="hidden lg:block space-y-4 lg:mb-8">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-[10px] font-bold uppercase opacity-60">Item Terpilih</span>
+                      <span className="text-xs font-black">{selectedIds.length} Produk</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-[10px] font-bold uppercase opacity-60">Subtotal Keranjang</span>
+                      <span className="font-bold">Rp {selectedSubtotal.toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="divider opacity-10 my-0"></div>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-[10px] font-bold uppercase opacity-60">Subtotal Keranjang</span>
-                    <span className="font-bold">Rp {selectedSubtotal.toLocaleString("id-ID")}</span>
-                  </div>
-                  <div className="divider opacity-10 my-0"></div>
-                  <div className="flex flex-col gap-1 pt-2">
+
+                  {/* Total Tagihan: Tampil di Mobile & Desktop */}
+                  <div className="flex flex-col gap-0 lg:gap-1 lg:pt-2">
                     <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Tagihan</span>
-                    <span className="text-3xl font-black text-primary tracking-tighter leading-none">
+                    <span className="text-[17px] md:text-xl lg:text-3xl font-black text-primary tracking-tighter leading-none">
                       Rp {selectedSubtotal.toLocaleString("id-ID")}
                     </span>
                   </div>
+
+                  {/* Tombol Checkout */}
+                  <button 
+                    disabled={selectedIds.length === 0}
+                    onClick={handleCheckout}
+                    className="btn btn-primary lg:btn-block rounded-xl lg:rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-12 lg:h-16 text-xs w-[55%] lg:w-full"
+                  >
+                    Checkout <span className="hidden lg:inline">Sekarang</span>
+                    <span className="lg:hidden ml-1">({selectedIds.length})</span>
+                  </button>
+
                 </div>
 
-                <button 
-                  disabled={selectedIds.length === 0}
-                  onClick={handleCheckout}
-                  className="btn btn-primary btn-block rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-16 text-xs"
-                >
-                  Checkout Sekarang
-                </button>
-                <p className="text-[8px] text-center mt-4 opacity-40 font-bold uppercase tracking-tighter">
+                {/* Info Text: Hanya Desktop */}
+                <p className="hidden lg:block text-[8px] text-center mt-4 opacity-40 font-bold uppercase tracking-tighter">
                   Harga sudah termasuk pajak & biaya layanan cetak. Belum termasuk ongkos kirim.
                 </p>
+
               </div>
             </div>
           </div>

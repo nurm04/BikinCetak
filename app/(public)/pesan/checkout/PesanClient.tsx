@@ -262,7 +262,6 @@ export default function PesanClient() {
     fetchOngkir();
   }, [alamatUtama]);
 
-
   const hitungRowTotal = (item: CheckoutItem) => {
     const finishingTotal = item.finishing.reduce((sum, fin) => sum + fin.harga_tambahan, 0);
     const hargaPerPcs = item.harga_satuan + finishingTotal;
@@ -391,7 +390,7 @@ export default function PesanClient() {
   );
 
   return (
-    <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 relative">
+    <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 pb-48 lg:pb-8 relative">
       <AlertPopup 
         isOpen={popup.isOpen} title={popup.title} message={popup.message} type={popup.type}
         onCancel={() => setPopup(prev => ({ ...prev, isOpen: false }))}
@@ -481,7 +480,6 @@ export default function PesanClient() {
               ) : (
                 <div className="flex flex-col gap-4">
                   
-                  {/* Peringatan error tetap muncul jika ongkir gagal, tapi pilihan kurir tidak disembunyikan */}
                   {ongkirError && (
                     <div className="py-4 px-4 text-center text-xs font-bold text-warning uppercase tracking-wider bg-warning/10 rounded-xl border border-dashed border-warning/30">
                       {ongkirError}
@@ -524,13 +522,11 @@ export default function PesanClient() {
                                     {courier.name} - {srv.service}
                                   </p>
                                   <p className="text-[10px] font-bold opacity-60 mt-1">
-                                    {/* Jika Ambil di Toko, tampilkan deskripsi. Jika reguler, tampilkan estimasi hari */}
                                     {isPickup ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}
                                   </p>
                                 </div>
                               </div>
                               <div className="text-right font-black text-primary">
-                                {/* Format nominal 0 rupiah menjadi GRATIS */}
                                 {srv.cost === 0 ? "GRATIS" : `Rp ${srv.cost.toLocaleString("id-ID")}`}
                               </div>
                             </div>
@@ -546,52 +542,69 @@ export default function PesanClient() {
           </div>
 
           <div className="lg:col-span-4">
-            <div className="sticky top-24 space-y-4">
+            
+            <div className="fixed bottom-16 left-0 right-0 z-40 bg-base-100 border-t border-base-content/10 px-4 py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.08)] lg:static lg:bg-transparent lg:border-none lg:p-0 lg:shadow-none lg:z-auto">
+              
+              {/* FIX: Ganti lg:space-y-4 jadi flex-col dengan gap-6 khusus desktop */}
+              <div className="lg:sticky lg:top-24 flex flex-col gap-0 lg:gap-6">
+                
+                {/* CARD VOUCHER */}
+                <div className="pb-3 border-b border-base-content/5 mb-3 lg:mb-0 lg:p-6 lg:bg-base-100 lg:border-2 lg:border-base-content/10 lg:rounded-2xl">
+                  
+                  {/* Judul Desktop */}
+                  <h3 className="hidden lg:flex text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-4 items-center gap-2">
+                    <Ticket size={14} /> Voucher & Promo
+                  </h3>
 
-              {/* CARD VOUCHER */}
-              <div className="card bg-base-100 border-2 border-base-content/10 rounded-2xl overflow-hidden">
-                <div className="p-6">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-4 flex items-center gap-2">
-                        <Ticket size={14} /> Voucher & Promo
-                    </h3>
+                  {/* Judul Mobile Kecil */}
+                  <div className="flex items-center gap-2 mb-2 lg:hidden">
+                    <Ticket size={14} className="text-primary"/>
+                    <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Makin Hemat Pakai Voucher</span>
+                  </div>
 
-                    {appliedVoucher ? (
-                        <div className="bg-success/10 border border-success/30 p-4 rounded-xl flex justify-between items-center">
-                            <div>
-                                <p className="text-success font-black text-xs uppercase tracking-wider">{appliedVoucher.kode_voucher}</p>
-                                <p className="text-[10px] font-bold opacity-70 mt-0.5">{appliedVoucher.nama_promo}</p>
-                            </div>
-                            <button onClick={hapusVoucher} className="btn btn-ghost btn-xs text-error">Hapus</button>
+                  {appliedVoucher ? (
+                    <div className="bg-success/10 border border-success/30 p-2.5 lg:p-4 rounded-xl flex justify-between items-center">
+                      <div>
+                        <p className="text-success font-black text-[11px] lg:text-xs uppercase tracking-wider">{appliedVoucher.kode_voucher}</p>
+                        <p className="text-[9px] lg:text-[10px] font-bold opacity-70 mt-0.5">{appliedVoucher.nama_promo}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right hidden sm:block lg:hidden">
+                          <span className="text-[9px] uppercase font-bold opacity-50 block">Potongan</span>
+                          <span className="text-error font-black text-xs">- Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")}</span>
                         </div>
-                    ) : (
-                        <div className="flex gap-2">
-                            <input 
-                                type="text" 
-                                placeholder="Masukkan Kode..." 
-                                className="input input-bordered input-sm w-full uppercase"
-                                value={inputVoucher}
-                                onChange={(e) => setInputVoucher(e.target.value.toUpperCase())}
-                                disabled={isVerifyingVoucher}
-                            />
-                            <button 
-                                onClick={handleApplyVoucher} 
-                                disabled={!inputVoucher.trim() || isVerifyingVoucher}
-                                className="btn btn-primary btn-sm uppercase font-black"
-                            >
-                                {isVerifyingVoucher ? <Loader2 size={16} className="animate-spin" /> : 'Pakai'}
-                            </button>
-                        </div>
-                    )}
+                        <button onClick={hapusVoucher} className="btn btn-ghost btn-xs text-error">Hapus</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Masukkan Kode..." 
+                        className="input input-bordered input-sm lg:input-md w-full uppercase"
+                        value={inputVoucher}
+                        onChange={(e) => setInputVoucher(e.target.value.toUpperCase())}
+                        disabled={isVerifyingVoucher}
+                      />
+                      <button 
+                        onClick={handleApplyVoucher} 
+                        disabled={!inputVoucher.trim() || isVerifyingVoucher}
+                        className="btn btn-primary btn-sm lg:btn-md uppercase font-black"
+                      >
+                        {isVerifyingVoucher ? <Loader2 size={16} className="animate-spin" /> : 'Pakai'}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <div className="card bg-base-100 border-2 border-base-content/10 rounded-2xl overflow-hidden">
-                <div className="p-8">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 flex items-center gap-2">
+                {/* CARD DETAIL PEMBAYARAN */}
+                <div className="lg:p-8 lg:bg-base-100 lg:border-2 lg:border-base-content/10 lg:rounded-2xl">
+                  <h3 className="hidden lg:flex text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 items-center gap-2">
                     <CreditCard size={14} /> Detail Pembayaran
                   </h3>
                   
-                  <div className="space-y-4 mb-8">
+                  {/* Rincian Desktop (Hidden di Mobile biar compact) */}
+                  <div className="hidden lg:block space-y-4 mb-8">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[10px] font-bold uppercase opacity-60">Total Pesanan</span>
                       <span className="font-bold">Rp {subTotal.toLocaleString("id-ID")}</span>
@@ -605,39 +618,46 @@ export default function PesanClient() {
                     </div>
 
                     {appliedVoucher && (
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-[10px] font-bold uppercase opacity-60">Potongan Diskon</span>
-                            <span className="font-black text-error">
-                                - Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")}
-                            </span>
-                        </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-[10px] font-bold uppercase opacity-60">Potongan Diskon</span>
+                        <span className="font-black text-error">
+                          - Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")}
+                        </span>
+                      </div>
                     )}
 
                     <div className="divider opacity-10 my-0"></div>
-                    <div className="flex flex-col gap-1 pt-2">
+                  </div>
+
+                  {/* Bagian Bawah: Total & Tombol */}
+                  <div className="flex flex-row justify-between items-center lg:flex-col lg:items-stretch gap-4">
+                    <div className="flex flex-col gap-0 lg:gap-1 lg:pt-2">
                       <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Tagihan</span>
-                      <span className="text-3xl font-black text-primary tracking-tighter leading-none">
+                      <span className="text-[17px] md:text-xl lg:text-3xl font-black text-primary tracking-tighter leading-none">
                         Rp {totalBill.toLocaleString("id-ID")}
                       </span>
                     </div>
+
+                    <button 
+                      onClick={handleCheckout} 
+                      disabled={loading || items.length === 0 || !selectedShipping} 
+                      className="btn btn-primary lg:btn-block rounded-xl lg:rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-11 lg:h-16 text-[10px] lg:text-xs w-[55%] lg:w-full"
+                    >
+                      {loading ? (<Loader2 className="animate-spin" />) : (
+                        <>Konfirmasi <span className="hidden lg:inline">Pesanan</span></>
+                      )}
+                    </button>
                   </div>
 
-                  <button 
-                    onClick={handleCheckout} 
-                    disabled={loading || items.length === 0 || !selectedShipping} 
-                    className="btn btn-primary btn-block rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-16 text-xs"
-                  >
-                    {loading ? (<Loader2 className="animate-spin" />) : ("Konfirmasi Pesanan")}
-                  </button>
-
-                  <p className="text-[9px] text-center mt-6 opacity-60 font-bold uppercase tracking-tighter leading-relaxed">
+                  <p className="hidden lg:block text-[9px] text-center mt-6 opacity-60 font-bold uppercase tracking-tighter leading-relaxed">
                     Silakan lakukan pembayaran <span className="text-primary font-black">Transfer Manual</span> sesuai instruksi pada halaman selanjutnya.
                   </p>
                 </div>
+
               </div>
             </div>
-          </div>
 
+          </div>
         </div>
       </div>
 

@@ -105,7 +105,7 @@ export default function StatusPesananPage({params}: Props) {
     return (
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
         <div className="text-center">
-          <p className="font-black">Pesanan tidak ditemukan</p>
+          <p className="font-black">Transaksi tidak ditemukan</p>
         </div>
       </div>
     );
@@ -117,8 +117,8 @@ export default function StatusPesananPage({params}: Props) {
         <div className="max-w-2xl mx-auto">
           <div className="bg-base-100 rounded-3xl p-10 text-center border border-base-content/5">
             <XCircle size={64} className="mx-auto text-error mb-4"/>
-            <h1 className="text-2xl font-black uppercase">Pesanan Dibatalkan</h1>
-            <p className="opacity-60 mt-2">Pesanan ini sudah dibatalkan.</p>
+            <h1 className="text-2xl font-black uppercase">Transaksi Dibatalkan</h1>
+            <p className="opacity-60 mt-2">Transaksi ini sudah dibatalkan.</p>
           </div>
         </div>
       </main>
@@ -295,7 +295,7 @@ export default function StatusPesananPage({params}: Props) {
         </div>
         <div className="mt-8">
           <Link href={`/pesan/${kode_transaksi}`} className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase">
-            Lihat Detail Pesanan
+            Lihat Detail Transaksi
           </Link>
         </div>
       </div>

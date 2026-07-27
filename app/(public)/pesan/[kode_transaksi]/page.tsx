@@ -64,7 +64,7 @@ export default async function DetailPesananPage({ params }: {
           <div className="breadcrumbs text-[10px] uppercase font-black opacity-40 tracking-widest">
             <ul>
               <li><Link href="/">Home</Link></li>
-              <li><Link href="/pesan">Pesanan</Link></li>
+              <li><Link href="/pesan">Transaksi</Link></li>
               <li>{pesanan.kode_transaksi}</li>
             </ul>
           </div>
@@ -101,7 +101,7 @@ export default async function DetailPesananPage({ params }: {
             <div className="bg-base-100 rounded-2xl p-6 shadow-sm border border-base-content/5">
               <div className="flex items-center gap-3 mb-6 border-b border-base-content/5 pb-4">
                 <ShoppingBag className="text-primary" size={20} />
-                <h2 className="text-xl font-black uppercase tracking-tight">Produk Pesanan</h2>
+                <h2 className="text-xl font-black uppercase tracking-tight">Produk Transaksi</h2>
               </div>
               <div className="divide-y divide-base-content/5">
                 {pesanan.pesanan_item?.map((item: PesananItem) => {
@@ -241,7 +241,7 @@ export default async function DetailPesananPage({ params }: {
               {pesanan.status_operasional === "proses_pengantaran" && (
                  <form action={completeAction.bind(null, pesanan.kode_transaksi)}>
                     <button className="btn btn-success text-white btn-block rounded-2xl font-black uppercase text-xs shadow-lg shadow-success/30">
-                      <CheckCircle size={18} /> Pesanan Diterima
+                      <CheckCircle size={18} /> Transaksi Diterima
                     </button>
                  </form>
               )}

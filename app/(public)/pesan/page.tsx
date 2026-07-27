@@ -26,7 +26,7 @@ export default async function PesanPage() {
               <li>
                 <Link href="/">Home</Link>
               </li>
-              <li>Pesanan</li>
+              <li>Transaksi</li>
             </ul>
           </div>
         </div>
@@ -36,7 +36,7 @@ export default async function PesanPage() {
 
           <div className="p-6 border-b border-base-content/5 bg-base-200/30">
             <h2 className="text-xs font-black uppercase tracking-tight">
-              Semua Pesanan
+              Semua Transaksi
             </h2>
           </div>
 
@@ -57,11 +57,11 @@ export default async function PesanPage() {
 
               <div>
                 <p className="text-sm font-black opacity-50 uppercase tracking-tight">
-                  Belum Ada Pesanan
+                  Belum Ada Transaksi
                 </p>
 
                 <p className="text-[10px] font-bold opacity-30 uppercase mt-1">
-                  Pesanan yang sudah checkout akan muncul di sini
+                  Transaksi yang sudah checkout akan muncul di sini
                 </p>
               </div>
             </div>

@@ -13,7 +13,6 @@ interface FinishingItem {
   harga_tambahan: number;
 }
 
-// Interface baru untuk parsing file_desain dari backend
 export interface DataFileDesain {
   tipe: "upload" | "link" | "email";
   nilai: string;
@@ -33,7 +32,6 @@ interface CartProductItemProps {
   harga_pengerjaan_snapshot?: number;
   catatan?: string | null;
   
-  // Ubah tipe data file_desain agar bisa nerima Object, String JSON, atau Array lama
   file_desain?: DataFileDesain | string | string[] | null;
 
   isReadOnly?: boolean; 
@@ -50,13 +48,11 @@ export default function CartProductItem({
   harga_satuan,
   jumlah,
   finishing = [],
-
   rincian_diskon_snapshot = [],
   estimasi_pengerjaan,
   harga_pengerjaan_snapshot = 0,
   catatan,
   file_desain = null,
-
   isReadOnly = false,
   isSelected = false,
   onToggleSelect,
@@ -104,8 +100,7 @@ export default function CartProductItem({
     if (typeof file_desain === "string") {
       try {
         parsedFileDesain = JSON.parse(file_desain);
-      } catch (e) {
-      }
+      } catch (e) {}
     } else if (Array.isArray(file_desain) && file_desain.length > 0) {
       parsedFileDesain = { tipe: "upload", nilai: file_desain[0] };
     } else if (typeof file_desain === "object" && !Array.isArray(file_desain)) {
@@ -114,195 +109,165 @@ export default function CartProductItem({
   }
 
   return (
-    <div className={`py-6 flex flex-col sm:flex-row gap-6 items-start transition-all ${!isReadOnly && !isSelected ? "opacity-60" : "opacity-100"}`}>
+    <div className={`py-4 sm:py-5 flex flex-row gap-2.5 sm:gap-4 items-start transition-all ${!isReadOnly && !isSelected ? "opacity-60" : "opacity-100"}`}>
       
-      {/* 1. CHECKBOX */}
-      {!isReadOnly && onToggleSelect && (
-        <div className="pt-8 hidden sm:block shrink-0">
+      {/* 1. BAGIAN KIRI (Checkbox + Image digabung biar rata tengah vertikal) */}
+      <div className="flex items-center gap-2.5 shrink-0 pt-1 sm:pt-0">
+        {!isReadOnly && onToggleSelect && (
           <input 
             type="checkbox" 
-            className="checkbox checkbox-primary checkbox-sm rounded-lg" 
+            className="checkbox checkbox-primary checkbox-sm rounded" 
             checked={isSelected} 
             onChange={() => onToggleSelect(id)} 
           />
-        </div>
-      )}
+        )}
 
-      {/* 2. IMAGE */}
-      <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-base-200 border border-base-content/5 shrink-0">
-        <Image 
-          src="/favicon.ico"
-          alt={productName} 
-          fill 
-          unoptimized
-          sizes="96px" 
-          className="object-cover" 
-        />
+        <div className="relative w-17 h-17 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-base-200 border border-base-content/10 shrink-0">
+          <Image 
+            src="/favicon.ico"
+            alt={productName} 
+            fill 
+            unoptimized
+            sizes="(max-width: 640px) 68px, 80px" 
+            className="object-cover" 
+          />
+        </div>
       </div>
 
-      {/* 3. INFO PRODUK */}
-      <div className="flex-1 space-y-1 min-w-0 w-full">
-        <h3 className="font-black uppercase text-sm tracking-tight leading-tight truncate">
+      {/* 2. BAGIAN KANAN (Info + Actions dalam satu tumpukan vertikal) */}
+      <div className="flex flex-col flex-1 min-w-0">
+        
+        {/* Info Header (Judul) */}
+        <h3 className="font-black uppercase text-[11px] sm:text-sm tracking-tight leading-snug line-clamp-2 mb-1 pr-1">
           {productName}
         </h3>
         
-        {/* HARGA SATUAN */}
-        <div className="flex items-center gap-2">
-           <p className="text-xs font-bold text-primary">
-             Rp {unitPriceTotal.toLocaleString("id-ID")} / pcs
-           </p>
-        </div>
+        {/* Harga Satuan */}
+        <p className="text-[10px] sm:text-xs font-bold text-primary mb-1.5">
+          Rp {unitPriceTotal.toLocaleString("id-ID")} <span className="opacity-60 text-base-content font-medium">/ pcs</span>
+        </p>
 
-        {/* BADGES (Diskon & Pengerjaan) */}
-        <div className="flex flex-wrap gap-2 mt-1">
-           {rincian_diskon_snapshot.length > 0 && (
-              <span className="text-[9px] font-black uppercase tracking-widest text-success bg-success/10 px-2 py-0.5 rounded">
-                 ✨ {rincian_diskon_snapshot[0].nama}
-              </span>
-           )}
-           {harga_pengerjaan_snapshot > 0 && (
-              <span className="text-[9px] font-black uppercase tracking-widest text-warning bg-warning/10 px-2 py-0.5 rounded flex items-center gap-1">
-                 <Clock size={10}/> {estimasi_pengerjaan} (+ Rp {harga_pengerjaan_snapshot.toLocaleString("id-ID")})
-              </span>
-           )}
-        </div>
-        
-        <div className="mt-3">
-          <div className="inline-block w-full bg-base-300/50 px-4 py-3 rounded-xl border border-base-content/5 space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-tight leading-relaxed">
-              {finishing.length > 0 ? (
-                <span>
-                  {finishing.map((f, idx) => (
-                    <span key={idx}>
-                      {idx > 0 && <span className="mx-2 opacity-20"> | </span>}
-                      <span className="opacity-60">
-                        {f.nama_pilihan || f.nama_finishing}
-                      </span>
-                    </span>
-                  ))}
-                </span>
-              ) : (
-                <span className="opacity-40">Tidak ada jasa tambahan</span>
-              )}
-            </p>
-
-            {catatan && (
-               <p className="text-[9px] font-bold opacity-60 lowercase first-letter:uppercase pt-2 border-t border-base-content/10">
-                 Catatan: {catatan}
-               </p>
-            )}
-
-            {/* BADGE TIPE FILE DESAIN */}
-            {parsedFileDesain && (
-              <div className="pt-2 border-t border-base-content/10">
-                <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1.5">File Desain:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  
-                  {parsedFileDesain.tipe === "upload" && (
-                    <a 
-                      href={`http://127.0.0.1:8000/storage/${parsedFileDesain.nilai}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 bg-base-100 hover:bg-base-200 transition-colors border border-base-content/10 hover:border-primary/50 px-2.5 py-1.5 rounded-lg text-[9px] font-bold shadow-sm cursor-pointer group"
-                    >
-                      <Paperclip size={12} className="text-primary group-hover:text-primary-focus"/>
-                      <span className="truncate max-w-30 group-hover:underline">Lampiran File</span>
-                    </a>
-                  )}
-
-                  {parsedFileDesain.tipe === "link" && (
-                    <a 
-                      href={parsedFileDesain.nilai.startsWith('http') ? parsedFileDesain.nilai : `https://${parsedFileDesain.nilai}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 bg-base-100 hover:bg-base-200 transition-colors border border-base-content/10 hover:border-primary/50 px-2.5 py-1.5 rounded-lg text-[9px] font-bold shadow-sm cursor-pointer group"
-                    >
-                      <LinkIcon size={12} className="text-primary group-hover:text-primary-focus"/>
-                      <span className="truncate max-w-30 group-hover:underline">Buka Link Drive</span>
-                    </a>
-                  )}
-
-                  {parsedFileDesain.tipe === "email" && (
-                    <div className="flex items-center gap-1.5 bg-base-100 border border-base-content/10 px-2.5 py-1.5 rounded-lg text-[9px] font-bold shadow-sm opacity-80 cursor-default">
-                      <Mail size={12} className="text-primary"/>
-                      <span className="truncate max-w-30">Dikirim via Email</span>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            )}
-
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-row sm:flex-col justify-between items-center sm:items-end w-full sm:w-auto gap-4 shrink-0">
-        {!isReadOnly ? (
-          <div className="flex items-center bg-base-200 rounded-xl p-1 relative">
-            <button 
-              onClick={() => onUpdateQty?.(id, Math.max(1, jumlah - 1))} 
-              disabled={isLoading || jumlah <= 1} 
-              className="btn btn-ghost btn-xs btn-square"
-            >
-              <Minus size={12}/>
-            </button>
-            
-            <div className="relative w-12 h-6 flex justify-center items-center">
-              {isLoading ? (
-                <span className="loading loading-spinner loading-xs absolute text-primary"></span>
-              ) : (
-                <input 
-                  type="number"
-                  value={localQty}
-                  onChange={handleQtyChange}
-                  onBlur={submitQty}
-                  onKeyDown={handleKeyDown}
-                  disabled={isLoading}
-                  className="w-full h-full text-xs font-black text-center bg-transparent outline-none focus:bg-base-100 focus:ring-1 focus:ring-primary rounded transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  min="1"
-                />
-              )}
-            </div>
-
-            <button 
-              onClick={() => onUpdateQty?.(id, jumlah + 1)} 
-              disabled={isLoading} 
-              className="btn btn-ghost btn-xs btn-square"
-            >
-              <Plus size={12}/>
-            </button>
-          </div>
-        ) : (
-          <div className="bg-base-200 px-3 py-1.5 rounded-lg text-[10px] font-black opacity-60 uppercase tracking-widest border border-base-content/5">
-            {jumlah} Pcs
-          </div>
-        )}
-        
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col items-end">
-            <p className="font-black text-sm text-primary">
-              Rp {rowTotal.toLocaleString("id-ID")}
-            </p>
-            {harga_pengerjaan_snapshot > 0 && (
-               <span className="text-[8px] opacity-40 uppercase font-bold tracking-widest mt-0.5">
-                 *Termasuk Biaya {estimasi_pengerjaan}
-               </span>
-            )}
-          </div>
-          
-          {!isReadOnly && onDelete && (
-            <button 
-              onClick={() => onDelete(id)} 
-              disabled={isLoading} 
-              className="btn btn-ghost btn-xs text-error btn-square hover:bg-error/20"
-            >
-              <Trash2 size={16} />
-            </button>
+        {/* Badges (Diskon & Pengerjaan) */}
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {rincian_diskon_snapshot.length > 0 && (
+            <span className="text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-success bg-success/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              ✨ {rincian_diskon_snapshot[0].nama}
+            </span>
+          )}
+          {harga_pengerjaan_snapshot > 0 && (
+            <span className="text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-warning bg-warning/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Clock size={9}/> {estimasi_pengerjaan} (+ Rp {harga_pengerjaan_snapshot.toLocaleString("id-ID")})
+            </span>
           )}
         </div>
-      </div>
+        
+        {/* Detail Varian (Box Abu-abu) */}
+        <div className="w-full bg-base-200/50 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-lg border border-base-content/5 space-y-1.5 mt-0.5">
+          <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-tight leading-relaxed text-base-content/80">
+            {finishing.length > 0 ? (
+              <span>
+                {finishing.map((f, idx) => (
+                  <span key={idx}>
+                    {idx > 0 && <span className="mx-1.5 opacity-30">|</span>}
+                    <span>
+                      {f.nama_pilihan || f.nama_finishing}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className="opacity-40">Tidak ada jasa tambahan</span>
+            )}
+          </p>
 
+          {catatan && (
+            <p className="text-[9px] font-bold opacity-60 lowercase first-letter:uppercase pt-1.5 border-t border-base-content/5">
+              Catatan: {catatan}
+            </p>
+          )}
+
+          {/* Badge File Desain */}
+          {parsedFileDesain && (
+            <div className="pt-1.5 border-t border-base-content/5">
+              <div className="flex flex-wrap gap-1.5">
+                {parsedFileDesain.tipe === "upload" && (
+                  <a href={`http://127.0.0.1:8000/storage/${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group">
+                    <Paperclip size={10} className="text-primary"/>
+                    <span className="truncate max-w-25">Lampiran File</span>
+                  </a>
+                )}
+                {parsedFileDesain.tipe === "link" && (
+                  <a href={parsedFileDesain.nilai.startsWith('http') ? parsedFileDesain.nilai : `https://${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group">
+                    <LinkIcon size={10} className="text-primary"/>
+                    <span className="truncate max-w-25">Buka Link Drive</span>
+                  </a>
+                )}
+                {parsedFileDesain.tipe === "email" && (
+                  <div className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm opacity-80">
+                    <Mail size={10} className="text-primary"/>
+                    <span>Dikirim via Email</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 3. ROW BAWAH (Tombol Qty & Harga Total) */}
+        <div className="flex flex-row justify-between items-end w-full mt-3 gap-2">
+          
+          {/* Qty Controls */}
+          {!isReadOnly ? (
+            <div className="flex items-center bg-base-200/80 rounded border border-base-content/5 p-0.5">
+              <button onClick={() => onUpdateQty?.(id, Math.max(1, jumlah - 1))} disabled={isLoading || jumlah <= 1} className="btn btn-ghost btn-square min-h-0 h-6 w-6 sm:h-7 sm:w-7 p-0">
+                <Minus size={12}/>
+              </button>
+              
+              <div className="relative w-8 sm:w-10 h-6 sm:h-7 flex justify-center items-center">
+                {isLoading ? (
+                  <span className="loading loading-spinner loading-xs absolute text-primary"></span>
+                ) : (
+                  <input 
+                    type="number" value={localQty} onChange={handleQtyChange} onBlur={submitQty} onKeyDown={handleKeyDown} disabled={isLoading}
+                    className="w-full h-full text-[11px] sm:text-xs font-black text-center bg-transparent outline-none focus:bg-base-100 rounded transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    min="1"
+                  />
+                )}
+              </div>
+
+              <button onClick={() => onUpdateQty?.(id, jumlah + 1)} disabled={isLoading} className="btn btn-ghost btn-square min-h-0 h-6 w-6 sm:h-7 sm:w-7 p-0">
+                <Plus size={12}/>
+              </button>
+            </div>
+          ) : (
+            <div className="bg-base-200 px-3 py-1 rounded text-[9px] font-black opacity-60 uppercase tracking-widest border border-base-content/5">
+              {jumlah} Pcs
+            </div>
+          )}
+          
+          {/* Total & Hapus */}
+          <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+            <div className="flex flex-col items-end">
+              <p className="font-black text-[13px] sm:text-base text-primary leading-none">
+                Rp {rowTotal.toLocaleString("id-ID")}
+              </p>
+              {harga_pengerjaan_snapshot > 0 && (
+                <span className="text-[7.5px] opacity-40 uppercase font-black tracking-wider mt-1">
+                  *Termasuk Biaya
+                </span>
+              )}
+            </div>
+            
+            {!isReadOnly && onDelete && (
+              <button onClick={() => onDelete(id)} disabled={isLoading} className="text-base-content/30 hover:text-error transition-colors p-1">
+                <Trash2 size={16} />
+              </button>
+            )}
+          </div>
+
+        </div>
+
+      </div>
     </div>
   );
 }
