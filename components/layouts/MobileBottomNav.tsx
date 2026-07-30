@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -19,6 +20,7 @@ import {
   Phone,
   Mail
 } from 'lucide-react';
+
 const getCategoryIcon = (categoryName: string) => {
   const name = categoryName.toLowerCase();
   if (name.includes('sticker') || name.includes('stiker')) return <StickyNote size={28} className="text-primary mb-2" strokeWidth={1.5} />;
@@ -52,8 +54,12 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
   const [isCatOpen, setIsCatOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const pathname = usePathname();
+  
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+    
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
@@ -92,7 +98,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
 
   return (
     <>
-      {/* 1. OVERLAY GELAP (Muncul saat salah satu Sheet diklik) */}
+      {/* 1. OVERLAY GELAP */}
       <div 
         className={`fixed inset-0 bg-black/60 z-60 md:hidden transition-opacity duration-300 ${(isCatOpen || isChatOpen) ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
         onClick={() => { setIsCatOpen(false); setIsChatOpen(false); }}
@@ -143,8 +149,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto pb-8">
           <div className="flex flex-col gap-3">
-            {/* List Kontak 1 - WhatsApp CS */}
-            <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
+            <a href="https://wa.me/6283831862770" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
               <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-600">
                 <Phone size={24} />
               </div>
@@ -153,15 +158,13 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
                 <p className="text-xs text-base-content/60">Fast response (08.00 - 17.00)</p>
               </div>
             </a>
-
-            {/* List Kontak 2 - Email */}
-            <a href="mailto:admin@bikincetak.com" className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
+            <a href="mailto:bikincetak@gmail.com" className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600">
                 <Mail size={24} />
               </div>
               <div>
                 <h4 className="font-bold text-sm text-base-content">Email Support</h4>
-                <p className="text-xs text-base-content/60">admin@bikincetak.com</p>
+                <p className="text-xs text-base-content/60">bikincetak@gmail.com</p>
               </div>
             </a>
           </div>
@@ -174,10 +177,12 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
           ${isKeyboardOpen ? "hidden" : "flex"}
       `}>
         {navItems.map((item, index) => {
-          // Logic active state menyesuaikan href atau sheet yang kebuka
-          const isActive = item.href 
-            ? pathname === item.href 
-            : (item.name === 'Kategori' ? isCatOpen : (item.name === 'Chat' ? isChatOpen : false));
+          // 3. PAKAI isMounted UNTUK MENCEGAH HYDRATION MISMATCH
+          const isActive = isMounted 
+            ? (item.href 
+                ? pathname === item.href 
+                : (item.name === 'Kategori' ? isCatOpen : (item.name === 'Chat' ? isChatOpen : false)))
+            : false; // Paksa jadi false (default render) saat pertama kali load dari Server
             
           const Icon = item.icon;
 

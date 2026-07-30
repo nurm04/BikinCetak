@@ -76,13 +76,11 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   const isHome = pathname === '/';
 
-  // Olah data kategori untuk menu Desktop
   const groupedItems: Record<string, Array<{ name: string }>> = {};
   items.forEach((item) => {
     if (item.is_active === 0) return;
+    if (item.id_produk === "PRD-0001") return;
     const categoryName = item.kategori || "Lainnya";
-    const lowerCat = categoryName.toLowerCase();
-    if (lowerCat === "services" || lowerCat === "jasa") return;
 
     if (!groupedItems[categoryName]) {
       groupedItems[categoryName] = [];
@@ -90,11 +88,13 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     groupedItems[categoryName].push({ name: item.nama_produk });
   });
 
-  const dynamicCategories = Object.keys(groupedItems).map((categoryKey) => ({
-    key: slugify(categoryKey),
-    label: categoryKey,
-    submenu: groupedItems[categoryKey],
-  }));
+  const dynamicCategories = Object.keys(groupedItems)
+    .map((categoryKey) => ({
+      key: slugify(categoryKey),
+      label: categoryKey,
+      submenu: groupedItems[categoryKey],
+    }))
+    .sort((a, b) => (a.label === "Jasa" ? 1 : b.label === "Jasa" ? -1 : 0));
 
   return (
     <>

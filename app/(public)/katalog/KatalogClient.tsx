@@ -8,17 +8,26 @@ import Link from 'next/link';
 import { Filter, ChevronDown, ChevronUp, SearchX } from 'lucide-react';
 import { slugify } from '@/lib/utils';
 
-interface ProductItem {
+interface SidebarProduct {
   id: string;
   name: string;
+  slug: string;
+}
+
+interface SkuGridItem {
+  id_sku: string;
+  nama_sku_bersih: string;
+  slug: string;
   kategori: string;
-  image: string[];
-  harga_mulai_dari: number;
+  parent_slug: string;
+  harga: number;
+  image: string;
   diskon_roles: Record<string, number>;
 }
 
 interface KatalogClientProps {
-  initialItems: ProductItem[];
+  sidebarData: Record<string, SidebarProduct[]>;
+  skuItems: SkuGridItem[];
   activeRoleId: string | null;
 }
 
@@ -30,49 +39,43 @@ const formatRupiah = (angka: number) => {
   }).format(angka);
 };
 
-function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
+function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   
   const queryParam = searchParams.get('q') || '';
   const categoryParam = searchParams.get('kategori') || '';
+  const productParam = searchParams.get('produk') || '';
 
-  const [activeCategory, setActiveCategory] = useState<string>(categoryParam);
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<string>('terkait');
 
   useEffect(() => {
-    if (categoryParam) {
+    if (productParam) {
+      const foundCat = Object.keys(sidebarData).find(cat => 
+        sidebarData[cat].some(p => p.slug === productParam)
+      );
+      if (foundCat) setExpandedCats({ [slugify(foundCat)]: true });
+    } else if (categoryParam) {
       setExpandedCats({ [categoryParam]: true });
-      setActiveCategory(categoryParam);
     } else {
       setExpandedCats({});
-      setActiveCategory('');
     }
-  }, [categoryParam]);
+  }, [productParam, categoryParam, sidebarData]);
 
-  // Kelompokkan data untuk Sidebar
-  const groupedItems = useMemo(() => {
-    const groups: Record<string, ProductItem[]> = {};
-    initialItems.forEach(item => {
-      const cat = item.kategori;
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(item);
-    });
-    return groups;
-  }, [initialItems]);
-
-  // Logika Filter & Sorting
   const filteredAndSortedItems = useMemo(() => {
-    let result = [...initialItems];
+    let result = [...skuItems];
 
     if (queryParam) {
       const q = queryParam.toLowerCase();
-      result = result.filter(item => item.name.toLowerCase().includes(q));
+      result = result.filter(item => item.nama_sku_bersih.toLowerCase().includes(q));
     }
 
-    if (activeCategory) {
-      result = result.filter(item => slugify(item.kategori) === activeCategory);
+    // Filter by Kategori atau by Produk (dari klik Sidebar)
+    if (productParam) {
+      result = result.filter(item => item.parent_slug === productParam);
+    } else if (categoryParam) {
+      result = result.filter(item => slugify(item.kategori) === categoryParam);
     }
 
     switch (sortBy) {
@@ -80,42 +83,51 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
         result = result.reverse(); 
         break;
       case 'harga-rendah':
-        result.sort((a, b) => a.harga_mulai_dari - b.harga_mulai_dari);
+        result.sort((a, b) => a.harga - b.harga);
         break;
       case 'harga-tinggi':
-        result.sort((a, b) => b.harga_mulai_dari - a.harga_mulai_dari);
+        result.sort((a, b) => b.harga - a.harga);
         break;
       default:
         break; 
     }
 
     return result;
-  }, [initialItems, queryParam, activeCategory, sortBy]);
+  }, [skuItems, queryParam, categoryParam, productParam, sortBy]);
 
-  const toggleCategory = (catKey: string) => {
-    setExpandedCats((prev: Record<string, boolean>) => {
-      // FIX: Jika sudah terbuka, tutup (return object kosong)
-      // Jika belum terbuka, buka HANYA kategori ini (timpa yg lain)
-      return prev[catKey] ? {} : { [catKey]: true };
-    });
+  const handleToggleCategory = (catKey: string) => {
+    setExpandedCats(prev => prev[catKey] ? {} : { [catKey]: true });
   };
 
   const selectCategory = (catKey: string) => {
-    setActiveCategory(activeCategory === catKey ? '' : catKey);
-    if (queryParam) {
-      router.push(`/katalog?kategori=${catKey}`);
+    if (categoryParam === catKey && !productParam) {
+      router.push('/katalog');
     } else {
-      window.history.replaceState(null, '', `/katalog${activeCategory === catKey ? '' : `?kategori=${catKey}`}`);
+      router.push(`/katalog?kategori=${catKey}`);
     }
   };
 
-  const currentCategoryLabel = Object.keys(groupedItems).find(k => slugify(k) === activeCategory) || "Semua Produk";
+  // Dinamis label breadcrumbs
+  const getBreadcrumbLabel = () => {
+    if (queryParam) return `Pencarian: "${queryParam}"`;
+    if (productParam) {
+      for (const cat in sidebarData) {
+        const p = sidebarData[cat].find(x => x.slug === productParam);
+        if (p) return p.name;
+      }
+    }
+    if (categoryParam) {
+      const catName = Object.keys(sidebarData).find(k => slugify(k) === categoryParam);
+      if (catName) return catName;
+    }
+    return "Semua Produk";
+  };
 
   return (
     <div className="bg-base-200 min-h-screen py-8 pb-24 md:pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row gap-6">
         
-        {/* SIDEBAR FILTER - HANYA TAMPIL DI DEKSTOP */}
+        {/* SIDEBAR FILTER (KATEGORI -> PRODUK) */}
         <aside className="hidden md:block w-64 shrink-0">
           <div className="bg-base-100 p-5 rounded-2xl shadow-sm border border-base-300 sticky top-24">
             <div className="flex items-center gap-2 mb-4 text-base-content pb-3 border-b border-base-200">
@@ -126,15 +138,15 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
             <h3 className="font-bold text-xs uppercase opacity-75 mb-3 tracking-wider">Berdasarkan Kategori</h3>
             
             <div className="flex flex-col gap-1">
-              {Object.entries(groupedItems).map(([catName, catItems]) => {
+              {Object.entries(sidebarData).map(([catName, products]) => {
                 const catKey = slugify(catName);
-                const isActiveCat = activeCategory === catKey;
-                const isExpanded = expandedCats[catKey] || isActiveCat;
+                const isActiveCat = categoryParam === catKey && !productParam;
+                const isExpanded = expandedCats[catKey];
 
                 return (
                   <div key={catKey} className="border-b border-base-200/60 last:border-0 pb-1">
                     <button 
-                      onClick={() => { toggleCategory(catKey); selectCategory(catKey); }}
+                      onClick={() => { handleToggleCategory(catKey); selectCategory(catKey); }}
                       className={`flex items-center justify-between w-full py-2.5 px-2 rounded-xl text-left text-sm transition-colors ${isActiveCat ? 'bg-primary/10 text-primary font-bold' : 'text-base-content/80 hover:bg-base-200/50 hover:text-primary'}`}
                     >
                       <span className="truncate">{catName}</span>
@@ -143,15 +155,18 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
                     
                     {isExpanded && (
                       <div className="pl-4 py-1 flex flex-col gap-1.5 border-l-2 border-primary/20 ml-2 mb-2 my-1">
-                        {catItems.map((item) => (
-                          <Link 
-                            href={`/produk/${slugify(item.name)}`} 
-                            key={item.id}
-                            className="text-[13px] text-base-content/60 hover:text-primary transition-colors block truncate py-0.5"
-                          >
-                            {item.name}
-                          </Link>
-                        ))}
+                        {products.map((product) => {
+                          const isActiveProduct = productParam === product.slug;
+                          return (
+                            <Link 
+                              href={`/katalog?produk=${product.slug}`} 
+                              key={product.id}
+                              className={`text-[13px] transition-colors block truncate py-0.5 ${isActiveProduct ? 'text-primary font-bold' : 'text-base-content/60 hover:text-primary'}`}
+                            >
+                              {product.name}
+                            </Link>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -167,11 +182,7 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
           <div className="text-sm breadcrumbs text-base-content/60 mb-4 px-1">
             <ul>
               <li><Link href="/">Home</Link></li>
-              {queryParam ? (
-                <li>Pencarian: <span className="font-semibold text-base-content ml-1">&quot;{queryParam}&quot;</span></li>
-              ) : (
-                <li className="font-semibold text-base-content">{currentCategoryLabel}</li>
-              )}
+              <li className="font-semibold text-base-content">{getBreadcrumbLabel()}</li>
             </ul>
           </div>
 
@@ -181,7 +192,6 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => setSortBy('terkait')} className={`btn btn-sm border-none rounded-xl font-normal ${sortBy === 'terkait' ? 'bg-primary text-primary-content hover:bg-primary/90' : 'bg-base-200 hover:bg-base-300'}`}>Terkait</button>
               <button onClick={() => setSortBy('terbaru')} className={`btn btn-sm border-none rounded-xl font-normal ${sortBy === 'terbaru' ? 'bg-primary text-primary-content hover:bg-primary/90' : 'bg-base-200 hover:bg-base-300'}`}>Terbaru</button>
-              <button onClick={() => setSortBy('terlaris')} className={`btn btn-sm border-none rounded-xl font-normal ${sortBy === 'terlaris' ? 'bg-primary text-primary-content hover:bg-primary/90' : 'bg-base-200 hover:bg-base-300'}`}>Terlaris</button>
               
               <select 
                 className="select select-sm select-bordered rounded-xl bg-base-200 border-none font-normal focus:outline-none"
@@ -195,7 +205,7 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
             </div>
           </div>
 
-          {/* PRODUCT GRID */}
+          {/* PRODUCT GRID (SKU) */}
           {filteredAndSortedItems.length > 0 ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
               {filteredAndSortedItems.map((item) => {
@@ -203,8 +213,8 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
 
                 return (
                   <Link
-                    key={item.id}
-                    href={`/produk/${slugify(item.name)}`}
+                    key={item.id_sku}
+                    href={`/produk/${item.slug}`}
                     className="card bg-base-100 shadow-sm border border-base-300 group overflow-hidden transition-all duration-300 hover:shadow-md hover:border-primary/50 relative cursor-pointer flex flex-col h-full rounded-2xl"
                   >
                     {/* Badge Diskon */}
@@ -214,13 +224,13 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
                       </div>
                     )}
 
-                    {/* Gambar */}
+                    {/* Gambar (Menggunakan Gambar Induk/Produk) */}
                     <figure className="relative h-32 md:h-44 w-full overflow-hidden bg-base-200">
                       <Image
                         fill
                         unoptimized
-                        alt={item.name}
-                        src={item.image?.[0] || "/favicon.ico"}
+                        alt={item.nama_sku_bersih}
+                        src={item.image}
                         className="object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                     </figure>
@@ -228,7 +238,7 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
                     {/* Info */}
                     <div className="card-body p-3 md:p-4 mt-auto">
                       <h2 className="card-title text-sm md:text-base leading-tight h-10 line-clamp-2 transition-colors group-hover:text-primary">
-                        {item.name}
+                        {item.nama_sku_bersih}
                       </h2>
 
                       <div className="flex flex-col mt-1 md:mt-2">
@@ -236,7 +246,7 @@ function KatalogContent({ initialItems, activeRoleId }: KatalogClientProps) {
                           Mulai dari
                         </span>
                         <span className="text-sm md:text-base font-black text-primary">
-                          {item.harga_mulai_dari ? formatRupiah(item.harga_mulai_dari) : "Rp 0"}
+                          {formatRupiah(item.harga)}
                         </span>
                       </div>
                     </div>

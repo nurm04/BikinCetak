@@ -19,6 +19,9 @@ async function getAuthHeader() {
   };
 }
 
+// Tipe data strict untuk kolom json atribut_custom_snapshot
+export type CustomAttributeValue = string | number | boolean;
+
 export interface RincianDiskon {
   nama: string;
   nominal: number;
@@ -57,6 +60,8 @@ export interface PesananItem {
 
   file_desain?: string | null;
   catatan?: string | null;
+  
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | null; // <-- Ditambahkan
 
   created_at?: string;
   updated_at?: string;

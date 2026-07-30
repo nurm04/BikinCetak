@@ -27,12 +27,8 @@ export default async function Home() {
 
   items.forEach((item) => {
     if (item.is_active === 0) return;
-
+    if (item.id_produk === "PRD-0001") return;
     const categoryName = item.kategori || "Lainnya";
-
-    if (categoryName.toLowerCase() === "services" || categoryName.toLowerCase() === "jasa") {
-      return;
-    }
 
     if (!groupedItems[categoryName]) {
       groupedItems[categoryName] = [];
@@ -47,11 +43,13 @@ export default async function Home() {
     });
   });
 
-  const dynamicCategories = Object.keys(groupedItems).map((categoryKey) => ({
-    key: categoryKey,
-    label: categoryKey,
-    submenu: groupedItems[categoryKey],
-  }));
+  const dynamicCategories = Object.keys(groupedItems)
+    .map((categoryKey) => ({
+      key: categoryKey,
+      label: categoryKey,
+      submenu: groupedItems[categoryKey],
+    }))
+    .sort((a, b) => (a.label === "Jasa" ? 1 : b.label === "Jasa" ? -1 : 0));
 
   return (
     <main className="min-h-screen bg-base-200">

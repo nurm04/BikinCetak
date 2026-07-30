@@ -23,6 +23,9 @@ async function getAuthHeader(isFormData = false) {
   return headers;
 }
 
+// Definisikan tipe strict pengganti 'any'
+export type CustomAttributeValue = string | number | boolean;
+
 export interface FinishingItemAPI {
   id?: number;
   nama_finishing: string;
@@ -44,6 +47,8 @@ export interface CartItemAPI {
   rincian_diskon_snapshot?: RincianDiskonAPI[];
   estimasi_pengerjaan?: string;
   harga_pengerjaan_snapshot?: number;
+  
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | null; // <-- Ditambahkan
 }
 
 export interface AddCartFinishing {
@@ -75,6 +80,8 @@ export interface AddCartItem {
   file_desain?: File | null; 
   tipe_file?: "upload" | "link" | "email";
   link_file?: string;
+
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue>; // <-- Ditambahkan
 }
 
 export interface CartServiceResponse<T = unknown> {
@@ -180,6 +187,11 @@ export async function addCart(id_alamat: string, items: AddCartItem[]): Promise<
 
       if (item.finishings && item.finishings.length > 0) {
         formData.append(`items[${index}][finishings]`, JSON.stringify(item.finishings));
+      }
+
+      // Handle JSON conversion untuk form data atribut custom
+      if (item.atribut_custom_snapshot && Object.keys(item.atribut_custom_snapshot).length > 0) {
+        formData.append(`items[${index}][atribut_custom_snapshot]`, JSON.stringify(item.atribut_custom_snapshot));
       }
     });
 

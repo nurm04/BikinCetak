@@ -9,6 +9,7 @@ export interface ItemData {
   gambar_urls: string[];
   harga_mulai_dari?: number;
   diskon_roles?: Record<string, number>;
+  dataSkus?: { nama_sku: string; harga: number; tipe_kalkulasi?: string }[];
 }
 
 export interface PilihanVarian {
@@ -32,16 +33,16 @@ export interface HargaBertingkat {
   id_sku: string;
   min: number;
   max: number;
-  tipe: "nominal" | "persen"; // REVISI: Menggantikan harga
-  nilai: number;              // REVISI: Menggantikan harga
+  tipe: "nominal" | "persen";
+  nilai: number; 
 }
 
 export interface HargaPengerjaan {
   id: number;
   id_sku: string;
   pengerjaan: string;
-  tipe: "nominal" | "persen"; // REVISI: Menggantikan harga
-  nilai: number;              // REVISI: Menggantikan harga
+  tipe: "nominal" | "persen";
+  nilai: number; 
 }
 
 export interface DiskonCustomer {
@@ -59,11 +60,15 @@ export interface OpsiFinishing {
   nama_pilihan: string;
   minimum_pesan: number;
   harga_tambahan: number;
+  tipe: "nominal" | "persen";
+  kali_jumlah_pesan: boolean;
 }
 
 export interface SkuDetail {
   id_sku: string;
   nama_sku: string;
+  deskripsi: string | null;
+  tipe_kalkulasi: string;
   minimum_pesan: number;
   harga_dasar: number;
   kombinasi_pilihan: string[];
@@ -94,7 +99,8 @@ export async function getItems(): Promise<ItemData[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/items`, {
       method: "GET",
-      next: { revalidate: 60 },
+      // next: { revalidate: 60 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
