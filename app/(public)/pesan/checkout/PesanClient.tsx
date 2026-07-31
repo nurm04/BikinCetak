@@ -9,7 +9,7 @@ import Link from "next/link";
 import CartProductItem from "@/components/shared/CardProductItem";
 import AlertPopup from "@/components/ui/AlertPopup";
 import UbahAlamat from "./UbahAlamat";
-import { checkoutCart, CheckoutPayload, getShippingCost, RincianDiskonAPI } from "@/services/cartService";
+import { checkoutCart, CheckoutPayload, getShippingCost, RincianDiskonAPI, CustomAttributeValue } from "@/services/cartService";
 import { cekVoucher } from "@/services/voucherService";
 
 interface CheckoutItem {
@@ -27,6 +27,8 @@ interface CheckoutItem {
   estimasi_pengerjaan?: string;
   harga_pengerjaan_snapshot?: number;
   catatan?: string | null;
+
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | string | null;
 
   finishing: {
     id: number;
@@ -263,11 +265,48 @@ export default function PesanClient() {
   }, [alamatUtama]);
 
   const hitungRowTotal = (item: CheckoutItem) => {
+    let hargaDasar = item.harga_satuan;
+
+    let jumlahHalaman = 1;
+    if (item.atribut_custom_snapshot) {
+      let atribut: Record<string, CustomAttributeValue> = {};
+      
+      if (typeof item.atribut_custom_snapshot === "string") {
+        try {
+          atribut = JSON.parse(item.atribut_custom_snapshot) as Record<string, CustomAttributeValue>;
+        } catch (error) {
+          console.error("Gagal parse atribut_custom_snapshot", error);
+        }
+      } else {
+        atribut = item.atribut_custom_snapshot;
+      }
+
+      if (atribut["Jumlah Halaman"]) {
+        const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
+        if (!isNaN(val) && val > 0) {
+          jumlahHalaman = val;
+        }
+      }
+    }
+
+    let sisi = 1;
+    item.finishing.forEach((fin) => {
+      const label = fin.nama_finishing.toLowerCase();
+      if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) {
+        sisi = 2;
+      }
+    });
+
+    if (jumlahHalaman > 1) {
+      hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
+    }
+
     const finishingTotal = item.finishing.reduce((sum, fin) => sum + fin.harga_tambahan, 0);
-    const hargaPerPcs = item.harga_satuan + finishingTotal;
+    const hargaPerPcs = hargaDasar + finishingTotal;
     const biayaPengerjaan = item.harga_pengerjaan_snapshot || 0;
+    
     return (hargaPerPcs * item.jumlah) + biayaPengerjaan;
-  }
+  };
 
   const subTotal = items.reduce((acc, item) => acc + hitungRowTotal(item), 0);
 

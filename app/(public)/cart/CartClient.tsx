@@ -5,33 +5,40 @@ import Link from "next/link";
 import { ArrowLeft, ShoppingBag, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCartItems, updateCartItemQty, deleteCartItem, CartItemAPI, CartServiceResponse, FinishingItemAPI, RincianDiskonAPI } from "@/services/cartService";
+import { 
+  getCartItems, 
+  updateCartItemQty, 
+  deleteCartItem, 
+  CartServiceResponse, 
+  CartDataAPI,
+  RincianDiskonAPI,
+  CustomAttributeValue,
+  FileDesainAPI
+} from "@/services/cartService";
 import AlertPopup from "@/components/ui/AlertPopup";
 import CartProductItem from "@/components/shared/CardProductItem"; 
 
-interface RawCartData {
-  pesanan_item: Array<{
-    id: number;
-    jumlah: number;
-    nama_produk_snapshot: string;
-    harga_satuan_snapshot: number;
-    harga_dasar_awal_snapshot?: number;
-    total_diskon_snapshot?: number;
-    rincian_diskon_snapshot?: string | RincianDiskonAPI[]; 
-    estimasi_pengerjaan_snapshot?: string;
-    harga_pengerjaan_snapshot?: number;
-    file_desain?: string | string[] | null;
-    catatan?: string | null;
-    pesanan_item_finishing?: Array<{
-      id: number;
-      nama_finishing_snapshot: string;
-      harga_finishing_snapshot: number;
-    }>;
+// Interface lokal yang dimodifikasi khusus untuk kebutuhan UI keranjang
+interface ExtendedCartItemAPI {
+  id: number;
+  id_pesan: string;
+  jumlah: number;
+  nama_sku: string;
+  harga_satuan: number;
+  harga_dasar_awal_snapshot?: number;
+  total_diskon_snapshot?: number;
+  rincian_diskon_snapshot?: RincianDiskonAPI[];
+  estimasi_pengerjaan?: string;
+  harga_pengerjaan_snapshot?: number;
+  file_desain?: FileDesainAPI | null; 
+  catatan?: string | null;
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | null;
+  finishing?: Array<{
+    id?: number;
+    nama_finishing: string;
+    harga_tambahan: number;
+    kali_jumlah_pesan?: number | boolean;
   }>;
-}
-
-interface ExtendedCartItemAPI extends CartItemAPI {
-  file_desain?: string[];
 }
 
 export default function CartClient() {
@@ -60,7 +67,7 @@ export default function CartClient() {
   useEffect(() => {
     const fetchCart = async () => {
       try {
-        const res = (await getCartItems()) as CartServiceResponse<RawCartData>;
+        const res = (await getCartItems()) as CartServiceResponse<CartDataAPI>;
         
         if (res.error) {
           if (res.error.toLowerCase().includes("sesi") || res.error.toLowerCase().includes("login")) {
@@ -79,6 +86,7 @@ export default function CartClient() {
           ) {
             itemsList = rawData.pesanan_item.map((item) => {
                 
+                // Parse Rincian Diskon
                 let parsedRincianDiskon: RincianDiskonAPI[] = [];
                 if (item.rincian_diskon_snapshot) {
                   try {
@@ -90,7 +98,7 @@ export default function CartClient() {
                   }
                 }
 
-                let parsedFileDesain: string[] = [];
+                let parsedFileDesain: FileDesainAPI | null = null;
                 if (item.file_desain) {
                   try {
                       parsedFileDesain = typeof item.file_desain === 'string' 
@@ -101,9 +109,21 @@ export default function CartClient() {
                   }
                 }
 
+                // Parse Atribut Custom (JSON)
+                let parsedAtributCustom: Record<string, CustomAttributeValue> | null = null;
+                if (item.atribut_custom_snapshot) {
+                  try {
+                      parsedAtributCustom = typeof item.atribut_custom_snapshot === 'string'
+                          ? JSON.parse(item.atribut_custom_snapshot)
+                          : item.atribut_custom_snapshot;
+                  } catch (e) {
+                      console.error("Gagal parse atribut custom", e);
+                  }
+                }
+
                 return {
                   id: item.id,
-                  id_pesan: "",
+                  id_pesan: item.id_pesan || "",
                   jumlah: item.jumlah,
                   nama_sku: item.nama_produk_snapshot,
                   harga_satuan: item.harga_satuan_snapshot, 
@@ -115,11 +135,13 @@ export default function CartClient() {
                   harga_pengerjaan_snapshot: item.harga_pengerjaan_snapshot,
                   catatan: item.catatan,
                   file_desain: parsedFileDesain,
+                  atribut_custom_snapshot: parsedAtributCustom,
 
                   finishing: item.pesanan_item_finishing?.map((fin) => ({
                       id: fin.id,
                       nama_finishing: fin.nama_finishing_snapshot,
                       harga_tambahan: fin.harga_finishing_snapshot,
+                      kali_jumlah_pesan: fin.kali_jumlah_pesan, 
                   })) ?? [],
                 };
             });
@@ -138,19 +160,44 @@ export default function CartClient() {
     fetchCart();
   }, [router]);
 
+  // LOGIKA SINKRON DENGAN BACKEND & VUE (Detail.vue & OrderItemsTable.vue)
   const selectedSubtotal = cartItems
     .filter((item) => selectedIds.includes(item.id))
     .reduce((total: number, item: ExtendedCartItemAPI) => {
-      const totalFinishing = (item.finishing || []).reduce(
-        (acc: number, f: FinishingItemAPI) => acc + (f.harga_tambahan || 0),
-        0
-      );
+      let hargaAwal = item.harga_satuan || 0;
+      const attr = item.atribut_custom_snapshot;
+      const finishings = item.finishing || [];
 
-      const hargaProdukPerPcs = (item.harga_satuan || 0) + totalFinishing;
+      // 1. CARI "SISI CETAK" DARI NAMA FINISHING
+      let sisi = 1; 
+      finishings.forEach(f => {
+          const namaFin = (f.nama_finishing || "").toLowerCase();
+          if (namaFin.includes('dua sisi') || namaFin.includes('2 sisi') || namaFin.includes('bolak')) {
+              sisi = 2;
+          }
+      });
+
+      // 2. HITUNG BIAYA HALAMAN (Hanya jika produk tersebut butuh input halaman)
+      if (attr && attr['Jumlah Halaman'] !== undefined) {
+          let hal = parseInt(String(attr['Jumlah Halaman']), 10);
+          if (isNaN(hal) || hal < 1) hal = 1;
+          hargaAwal += (Math.max(0, hal - 1) * sisi * 1500);
+      }
+
+      let subtotalItem = hargaAwal * item.jumlah;
+
+      // 3. HITUNG BIAYA FINISHING
+      finishings.forEach((f) => {
+        // Validasi ketat untuk status kali_jumlah_pesan
+        const isKaliQty = f.kali_jumlah_pesan === true || f.kali_jumlah_pesan === 1;
+        const val = f.harga_tambahan || 0;
+        
+        subtotalItem += isKaliQty ? (val * item.jumlah) : val;
+      });
+
       const biayaPengerjaan = item.harga_pengerjaan_snapshot || 0;
-      const subtotalItem = (hargaProdukPerPcs * item.jumlah) + biayaPengerjaan;
-
-      return total + subtotalItem;
+      
+      return total + subtotalItem + biayaPengerjaan;
     }, 0);
 
   const toggleSelect = (id: number) => {
@@ -247,7 +294,6 @@ export default function CartClient() {
   }
 
   return (
-    // Tambahan pb-36 di mobile biar produk ga ketutup summary yg ngambang
     <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 pb-36 lg:pb-8 relative">
       <AlertPopup 
         isOpen={popup.isOpen}
@@ -321,6 +367,8 @@ export default function CartClient() {
                       catatan={item.catatan}
                       file_desain={item.file_desain}
 
+                      atribut_custom_snapshot={item.atribut_custom_snapshot}
+
                       isSelected={selectedIds.includes(item.id)}
                       onToggleSelect={toggleSelect}
                       onUpdateQty={handleUpdateQty}
@@ -334,19 +382,16 @@ export default function CartClient() {
           </div>
 
           <div className="lg:col-span-4">
-            {/* CONTAINER YANG DI-FIXED KE BAWAH SAAT MOBILE */}
             <div className="fixed bottom-0 left-0 right-0 z-40 bg-base-100 border-t border-base-content/10 px-4 pt-4 pb-20 shadow-[0_-10px_20px_rgba(0,0,0,0.08)] lg:static lg:bg-transparent lg:border-none lg:p-0 lg:shadow-none lg:z-auto">
               
               <div className="lg:sticky lg:top-24 lg:card lg:bg-base-100 lg:p-8 lg:border-2 lg:border-base-content/10 lg:rounded-2xl lg:shadow-sm">
                 
-                {/* Judul: Hanya Desktop */}
                 <h3 className="hidden lg:flex text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-8 items-center gap-2">
                   <CreditCard size={14} /> Ringkasan Pesanan
                 </h3>
                 
                 <div className="flex flex-row justify-between items-center lg:flex-col lg:items-stretch lg:space-y-4">
                   
-                  {/* Rincian Detail: Hanya Desktop */}
                   <div className="hidden lg:block space-y-4 lg:mb-8">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[10px] font-bold uppercase opacity-60">Item Terpilih</span>
@@ -359,7 +404,6 @@ export default function CartClient() {
                     <div className="divider opacity-10 my-0"></div>
                   </div>
 
-                  {/* Total Tagihan: Tampil di Mobile & Desktop */}
                   <div className="flex flex-col gap-0 lg:gap-1 lg:pt-2">
                     <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Tagihan</span>
                     <span className="text-[17px] md:text-xl lg:text-3xl font-black text-primary tracking-tighter leading-none">
@@ -367,7 +411,6 @@ export default function CartClient() {
                     </span>
                   </div>
 
-                  {/* Tombol Checkout */}
                   <button 
                     disabled={selectedIds.length === 0}
                     onClick={handleCheckout}
@@ -379,7 +422,6 @@ export default function CartClient() {
 
                 </div>
 
-                {/* Info Text: Hanya Desktop */}
                 <p className="hidden lg:block text-[8px] text-center mt-4 opacity-40 font-bold uppercase tracking-tighter">
                   Harga sudah termasuk pajak & biaya layanan cetak. Belum termasuk ongkos kirim.
                 </p>

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import { useEffect } from "react";
@@ -28,22 +29,21 @@ interface FormPesanProps {
 
 export default function FormPesan({ fields, values, onValueChange, groupedAddons, minimumQty = 1, tipeKalkulasi = "standard" }: FormPesanProps) {
   
-  // Efek untuk auto-select addon/finishing yang harga_tambahannya 0
   useEffect(() => {
     if (!groupedAddons || !onValueChange) return;
 
     Object.entries(groupedAddons).forEach(([groupName, addons]) => {
-      if (!values?.[groupName]) {
-        const isAllZero = addons.every((a) => Number(a.harga_tambahan) === 0);
-        if (!isAllZero) {
-          const defaultAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
-          if (defaultAddon) {
-            onValueChange(groupName, defaultAddon.id_pilihan_finishing);
-          }
+      if (values?.[groupName] === undefined) {
+        
+        const zeroAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
+        
+        if (zeroAddon) {
+          onValueChange(groupName, zeroAddon.id_pilihan_finishing);
+        } else {
+          onValueChange(groupName, "");
         }
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupedAddons]); 
 
   return (
@@ -69,17 +69,28 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
 
       {/* 2. LOOPING ADDONS / FINISHING */}
       {groupedAddons && Object.entries(groupedAddons).map(([groupName, addons]) => {
-        const isAllZero = addons.every((a) => Number(a.harga_tambahan) === 0);
-        const defaultAddon = !isAllZero ? addons.find((a) => Number(a.harga_tambahan) === 0) : undefined;
-        const fallbackValue = defaultAddon ? defaultAddon.id_pilihan_finishing : "";
+        const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
+        const addonOptions: FormFieldOption[] = [];
 
-        const selectedAddonId = values?.[groupName] || fallbackValue;
-        const selectedAddonInfo = addons.find(a => a.id_pilihan_finishing === selectedAddonId);
+        if (!hasZero) {
+          addonOptions.push({
+            value: "",
+            label: `Tanpa ${groupName} (+ Rp 0)`
+          });
+        }
 
-        const addonOptions = addons.map(a => ({
+        addons.forEach(a => {
+          addonOptions.push({
             value: a.id_pilihan_finishing,
             label: `${a.nama_pilihan} (+ Rp ${Number(a.harga_tambahan).toLocaleString("id-ID")})`
-        }));
+          });
+        });
+
+        const selectedAddonId = values?.[groupName] !== undefined 
+          ? values[groupName] 
+          : (hasZero ? addons.find(a => Number(a.harga_tambahan) === 0)?.id_pilihan_finishing || "" : "");
+
+        const selectedAddonInfo = addons.find(a => a.id_pilihan_finishing === selectedAddonId);
 
         return (
           <div key={groupName} className="pt-2 border-t border-base-content/5">

@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle2, CircleDot, Clock, CreditCard, Package, Truck, XCircle, Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, use } from "react";
-import { getStatusPesanan, Pesanan } from "@/services/pesanService";
+import { getStatusPesanan, Pesanan, CustomAttributeValue } from "@/services/pesanService"; // <-- Tambahkan CustomAttributeValue
 
 interface Props {params: Promise<{kode_transaksi: string}>}
 
@@ -81,6 +81,69 @@ export default function StatusPesananPage({params}: Props) {
     }) + " WIB";
   }, [pesanan]);
 
+  // ==========================================
+  // KALKULASI ULANG HARGA MURNI (USE MEMO)
+  // ==========================================
+  const total_tagihan_akurat = useMemo(() => {
+    if (!pesanan) return 0;
+
+    let totalHargaMurniProduk = 0;
+    let totalBiayaPengerjaan = 0;
+
+    pesanan.pesanan_item?.forEach((item) => {
+      let hargaDasar = Number(item.harga_satuan_snapshot) || 0;
+      let jumlahHalaman = 1;
+      let atribut: Record<string, CustomAttributeValue> = {};
+
+      // Ekstrak Halaman
+      if (item.atribut_custom_snapshot) {
+        if (typeof item.atribut_custom_snapshot === "string") {
+          try {
+            atribut = JSON.parse(item.atribut_custom_snapshot);
+          } catch (e) {
+            console.error("Gagal parse atribut_custom_snapshot", e);
+          }
+        } else {
+          atribut = item.atribut_custom_snapshot as Record<string, CustomAttributeValue>;
+        }
+
+        if (atribut && atribut["Jumlah Halaman"] !== undefined) {
+          const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
+          if (!isNaN(val) && val > 0) {
+            jumlahHalaman = val;
+          }
+        }
+      }
+
+      // Ekstrak Sisi Cetak
+      let sisi = 1;
+      item.pesanan_item_finishing?.forEach((fin) => {
+        const label = (fin.nama_finishing_snapshot || "").toLowerCase();
+        if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) {
+          sisi = 2;
+        }
+      });
+
+      // Tambahkan biaya kertas
+      if (jumlahHalaman > 1) {
+        hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
+      }
+
+      const finishingTotal = item.pesanan_item_finishing?.reduce((acc, fin) => acc + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
+      const subtotalItem = (hargaDasar + finishingTotal) * (Number(item.jumlah) || 1);
+
+      totalHargaMurniProduk += subtotalItem;
+      totalBiayaPengerjaan += Number(item.harga_pengerjaan_snapshot) || 0;
+    });
+
+    const ongkir = Number(pesanan.harga_ongkir || 0);
+    const diskon = Number(pesanan.diskon_voucher_nominal || 0);
+    const kodeUnik = Number(pesanan.kode_unik || 0);
+
+    return totalHargaMurniProduk + totalBiayaPengerjaan + ongkir - diskon + kodeUnik;
+  }, [pesanan]);
+
+
   const handleCopyRekening = () => {
     navigator.clipboard.writeText(bankNumber);
     setCopiedRekening(true);
@@ -137,7 +200,6 @@ export default function StatusPesananPage({params}: Props) {
     currentIndex = 1;
   }
 
-  const total_tagihan = Number(pesanan.total_tagihan) || 0;
   const kodeUnikPesanan = Number(pesanan.kode_unik) || 0;
 
   return (
@@ -245,9 +307,10 @@ export default function StatusPesananPage({params}: Props) {
               <div>
                 <span className="text-[10px] font-black uppercase opacity-60">Total Harus Ditransfer</span>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-2xl font-black text-warning">Rp {total_tagihan.toLocaleString("id-ID")}</span>
+                  {/* Gunakan variabel akurat */}
+                  <span className="text-2xl font-black text-warning">Rp {total_tagihan_akurat.toLocaleString("id-ID")}</span>
                   <button 
-                    onClick={() => handleCopyNominal(total_tagihan)} 
+                    onClick={() => handleCopyNominal(total_tagihan_akurat)} 
                     className="btn btn-ghost btn-xs btn-circle text-warning tooltip tooltip-top" 
                     data-tip={copiedNominal ? "Tersalin!" : "Salin Nominal"}
                   >
@@ -259,7 +322,7 @@ export default function StatusPesananPage({params}: Props) {
               <div className="text-right text-xs font-bold opacity-70 bg-base-100 p-3 rounded-lg border border-base-content/5 w-full md:w-auto">
                 <div className="flex justify-between gap-6 mb-1">
                   <span>Subtotal Tagihan:</span>
-                  <span>Rp {(total_tagihan - kodeUnikPesanan).toLocaleString("id-ID")}</span>
+                  <span>Rp {(total_tagihan_akurat - kodeUnikPesanan).toLocaleString("id-ID")}</span>
                 </div>
                 <div className="flex justify-between gap-6 text-warning">
                   <span>Kode Unik:</span>
@@ -289,7 +352,7 @@ export default function StatusPesananPage({params}: Props) {
             </div>
 
             <p className="text-2xl font-black text-primary">
-              Rp {total_tagihan.toLocaleString("id-ID")}
+              Rp {total_tagihan_akurat.toLocaleString("id-ID")}
             </p>
           </div>
         </div>

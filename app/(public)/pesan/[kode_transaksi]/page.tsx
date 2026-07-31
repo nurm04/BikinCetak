@@ -3,8 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache"; 
 import { ArrowLeft, ShoppingBag, CreditCard, Calendar, CheckCircle } from "lucide-react";
-import { getPesananByKodeTransaksi, completePesanan, Pesanan, PesananItem } from "@/services/pesanService";
-import { RincianDiskon } from "@/services/pesanService";
+import { getPesananByKodeTransaksi, completePesanan, Pesanan, PesananItem, CustomAttributeValue, RincianDiskon } from "@/services/pesanService";
 import CartProductItem from "@/components/shared/CardProductItem";
 
 async function completeAction(kode_transaksi: string) {
@@ -24,19 +23,66 @@ export default async function DetailPesananPage({ params }: {
   }
 
   const pesanan = result.data as Pesanan;
-  const totalTagihan = pesanan.total_tagihan || 0;
-  const kodeUnik = pesanan.kode_unik || 0;
+  const kodeUnik = Number(pesanan.kode_unik || 0);
+  const ongkir = Number(pesanan.harga_ongkir || 0);
+  const diskon = Number(pesanan.diskon_voucher_nominal || 0);
 
-  // Hitung total Murni (Harga + Finishing)
-  const totalHargaMurniProduk = pesanan.pesanan_item?.reduce((sum, item) => {
-      const finishingTotal = item.pesanan_item_finishing?.reduce((acc, fin) => acc + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
-      return sum + ((Number(item.harga_satuan_snapshot) + finishingTotal) * Number(item.jumlah));
-  }, 0) ?? 0;
+  // ==========================================
+  // KALKULASI ULANG HARGA MURNI & PENGERJAAN
+  // ==========================================
+  let totalHargaMurniProduk = 0;
+  let totalBiayaPengerjaan = 0;
 
-  // Hitung total Biaya SLA
-  const totalBiayaPengerjaan = pesanan.pesanan_item?.reduce((sum, item) => {
-      return sum + (Number(item.harga_pengerjaan_snapshot) || 0);
-  }, 0) ?? 0;
+  pesanan.pesanan_item?.forEach((item) => {
+    let hargaDasar = Number(item.harga_satuan_snapshot) || 0;
+
+    // 1. Ekstrak Jumlah Halaman
+    let jumlahHalaman = 1;
+    let atribut: Record<string, CustomAttributeValue> = {};
+
+    if (item.atribut_custom_snapshot) {
+      if (typeof item.atribut_custom_snapshot === "string") {
+        try {
+          atribut = JSON.parse(item.atribut_custom_snapshot) as Record<string, CustomAttributeValue>;
+        } catch (e) {
+          console.error("Gagal parse atribut_custom_snapshot", e);
+        }
+      } else {
+        atribut = item.atribut_custom_snapshot as Record<string, CustomAttributeValue>;
+      }
+
+      if (atribut && atribut["Jumlah Halaman"] !== undefined) {
+        const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
+        if (!isNaN(val) && val > 0) {
+          jumlahHalaman = val;
+        }
+      }
+    }
+
+    // 2. Deteksi Sisi Cetak
+    let sisi = 1;
+    item.pesanan_item_finishing?.forEach((fin) => {
+      const label = (fin.nama_finishing_snapshot || "").toLowerCase();
+      if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) {
+        sisi = 2;
+      }
+    });
+
+    // 3. Tambahan Biaya Kertas Halaman Dalam
+    if (jumlahHalaman > 1) {
+      hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
+    }
+
+    // 4. Kalkulasi Subtotal Produk (Harga Dasar + Kertas + Finishing)
+    const finishingTotal = item.pesanan_item_finishing?.reduce((acc, fin) => acc + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
+    const subtotalItem = (hargaDasar + finishingTotal) * (Number(item.jumlah) || 1);
+
+    totalHargaMurniProduk += subtotalItem;
+    totalBiayaPengerjaan += Number(item.harga_pengerjaan_snapshot) || 0;
+  });
+
+  // 5. Timpa total tagihan (Akurat)
+  const totalTagihanAkurat = totalHargaMurniProduk + totalBiayaPengerjaan + ongkir - diskon + kodeUnik;
 
   // Data Bank dari Environment
   const bankName = process.env.NEXT_PUBLIC_BANK_NAME || "BCA";
@@ -125,6 +171,8 @@ export default async function DetailPesananPage({ params }: {
                         harga_pengerjaan_snapshot={item.harga_pengerjaan_snapshot}
                         catatan={item.catatan}
                         file_desain={parsedFileDesain}
+                        // Pastikan meneruskan atribut_custom_snapshot jika CardProductItem butuh
+                        atribut_custom_snapshot={item.atribut_custom_snapshot}
                      />
                    )
                 })}
@@ -158,13 +206,13 @@ export default async function DetailPesananPage({ params }: {
 
                     <div className="flex justify-between text-sm">
                       <span className="opacity-70 font-bold">Ongkos Kirim</span>
-                      <span className="font-black text-primary">+ Rp {(pesanan.harga_ongkir || 0).toLocaleString("id-ID")}</span>
+                      <span className="font-black text-primary">+ Rp {ongkir.toLocaleString("id-ID")}</span>
                     </div>
 
-                    {pesanan.diskon_voucher_nominal && pesanan.diskon_voucher_nominal > 0 ? (
+                    {diskon > 0 ? (
                       <div className="flex justify-between text-sm">
                         <span className="opacity-70 font-bold">Diskon Voucher</span>
-                        <span className="font-black text-error">- Rp {pesanan.diskon_voucher_nominal.toLocaleString("id-ID")}</span>
+                        <span className="font-black text-error">- Rp {diskon.toLocaleString("id-ID")}</span>
                       </div>
                     ) : null}
 
@@ -179,7 +227,8 @@ export default async function DetailPesananPage({ params }: {
                     
                     <div className="flex flex-col gap-1">
                       <p className="text-[10px] uppercase font-black opacity-40 tracking-widest">Total Tagihan</p>
-                      <p className="text-3xl font-black text-primary tracking-tighter">Rp {totalTagihan.toLocaleString("id-ID")}</p>
+                      {/* TAMPILKAN TOTAL TAGIHAN YANG AKURAT */}
+                      <p className="text-3xl font-black text-primary tracking-tighter">Rp {totalTagihanAkurat.toLocaleString("id-ID")}</p>
                     </div>
                   </div>
                 </div>
@@ -220,14 +269,14 @@ export default async function DetailPesananPage({ params }: {
                     <div>
                       <span className="text-[10px] font-black uppercase opacity-60">Total Harus Ditransfer</span>
                       <div className="mt-1">
-                        <span className="text-2xl font-black text-warning select-all">Rp {totalTagihan.toLocaleString("id-ID")}</span>
+                        <span className="text-2xl font-black text-warning select-all">Rp {totalTagihanAkurat.toLocaleString("id-ID")}</span>
                       </div>
                     </div>
                     
                     <div className="text-right text-xs font-bold opacity-70 bg-base-100 p-3 rounded-lg border border-base-content/5 w-full">
                       <div className="flex justify-between gap-4 mb-1">
                         <span>Subtotal:</span>
-                        <span>Rp {(totalTagihan - kodeUnik).toLocaleString("id-ID")}</span>
+                        <span>Rp {(totalTagihanAkurat - kodeUnik).toLocaleString("id-ID")}</span>
                       </div>
                       <div className="flex justify-between gap-4 text-warning">
                         <span>Kode Unik:</span>

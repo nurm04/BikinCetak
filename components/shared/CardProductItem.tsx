@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Trash2, Plus, Minus, Clock, Paperclip, Link as LinkIcon, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
-import { RincianDiskonAPI } from "@/services/cartService";
+import { RincianDiskonAPI, CustomAttributeValue, FileDesainAPI } from "@/services/cartService";
 
 interface FinishingItem {
   id?: number;
@@ -11,11 +11,7 @@ interface FinishingItem {
   nama_pilihan?: string;
   nama_finishing?: string;
   harga_tambahan: number;
-}
-
-export interface DataFileDesain {
-  tipe: "upload" | "link" | "email";
-  nilai: string;
+  kali_jumlah_pesan?: number | boolean; // Tambahkan ini untuk sinkronisasi harga
 }
 
 interface CartProductItemProps {
@@ -32,7 +28,9 @@ interface CartProductItemProps {
   harga_pengerjaan_snapshot?: number;
   catatan?: string | null;
   
-  file_desain?: DataFileDesain | string | string[] | null;
+  // Ambil tipe langsung dari API agar strict
+  file_desain?: FileDesainAPI | string | string[] | null;
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | string | null;
 
   isReadOnly?: boolean; 
   isSelected?: boolean;
@@ -53,6 +51,7 @@ export default function CartProductItem({
   harga_pengerjaan_snapshot = 0,
   catatan,
   file_desain = null,
+  atribut_custom_snapshot = null,
   isReadOnly = false,
   isSelected = false,
   onToggleSelect,
@@ -60,11 +59,75 @@ export default function CartProductItem({
   onDelete,
   isLoading = false,
 }: CartProductItemProps) {
-  const totalJasa = finishing.reduce((acc, f) => acc + f.harga_tambahan, 0);
-  const unitPriceTotal = harga_satuan + totalJasa;
-  const rowTotal = (unitPriceTotal * jumlah) + harga_pengerjaan_snapshot;
 
-  const productName = nama_sku;
+  // ==========================================
+  // PARSING & FILTERING ATRIBUT CUSTOM
+  // ==========================================
+  let rawAtribut: Record<string, CustomAttributeValue> | null = null;
+  if (typeof atribut_custom_snapshot === "string") {
+    try {
+      rawAtribut = JSON.parse(atribut_custom_snapshot);
+    } catch (e) {
+      console.error("Gagal parse atribut_custom_snapshot", e);
+    }
+  } else {
+    rawAtribut = atribut_custom_snapshot as Record<string, CustomAttributeValue> | null;
+  }
+
+  // Buang atribut yang nilainya null, undefined, atau string kosong ""
+  let parsedAtribut: Record<string, CustomAttributeValue> | null = null;
+  if (rawAtribut && typeof rawAtribut === 'object') {
+    const filtered = Object.entries(rawAtribut).filter(
+      ([_, val]) => val !== null && val !== undefined && val !== ""
+    );
+    if (filtered.length > 0) {
+      parsedAtribut = Object.fromEntries(filtered);
+    }
+  }
+  
+  // ==========================================
+  // LOGIKA KALKULASI HARGA (SINKRON DENGAN CART)
+  // ==========================================
+  
+  // 1. Cari Sisi Cetak
+  let sisi = 1; 
+  finishing.forEach(f => {
+      const namaFin = (f.nama_finishing || f.nama_pilihan || "").toLowerCase();
+      if (namaFin.includes('dua sisi') || namaFin.includes('2 sisi') || namaFin.includes('bolak')) {
+          sisi = 2;
+      }
+  });
+
+  // 2. Hitung Biaya Halaman Kertas (Jika Ada)
+  let paperCost = 0;
+  if (parsedAtribut && parsedAtribut['Jumlah Halaman'] !== undefined) {
+      let hal = parseInt(String(parsedAtribut['Jumlah Halaman']), 10);
+      if (isNaN(hal) || hal < 1) hal = 1;
+      paperCost = (Math.max(0, hal - 1) * sisi * 1500);
+  }
+
+  // Harga dasar per pcs (Harga SKU awal + Harga Kertas Tambahan)
+  const basePrice = harga_satuan + paperCost;
+  let subtotalItem = basePrice * jumlah;
+
+  // 3. Hitung Biaya Finishing
+  finishing.forEach((f) => {
+    const isKaliQty = f.kali_jumlah_pesan === true || f.kali_jumlah_pesan === 1;
+    const val = f.harga_tambahan || 0;
+    subtotalItem += isKaliQty ? (val * jumlah) : val;
+  });
+
+  // Total Keseluruhan Baris (Termasuk SLA/Pengerjaan)
+  const rowTotal = subtotalItem + harga_pengerjaan_snapshot;
+  // ==========================================
+
+  // ==========================================
+  // BERSIHKAN NAMA PRODUK DARI KODE SKU
+  // ==========================================
+  const productName = (nama_sku || "")
+    .replace(/^[A-Za-z]+-\d+-/, "")
+    .replace(/-/g, " ");
+
   const [localQty, setLocalQty] = useState<string>(jumlah.toString());
 
   useEffect(() => {
@@ -94,8 +157,8 @@ export default function CartProductItem({
     }
   };
 
-  let parsedFileDesain: DataFileDesain | null = null;
-  
+  // Parsing File Desain
+  let parsedFileDesain: FileDesainAPI | null = null;
   if (file_desain) {
     if (typeof file_desain === "string") {
       try {
@@ -104,14 +167,14 @@ export default function CartProductItem({
     } else if (Array.isArray(file_desain) && file_desain.length > 0) {
       parsedFileDesain = { tipe: "upload", nilai: file_desain[0] };
     } else if (typeof file_desain === "object" && !Array.isArray(file_desain)) {
-      parsedFileDesain = file_desain as DataFileDesain;
+      parsedFileDesain = file_desain as FileDesainAPI;
     }
   }
 
   return (
     <div className={`py-4 sm:py-5 flex flex-row gap-2.5 sm:gap-4 items-start transition-all ${!isReadOnly && !isSelected ? "opacity-60" : "opacity-100"}`}>
       
-      {/* 1. BAGIAN KIRI (Checkbox + Image digabung biar rata tengah vertikal) */}
+      {/* 1. BAGIAN KIRI */}
       <div className="flex items-center gap-2.5 shrink-0 pt-1 sm:pt-0">
         {!isReadOnly && onToggleSelect && (
           <input 
@@ -134,20 +197,20 @@ export default function CartProductItem({
         </div>
       </div>
 
-      {/* 2. BAGIAN KANAN (Info + Actions dalam satu tumpukan vertikal) */}
+      {/* 2. BAGIAN KANAN */}
       <div className="flex flex-col flex-1 min-w-0">
         
-        {/* Info Header (Judul) */}
-        <h3 className="font-black uppercase text-[11px] sm:text-sm tracking-tight leading-snug line-clamp-2 mb-1 pr-1">
+        {/* Info Header */}
+        <h3 className="font-black capitalize text-[11px] sm:text-sm tracking-tight leading-snug line-clamp-2 mb-1 pr-1">
           {productName}
         </h3>
         
-        {/* Harga Satuan */}
-        <p className="text-[10px] sm:text-xs font-bold text-primary mb-1.5">
-          Rp {unitPriceTotal.toLocaleString("id-ID")} <span className="opacity-60 text-base-content font-medium">/ pcs</span>
+        {/* Harga Satuan Dasar */}
+        <p className="text-[10px] sm:text-xs font-bold text-primary mb-1.5 flex items-center gap-1">
+          Rp {basePrice.toLocaleString("id-ID")} <span className="opacity-60 text-base-content font-medium">/ pcs</span>
         </p>
 
-        {/* Badges (Diskon & Pengerjaan) */}
+        {/* Badges */}
         <div className="flex flex-wrap gap-1.5 mb-2">
           {rincian_diskon_snapshot.length > 0 && (
             <span className="text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-success bg-success/10 px-1.5 py-0.5 rounded flex items-center gap-0.5">
@@ -161,9 +224,23 @@ export default function CartProductItem({
           )}
         </div>
         
-        {/* Detail Varian (Box Abu-abu) */}
+        {/* Detail Varian */}
         <div className="w-full bg-base-200/50 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-lg border border-base-content/5 space-y-1.5 mt-0.5">
-          <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-tight leading-relaxed text-base-content/80">
+          
+          <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-tight leading-relaxed text-base-content/80">
+            {/* Atribut Custom (cth: Jumlah Halaman) */}
+            {parsedAtribut && Object.keys(parsedAtribut).length > 0 && (
+              <div className="mb-1 text-primary flex flex-wrap gap-1">
+                {Object.entries(parsedAtribut).map(([key, val], idx) => (
+                  <span key={key}>
+                    {idx > 0 && <span className="mx-1 opacity-40 text-base-content">|</span>}
+                    <span className="opacity-70">{key}:</span> {String(val)}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* List Finishing */}
             {finishing.length > 0 ? (
               <span>
                 {finishing.map((f, idx) => (
@@ -176,9 +253,9 @@ export default function CartProductItem({
                 ))}
               </span>
             ) : (
-              <span className="opacity-40">Tidak ada jasa tambahan</span>
+              !parsedAtribut && <span className="opacity-40">Tidak ada jasa tambahan</span>
             )}
-          </p>
+          </div>
 
           {catatan && (
             <p className="text-[9px] font-bold opacity-60 lowercase first-letter:uppercase pt-1.5 border-t border-base-content/5">
@@ -191,13 +268,13 @@ export default function CartProductItem({
             <div className="pt-1.5 border-t border-base-content/5">
               <div className="flex flex-wrap gap-1.5">
                 {parsedFileDesain.tipe === "upload" && (
-                  <a href={`http://127.0.0.1:8000/storage/${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group">
+                  <a href={`http://127.0.0.1:8000/storage/${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group hover:border-primary">
                     <Paperclip size={10} className="text-primary"/>
                     <span className="truncate max-w-25">Lampiran File</span>
                   </a>
                 )}
                 {parsedFileDesain.tipe === "link" && (
-                  <a href={parsedFileDesain.nilai.startsWith('http') ? parsedFileDesain.nilai : `https://${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group">
+                  <a href={parsedFileDesain.nilai.startsWith('http') ? parsedFileDesain.nilai : `https://${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group hover:border-primary">
                     <LinkIcon size={10} className="text-primary"/>
                     <span className="truncate max-w-25">Buka Link Drive</span>
                   </a>
@@ -213,7 +290,7 @@ export default function CartProductItem({
           )}
         </div>
 
-        {/* 3. ROW BAWAH (Tombol Qty & Harga Total) */}
+        {/* 3. ROW BAWAH */}
         <div className="flex flex-row justify-between items-end w-full mt-3 gap-2">
           
           {/* Qty Controls */}
@@ -251,9 +328,10 @@ export default function CartProductItem({
               <p className="font-black text-[13px] sm:text-base text-primary leading-none">
                 Rp {rowTotal.toLocaleString("id-ID")}
               </p>
-              {harga_pengerjaan_snapshot > 0 && (
+              {/* Tanda Bintang Jika Ada Biaya Tambahan Finishing Fix Atau Pengerjaan */}
+              {(harga_pengerjaan_snapshot > 0 || rowTotal > (basePrice * jumlah)) && (
                 <span className="text-[7.5px] opacity-40 uppercase font-black tracking-wider mt-1">
-                  *Termasuk Biaya
+                  *Termasuk Biaya Jasa
                 </span>
               )}
             </div>

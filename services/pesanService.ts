@@ -27,6 +27,12 @@ export interface RincianDiskon {
   nominal: number;
 }
 
+// 👇 TAMBAHAN: Interface untuk object File Desain
+export interface FileDesainAPI {
+  tipe: string;
+  nilai: string;
+}
+
 export interface PesananItemFinishing {
   id: number;
   id_pesanan_item: number;
@@ -54,14 +60,18 @@ export interface PesananItem {
   
   harga_dasar_awal_snapshot?: number;
   total_diskon_snapshot?: number;
-  rincian_diskon_snapshot?: RincianDiskon[] | null;
+  
+  // 👇 PERBAIKAN: Beri opsi string untuk jaga-jaga data lama
+  rincian_diskon_snapshot?: RincianDiskon[] | string | null;
 
   estimasi_pengerjaan_snapshot?: string;
 
-  file_desain?: string | null;
+  // 👇 PERBAIKAN: Sesuaikan dengan object dari database
+  file_desain?: FileDesainAPI | string | null;
   catatan?: string | null;
   
-  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | null; // <-- Ditambahkan
+  // 👇 PERBAIKAN: Kasih opsi string
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | string | null; 
 
   created_at?: string;
   updated_at?: string;

@@ -23,32 +23,46 @@ async function getAuthHeader(isFormData = false) {
   return headers;
 }
 
-// Definisikan tipe strict pengganti 'any'
 export type CustomAttributeValue = string | number | boolean;
 
 export interface FinishingItemAPI {
   id?: number;
-  nama_finishing: string;
-  harga_tambahan: number;
+  id_sku_finishing?: number;
+  nama_finishing_snapshot: string;
+  harga_finishing_snapshot: number;
+  hpp_finishing_snapshot?: number;
+  kali_jumlah_pesan?: number | boolean;
+}
+
+export interface FileDesainAPI {
+  tipe: string;
+  nilai: string;
 }
 
 export interface CartItemAPI {
   id: number;
   id_pesan: string;
-  nama_sku: string;
-  harga_satuan: number;
+  id_sku?: string;
+  nama_produk_snapshot: string; 
+  harga_satuan_snapshot: number; 
   jumlah: number;
   gambar_url?: string | null;
   catatan?: string | null;
-  finishing?: FinishingItemAPI[];
+  
+
+  pesanan_item_finishing?: FinishingItemAPI[];
 
   harga_dasar_awal_snapshot?: number;
   total_diskon_snapshot?: number;
-  rincian_diskon_snapshot?: RincianDiskonAPI[];
-  estimasi_pengerjaan?: string;
-  harga_pengerjaan_snapshot?: number;
+  rincian_diskon_snapshot?: RincianDiskonAPI[] | string;
   
-  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | null; // <-- Ditambahkan
+  estimasi_pengerjaan_snapshot?: string;
+  harga_pengerjaan_snapshot?: number;
+
+  file_desain?: FileDesainAPI | string | null;
+  
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue> | string | null;
+  subtotal?: number;
 }
 
 export interface AddCartFinishing {
@@ -56,6 +70,8 @@ export interface AddCartFinishing {
   kategori_finishing?: string;
   nama_finishing_snapshot: string;
   harga_finishing_snapshot: number;
+  tipe?: string;
+  kali_jumlah_pesan: number | boolean;
 }
 
 export interface RincianDiskonAPI {
@@ -81,7 +97,7 @@ export interface AddCartItem {
   tipe_file?: "upload" | "link" | "email";
   link_file?: string;
 
-  atribut_custom_snapshot?: Record<string, CustomAttributeValue>; // <-- Ditambahkan
+  atribut_custom_snapshot?: Record<string, CustomAttributeValue>;
 }
 
 export interface CartServiceResponse<T = unknown> {
@@ -89,6 +105,22 @@ export interface CartServiceResponse<T = unknown> {
   message?: string;
   data?: T;
   error?: string;
+}
+
+export interface CartDataAPI {
+  id_pesan: string;
+  kode_transaksi: string;
+  id_customer: string;
+  status_operasional: string;
+  status_pembayaran: string;
+  pesanan_item?: CartItemAPI[];
+  subtotal: number;
+  kode_unik: number;
+  ongkir: number;
+  diskon_voucher: number;
+  total_tagihan: number;
+  total_dibayar: number;
+  sisa_tagihan: number;
 }
 
 export interface CheckoutPayload {
@@ -102,7 +134,7 @@ export interface CheckoutPayload {
   diskon_voucher_nominal?: number;
 }
 
-export async function getCartItems(): Promise<CartServiceResponse<unknown>> {
+export async function getCartItems(): Promise<CartServiceResponse<CartDataAPI>> {
   try {
     const headers = await getAuthHeader();
 
@@ -186,7 +218,19 @@ export async function addCart(id_alamat: string, items: AddCartItem[]): Promise<
       }
 
       if (item.finishings && item.finishings.length > 0) {
-        formData.append(`items[${index}][finishings]`, JSON.stringify(item.finishings));
+        item.finishings.forEach((fin, fIdx) => {
+          formData.append(`items[${index}][finishings][${fIdx}][id_sku_finishing]`, String(fin.id_sku_finishing));
+          formData.append(`items[${index}][finishings][${fIdx}][nama_finishing_snapshot]`, fin.nama_finishing_snapshot);
+          formData.append(`items[${index}][finishings][${fIdx}][harga_finishing_snapshot]`, String(fin.harga_finishing_snapshot));
+          formData.append(`items[${index}][finishings][${fIdx}][kali_jumlah_pesan]`, String(fin.kali_jumlah_pesan));
+          
+          if (fin.kategori_finishing) {
+            formData.append(`items[${index}][finishings][${fIdx}][kategori_finishing]`, fin.kategori_finishing);
+          }
+          if (fin.tipe) {
+            formData.append(`items[${index}][finishings][${fIdx}][tipe]`, fin.tipe);
+          }
+        });
       }
 
       // Handle JSON conversion untuk form data atribut custom
