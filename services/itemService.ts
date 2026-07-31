@@ -1,6 +1,8 @@
 // @/services/itemService.ts
 "use server";
 
+import redis from "@/lib/redis";
+
 export interface ItemData {
   id_produk: string;
   nama_produk: string;
@@ -93,10 +95,17 @@ export interface ApiItemDetailResponse {
   data: ItemDetailData;
 }
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 
 export async function getItems(): Promise<ItemData[]> {
+  const cacheKey = "bikincetak:items_all";
   try {
+    const cachedItems = await redis.get(cacheKey);
+    if (cachedItems) {
+      console.log("[getItems] HIT - Mengambil dari Redis");
+      return JSON.parse(cachedItems);
+    }
+    
     const response = await fetch(`${API_BASE_URL}/items`, {
       method: "GET",
       // next: { revalidate: 60 },
@@ -110,7 +119,13 @@ export async function getItems(): Promise<ItemData[]> {
     }
 
     const result: ApiItemsResponse = await response.json();
-    return result.success ? result.data : [];
+    
+    if (result.success) {
+      await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
+      return result.data;
+    }
+
+    return [];
   } catch (error) {
     if (error instanceof Error) console.error("[getItems] Catch Error:", error.message);
     return [];
@@ -118,7 +133,14 @@ export async function getItems(): Promise<ItemData[]> {
 }
 
 export async function getItemDetail(idProduk: string): Promise<ItemDetailData | null> {
+  const cacheKey = `bikincetak:item_detail:${idProduk}`;
   try {
+    const cachedDetail = await redis.get(cacheKey);
+    if (cachedDetail) {
+      console.log(`[getItemDetail] HIT - Mengambil dari Redis untuk ID: ${idProduk}`);
+      return JSON.parse(cachedDetail);
+    }
+    
     const url = `${API_BASE_URL}/item/${encodeURIComponent(idProduk)}`;
     const response = await fetch(url, { method: "GET", cache: "no-store" });
 
@@ -128,7 +150,13 @@ export async function getItemDetail(idProduk: string): Promise<ItemDetailData | 
     }
 
     const result: ApiItemDetailResponse = await response.json();
-    return result.success ? result.data : null;
+    
+    if (result.success) {
+      await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
+      return result.data;
+    }
+
+    return null;
   } catch (error: unknown) {
     if (error instanceof Error) console.error("[getItemDetail] Catch Error:", error.message);
     return null;
