@@ -84,8 +84,7 @@ const Footer = ({ items = [] }: FooterProps) => {
               BIKIN<span className="text-black">CETAK</span>
             </h2>
             <p className="text-sm leading-relaxed opacity-90 max-w-2xl">
-              Percetakan online terpercaya yang melayani berbagai kebutuhan cetak mesin offset, digital offset, 
-              hingga merchandise. Kami mengedepankan kemudahan pemesanan, kecepatan produksi, 
+              Percetakan online terpercaya yang melayani berbagai kebutuhan cetak mesin offset, digital offset, indoor, outdoor, sablon hingga merchandise. Kami mengedepankan kemudahan pemesanan, kecepatan produksi, 
               dan harga yang tetap terjangkau untuk bisnis Anda.
             </p>
             <div className="flex gap-4 mt-6">
@@ -105,10 +104,10 @@ const Footer = ({ items = [] }: FooterProps) => {
                 className="flex items-center gap-3 hover:text-black transition-colors"
               >
                 <Phone size={16} />
-                <span>0838-3186-2770</span>
+                <span>0812-1313-9490</span>
               </a>
               <div className="flex items-center gap-3">
-                <Mail size={16} /> <span>bikincetak@gmail.com</span>
+                <Mail size={16} /> <span>bikinkancetak@gmail.com</span>
               </div>
               <div className="flex items-center gap-3">
                 <MapPin size={16} /> <span>Layanan Online - Seluruh Indonesia</span>
@@ -146,7 +145,7 @@ const Footer = ({ items = [] }: FooterProps) => {
 
       <div className="bg-black/10 py-6">
         <div className="container mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-medium">
-          <p>© {new Date().getFullYear()} bikincetak.id - Percetakan Layanan Online Modern</p>
+          <p>© {new Date().getFullYear()} bikincetak.co.id - Percetakan Layanan Online Modern</p>
           <div className="flex gap-6 uppercase tracking-wider">
             <Link href="/profil" className="hover:text-black transition-colors">Profil</Link>
             <Link href="/cara-order" className="hover:text-black transition-colors">Cara Order</Link>

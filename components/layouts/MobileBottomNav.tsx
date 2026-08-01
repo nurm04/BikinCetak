@@ -149,7 +149,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto pb-8">
           <div className="flex flex-col gap-3">
-            <a href="https://wa.me/6283831862770" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
+            <a href="https://wa.me/6281213139490" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
               <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-600">
                 <Phone size={24} />
               </div>
@@ -158,7 +158,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
                 <p className="text-xs text-base-content/60">Fast response (08.00 - 17.00)</p>
               </div>
             </a>
-            <a href="mailto:bikincetak@gmail.com" className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
+            <a href="mailto:bikinkancetak@gmail.com" className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600">
                 <Mail size={24} />
               </div>
