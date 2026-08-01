@@ -40,14 +40,14 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
     setError(null);
 
     if (files && files.length > 0) {
-      const allowedExtensions = ["pdf", "ai", "jpg", "jpeg", "png", "zip", "rar"];
+      const allowedExtensions = ["jpg", "jpeg", "png", "tif", "tiff"];
       const file = files[0];
       const fileExtension = file.name.split(".").pop()?.toLowerCase();
 
       let hasError = false;
 
       if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-        setError("FORMAT FILE TIDAK DIDUKUNG (PDF, AI, JPG, PNG, ZIP)");
+        setError("HANYA JPG/PNG/TIF. GUNAKAN LINK/EMAIL UNTUK FORMAT LAIN");
         hasError = true;
       }
 
@@ -84,7 +84,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
 
         {activeTab === "upload" && (
           <div className="mt-3">
-             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.ai,.jpg,.jpeg,.png,.zip" />
+             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept=".jpg,.jpeg,.png,.tif,.tiff" />
              {!selectedFile ? (
                <button type="button" onClick={() => fileInputRef.current?.click()} className={`btn btn-outline border-dashed border-2 w-full flex items-center justify-start gap-3 rounded-2xl h-12 bg-base-200/30 hover:bg-base-200 min-w-0 px-4 overflow-hidden ${error ? 'border-error bg-error/5 text-error' : 'border-base-300'}`}>
                  {error ? <AlertCircle size={16} /> : <Paperclip size={16} className="text-primary shrink-0" />}
@@ -104,7 +104,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
 
         {activeTab === "link" && (
           <div className="mt-3">
-            <input type="url" placeholder="Paste link Google Drive/Dropbox di sini..." value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="input input-bordered w-full h-12 rounded-2xl text-xs font-bold bg-base-200/50" />
+            <input type="url" placeholder="Paste link Google Drive/Cloud di sini..." value={linkDrive} onChange={(e) => setLinkDrive(e.target.value)} className="input input-bordered w-full h-12 rounded-2xl text-xs font-bold bg-base-200/50" />
           </div>
         )}
 
@@ -119,7 +119,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
     );
   }
 
-  // Tampilan Box (Desktop) - DIPERBAIKI
+  // Tampilan Box (Desktop)
   return (
     <div className="bg-base-100 border-base-content/5 rounded-2xl border w-full max-w-full min-w-0 p-5 shadow-sm flex flex-col overflow-hidden box-border">
       
@@ -128,7 +128,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
           <Upload size={14} className="mr-2 shrink-0" /> File Desain
         </span>
         
-        {/* TABS DESKTOP: Disusun grid supaya rata dan tidak memanjang ke samping */}
+        {/* TABS DESKTOP */}
         <div className="grid grid-cols-3 bg-base-200 p-1 rounded-xl gap-1 w-full">
           <button onClick={() => setActiveTab('upload')} className={`btn btn-xs border-none font-black text-[9px] uppercase h-8 ${activeTab === 'upload' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Upload</button>
           <button onClick={() => setActiveTab('link')} className={`btn btn-xs border-none font-black text-[9px] uppercase h-8 ${activeTab === 'link' ? 'bg-base-100 shadow-sm text-primary' : 'bg-transparent text-base-content/50 hover:bg-base-300'}`}>Link</button>
@@ -143,7 +143,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
               onClick={() => fileInputRef.current?.click()}
               className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl py-8 px-4 transition-all cursor-pointer group w-full max-w-full min-w-0 overflow-hidden box-border ${error ? "border-error bg-error/5" : "border-base-300 bg-base-200/50 hover:bg-base-200 hover:border-primary"}`}
             >
-              <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,.ai,.jpg,.jpeg,.png,.zip" />
+              <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileChange} accept=".jpg,.jpeg,.png,.tif,.tiff" />
               {error ? <AlertCircle className="mb-4 text-error animate-bounce" size={28} /> : <Upload className="mb-4 opacity-20 group-hover:text-primary group-hover:opacity-100 transition-all shrink-0" size={28} />}
               <p className={`text-[10px] text-center font-black uppercase tracking-tighter px-2 leading-tight ${error ? 'text-error' : 'opacity-50'}`}>{error || "Klik/Seret File ke Sini"}</p>
             </div>
@@ -158,7 +158,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
             </div>
           )}
           <p className={`text-[8px] mt-3 uppercase font-black text-center tracking-widest truncate w-full shrink-0 ${error ? 'text-error' : 'opacity-30'}`}>
-            {error ? `* ${error}` : "* PDF, AI, JPG, PNG, ZIP (MAKS 200MB)"}
+            {error ? `* ${error}` : "* JPG, PNG, TIF (MAKS 200MB)"}
           </p>
         </>
       )}
@@ -168,7 +168,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
           <LinkIcon className="mb-3 opacity-20 text-primary transition-all shrink-0" size={28} />
           <input 
             type="url" 
-            placeholder="Paste link Drive/Canva..." 
+            placeholder="Paste link Drive/Cloud..." 
             value={linkDrive} 
             onChange={(e) => setLinkDrive(e.target.value)} 
             className="input input-bordered w-full h-10 rounded-xl font-bold bg-base-100 text-[10px] text-center" 

@@ -24,8 +24,7 @@ export interface UserProfile {
   customer: CustomerProfile | null;
 }
 
-const BASE_URL = "http://127.0.0.1:8000/api";
-
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 async function getAuthHeader() {
   const cookieStore = await cookies();
   const jwtCookie = cookieStore.get("jwt");

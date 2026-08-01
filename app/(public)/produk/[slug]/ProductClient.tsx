@@ -92,8 +92,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
       Object.entries(groups).forEach(([kategori, options]) => {
         if (options.length > 0) {
-          defaultFinishing[kategori] = options[0];
-          defaultOptions[kategori] = options[0].id_pilihan_finishing;
+          defaultFinishing[kategori] = null;
+          defaultOptions[kategori] = ""; 
         }
       });
     }
@@ -114,10 +114,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         setSelectedPengerjaanTitle("Reguler");
     }
   }, [availablePengerjaan, selectedPengerjaanTitle]);
-
-  // ==== RUMUS FIX CETAK BUKU (HALAMAN 1 GRATIS) ====
   
-  // 1. Deteksi otomatis Sisi Cetak dari dropdown finishing
   const sisiCetakMultiplier = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
       let sisi = 1;
@@ -133,15 +130,12 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return 1;
   }, [sku?.tipe_kalkulasi, selectedFinishing]);
 
-  // 2. Ambil Input Halaman
   const jumlahHalaman = useMemo(() => {
     if (sku?.tipe_kalkulasi !== 'cetak_buku') return 1;
     const val = parseInt(selectedOptions.jumlah_halaman || "1", 10);
     return isNaN(val) || val < 1 ? 1 : val; 
   }, [sku?.tipe_kalkulasi, selectedOptions.jumlah_halaman]);
 
-  // 3. Harga Kertas = (Jumlah Halaman - 1) x 1500 x Sisi 
-  // Jika halaman cuma 1, math.max memastikan halamanDicharge = 0, jadi biaya kertas = Rp 0.
   const biayaHalamanPerBuku = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
       const halamanDicharge = Math.max(0, jumlahHalaman - 1);
@@ -150,12 +144,9 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return 0;
   }, [sku?.tipe_kalkulasi, jumlahHalaman, sisiCetakMultiplier]);
 
-  // 4. Harga Dasar Awal
   const hargaDasarAwal = useMemo(() => {
     return Number(sku?.harga_dasar) || 0;
   }, [sku]);
-
-  // =================================================================
 
   const diskonGrosirPerPcs = useMemo(() => {
       if (!sku) return 0;
@@ -182,23 +173,19 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   }, [activeDiscount, hargaDasarAwal]);
 
   const totalDiskonSatuan = useMemo(() => diskonGrosirPerPcs + diskonMemberPerPcs, [diskonGrosirPerPcs, diskonMemberPerPcs]);
-  
-  // Harga Cover/Jilid setelah Diskon
   const hargaSatuanNet = useMemo(() => Math.max(0, hargaDasarAwal - totalDiskonSatuan), [hargaDasarAwal, totalDiskonSatuan]);
   
-  // Harga 1 Buku Final (Harga Dasar + Kertas Halaman Dalam)
   const hargaSatuProdukFull = useMemo(() => {
     return hargaSatuanNet + biayaHalamanPerBuku;
   }, [hargaSatuanNet, biayaHalamanPerBuku]);
   
-  // ==== LOGIKA FINISHING (SEMUA TERMASUK SISI CETAK DIHITUNG) ====
   const totalFinishing = useMemo(() => {
     let total = 0;
     Object.values(selectedFinishing).forEach((fin) => {
       if (!fin) return;
       
       let biaya = 0;
-      const tipeFinishing = fin.tipe || 'nominal'; // Fallback aman anti jutaan
+      const tipeFinishing = fin.tipe || 'nominal'; 
       
       if (tipeFinishing === 'persen') {
         biaya = hargaSatuProdukFull * (Number(fin.harga_tambahan) / 100);
@@ -225,7 +212,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const slaPrice = useMemo(() => {
       if (!activePengerjaanObj) return 0;
-      const tipeSla = activePengerjaanObj.tipe || 'nominal'; // Fallback biar aman
+      const tipeSla = activePengerjaanObj.tipe || 'nominal'; 
       return tipeSla === 'persen' ? totalProduk * (Number(activePengerjaanObj.nilai) / 100) : Number(activePengerjaanObj.nilai);
   }, [activePengerjaanObj, totalProduk]);
 
@@ -320,10 +307,35 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return;
     }
 
+    // VALIDASI: Wajib lampirkan Desain
+    if (fileDesain.tipe_file === "upload" && !fileDesain.file) {
+      setPopup({ isOpen: true, title: "File Desain Wajib!", message: "Anda wajib mengunggah file desain untuk melanjutkan pesanan.", type: "warning" });
+      return;
+    }
+    if (fileDesain.tipe_file === "link" && !fileDesain.link_file) {
+      setPopup({ isOpen: true, title: "Link Desain Wajib!", message: "Anda wajib memasukkan link Google Drive/Cloud desain pesanan Anda.", type: "warning" });
+      return;
+    }
+
+    // VALIDASI: Cek Format & Ukuran untuk Upload Langsung
     if (fileDesain.tipe_file === "upload" && fileDesain.file) {
+      const allowedExtensions = ['jpg', 'jpeg', 'png', 'tif', 'tiff'];
+      const fileName = fileDesain.file.name.toLowerCase();
+      const fileExt = fileName.split('.').pop() || '';
+
+      if (!allowedExtensions.includes(fileExt)) {
+        setPopup({ 
+          isOpen: true, 
+          title: "Format File Ditolak!", 
+          message: "Sistem upload langsung hanya untuk format JPG, JPEG, PNG, dan TIF. Untuk format lain (CDR, PSD, PDF, dsb) wajib dikirim melalui Opsi Link Drive atau Email.", 
+          type: "warning" 
+        });
+        return;
+      }
+
       const MAX_FILE_SIZE = 200 * 1024 * 1024;
       if (fileDesain.file.size > MAX_FILE_SIZE) {
-        setPopup({ isOpen: true, title: "File Terlalu Besar!", message: "Maksimal ukuran file untuk di-upload langsung adalah 200MB. Silakan gunakan opsi pengiriman via Link.", type: "warning" });
+        setPopup({ isOpen: true, title: "File Terlalu Besar!", message: "Maksimal ukuran file untuk di-upload langsung adalah 200MB. Silakan gunakan opsi pengiriman via Link Drive.", type: "warning" });
         return;
       }
     }
@@ -543,8 +555,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <div className="space-y-2">
                     <FileUpload variant="minimal" onChange={setFileDesain} />
                     <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
-                      <Info size={14} className="shrink-0" />
-                      <p>Max upload file 200MB. Jika file lebih besar, mohon pilih opsi kirim via <b>Link Google Drive / Cloud</b>.</p>
+                      <Info size={14} className="shrink-0 mt-0.5" />
+                      <p>
+                        Lampiran file <b>wajib diisi</b>. Format upload langsung hanya <b>JPG, JPEG, PNG, TIF</b> (Max 200MB). 
+                        Untuk format mentahan seperti PDF, CDR, PSD, AI, harap pilih opsi pengiriman via <b>Link Drive</b> atau <b>Email</b>.
+                      </p>
                     </div>
                   </div>
                   <div className="bg-base-200/50 p-5 rounded-2xl border border-base-content/5">
@@ -661,8 +676,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             <div className="space-y-2">
               <FileUpload onChange={setFileDesain} />
               <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
-                <Info size={14} className="shrink-0" />
-                <p>Max upload file 200MB. Jika file lebih besar, mohon pilih opsi kirim via <b>Link Google Drive / Cloud</b>.</p>
+                <Info size={14} className="shrink-0 mt-0.5" />
+                <p>
+                  Lampiran file <b>wajib diisi</b>. Format upload langsung hanya <b>JPG, JPEG, PNG, TIF</b> (Max 200MB). 
+                  Untuk format mentahan seperti PDF, CDR, PSD, AI, harap pilih opsi pengiriman via <b>Link Drive</b> atau <b>Email</b>.
+                </p>
               </div>
             </div>
             

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache"; 
-import { ArrowLeft, ShoppingBag, CreditCard, Calendar, CheckCircle } from "lucide-react";
+import { ArrowLeft, ShoppingBag, CreditCard, Calendar, CheckCircle, Truck } from "lucide-react";
 import { getPesananByKodeTransaksi, completePesanan, Pesanan, PesananItem, CustomAttributeValue, RincianDiskon } from "@/services/pesanService";
 import CartProductItem from "@/components/shared/CardProductItem";
 
@@ -26,6 +26,7 @@ export default async function DetailPesananPage({ params }: {
   const kodeUnik = Number(pesanan.kode_unik || 0);
   const ongkir = Number(pesanan.harga_ongkir || 0);
   const diskon = Number(pesanan.diskon_voucher_nominal || 0);
+  const nomorResi = pesanan.nomor_resi;
 
   // ==========================================
   // KALKULASI ULANG HARGA MURNI & PENGERJAAN
@@ -171,7 +172,6 @@ export default async function DetailPesananPage({ params }: {
                         harga_pengerjaan_snapshot={item.harga_pengerjaan_snapshot}
                         catatan={item.catatan}
                         file_desain={parsedFileDesain}
-                        // Pastikan meneruskan atribut_custom_snapshot jika CardProductItem butuh
                         atribut_custom_snapshot={item.atribut_custom_snapshot}
                      />
                    )
@@ -184,6 +184,35 @@ export default async function DetailPesananPage({ params }: {
           <div className="lg:col-span-4">
             <div className="sticky top-24 space-y-4">
               
+              {/* INFORMASI PENGIRIMAN */}
+              {pesanan.ekspedisi_nama && (
+                <div className="card bg-base-100 border border-base-content/5 rounded-2xl shadow-sm">
+                  <div className="card-body">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-4 flex items-center gap-2">
+                      <Truck size={14} /> Pengiriman
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-[10px] font-bold opacity-50 uppercase tracking-widest mb-1">Kurir / Ekspedisi</p>
+                        <p className="text-sm font-black text-base-content uppercase">
+                          {pesanan.ekspedisi_nama} {pesanan.ekspedisi_layanan ? ` - ${pesanan.ekspedisi_layanan}` : ''}
+                        </p>
+                      </div>
+                      
+                      {/* Tampilkan Nomor Resi HANYA JIKA ADA ISINYA */}
+                      {nomorResi && (
+                        <div className="pt-3 border-t border-dashed border-base-content/10">
+                          <p className="text-[10px] font-bold opacity-50 uppercase tracking-widest mb-2">Nomor Resi</p>
+                          <div className="bg-primary/5 border border-primary/20 p-3 rounded-xl">
+                            <p className="text-sm font-black tracking-widest text-primary select-all text-center">{nomorResi}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* RINGKASAN TAGIHAN */}
               <div className="card bg-base-100 border border-base-content/5 rounded-2xl shadow-sm">
                 <div className="card-body">
@@ -227,7 +256,6 @@ export default async function DetailPesananPage({ params }: {
                     
                     <div className="flex flex-col gap-1">
                       <p className="text-[10px] uppercase font-black opacity-40 tracking-widest">Total Tagihan</p>
-                      {/* TAMPILKAN TOTAL TAGIHAN YANG AKURAT */}
                       <p className="text-3xl font-black text-primary tracking-tighter">Rp {totalTagihanAkurat.toLocaleString("id-ID")}</p>
                     </div>
                   </div>
@@ -288,7 +316,7 @@ export default async function DetailPesananPage({ params }: {
               )}
 
               {pesanan.status_operasional === "proses_pengantaran" && (
-                 <form action={completeAction.bind(null, pesanan.kode_transaksi)}>
+                 <form action={completeAction.bind(null, pesanan.id_pesan)}>
                     <button className="btn btn-success text-white btn-block rounded-2xl font-black uppercase text-xs shadow-lg shadow-success/30">
                       <CheckCircle size={18} /> Transaksi Diterima
                     </button>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // @/services/itemService.ts
 "use server";
 
@@ -99,17 +100,24 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/a
 
 export async function getItems(): Promise<ItemData[]> {
   const cacheKey = "bikincetak:items_all";
+
   try {
-    const cachedItems = await redis.get(cacheKey);
+    let cachedItems = null;
+    try {
+      cachedItems = await redis.get(cacheKey);
+    } catch (redisError) {
+      console.error("[getItems] Redis bermasalah, lanjut tembak API:", redisError instanceof Error ? redisError.message : String(redisError));
+    }
+
     if (cachedItems) {
       console.log("[getItems] HIT - Mengambil dari Redis");
       return JSON.parse(cachedItems);
     }
-    
+
+    console.log("[getItems] MISS - Menembak API Laravel");
     const response = await fetch(`${API_BASE_URL}/items`, {
       method: "GET",
-      // next: { revalidate: 60 },
-      cache: "no-store",
+      cache: "no-store", 
     });
 
     if (!response.ok) {
@@ -121,7 +129,11 @@ export async function getItems(): Promise<ItemData[]> {
     const result: ApiItemsResponse = await response.json();
     
     if (result.success) {
-      await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
+      try {
+        await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
+      } catch (setCacheError) {
+        console.error("[getItems] Gagal set cache Redis, tapi data tetap dikirim ke user");
+      }
       return result.data;
     }
 
@@ -134,13 +146,21 @@ export async function getItems(): Promise<ItemData[]> {
 
 export async function getItemDetail(idProduk: string): Promise<ItemDetailData | null> {
   const cacheKey = `bikincetak:item_detail:${idProduk}`;
+  
   try {
-    const cachedDetail = await redis.get(cacheKey);
+    let cachedDetail = null;
+    try {
+      cachedDetail = await redis.get(cacheKey);
+    } catch (redisError) {
+      console.error(`[getItemDetail] Redis bermasalah, lanjut tembak API:`, redisError instanceof Error ? redisError.message : String(redisError));
+    }
+
     if (cachedDetail) {
       console.log(`[getItemDetail] HIT - Mengambil dari Redis untuk ID: ${idProduk}`);
       return JSON.parse(cachedDetail);
     }
-    
+
+    console.log(`[getItemDetail] MISS - Menembak API Laravel untuk ID: ${idProduk}`);
     const url = `${API_BASE_URL}/item/${encodeURIComponent(idProduk)}`;
     const response = await fetch(url, { method: "GET", cache: "no-store" });
 
@@ -152,7 +172,11 @@ export async function getItemDetail(idProduk: string): Promise<ItemDetailData | 
     const result: ApiItemDetailResponse = await response.json();
     
     if (result.success) {
-      await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
+      try {
+        await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
+      } catch (setCacheError) {
+        console.error("[getItemDetail] Gagal set cache Redis, tapi data tetap dikirim ke user");
+      }
       return result.data;
     }
 

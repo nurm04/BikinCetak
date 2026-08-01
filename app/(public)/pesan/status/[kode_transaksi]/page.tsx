@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle2, CircleDot, Clock, CreditCard, Package, Truck, XCircle, Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, use } from "react";
-import { getStatusPesanan, Pesanan, CustomAttributeValue } from "@/services/pesanService"; // <-- Tambahkan CustomAttributeValue
+import { getStatusPesanan, Pesanan, CustomAttributeValue } from "@/services/pesanService";
 
 interface Props {params: Promise<{kode_transaksi: string}>}
 
@@ -201,6 +201,7 @@ export default function StatusPesananPage({params}: Props) {
   }
 
   const kodeUnikPesanan = Number(pesanan.kode_unik) || 0;
+  const nomorResi = pesanan.nomor_resi;
 
   return (
     <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8">
@@ -333,13 +334,13 @@ export default function StatusPesananPage({params}: Props) {
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-4">
+        {/* UBAH DISINI: Grid kolom otomatis jadi 3 jika ada nomor_resi */}
+        <div className={`grid gap-4 ${nomorResi ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div className="bg-base-100 rounded-2xl p-6 border border-base-content/5">
             <div className="flex items-center gap-2 mb-3 opacity-50">
               <Clock size={16} />
               <span className="text-[10px] font-black uppercase">Tanggal Pesan</span>
             </div>
-
             <p className="font-bold">
               {new Date(pesanan.tanggal_pesan).toLocaleString("id-ID")}
             </p>
@@ -350,14 +351,32 @@ export default function StatusPesananPage({params}: Props) {
               <CreditCard size={16} />
               <span className="text-[10px] font-black uppercase">Total Tagihan</span>
             </div>
-
             <p className="text-2xl font-black text-primary">
               Rp {total_tagihan_akurat.toLocaleString("id-ID")}
             </p>
           </div>
+
+          {/* BOX RESI - Tampil HANYA Jika nomorResi isi */}
+          {nomorResi && (
+            <div className="bg-base-100 rounded-2xl p-6 border border-base-content/5">
+              <div className="flex items-center gap-2 mb-3 opacity-50">
+                <Truck size={16} />
+                <span className="text-[10px] font-black uppercase">Nomor Resi</span>
+              </div>
+              <p className="text-lg font-black text-primary select-all tracking-wider truncate">
+                {nomorResi}
+              </p>
+              {pesanan.ekspedisi_nama && (
+                <p className="text-[9px] uppercase font-bold opacity-50 mt-1 line-clamp-1">
+                  {pesanan.ekspedisi_nama} {pesanan.ekspedisi_layanan ? `- ${pesanan.ekspedisi_layanan}` : ''}
+                </p>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="mt-8">
-          <Link href={`/pesan/${kode_transaksi}`} className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase">
+          <Link href={`/pesan/${kode_transaksi}`} className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase shadow-lg shadow-primary/20">
             Lihat Detail Transaksi
           </Link>
         </div>
