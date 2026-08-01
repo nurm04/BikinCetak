@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "BikinCetak - Platform Digital Printing Modern",
     description: "Percetakan online terlengkap untuk kebutuhan promosi bisnis Anda.",
-    url: "https://bikincetak.com",
+    url: "https://bikincetak.co.id",
     siteName: "BikinCetak",
     images: [
       {
