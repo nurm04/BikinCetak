@@ -423,7 +423,7 @@ export default function CartClient() {
                 </div>
 
                 <p className="hidden lg:block text-[8px] text-center mt-4 opacity-40 font-bold uppercase tracking-tighter">
-                  Harga sudah termasuk pajak & biaya layanan cetak. Belum termasuk ongkos kirim.
+                  Harga sudah termasuk biaya layanan cetak. Belum termasuk ongkos kirim.
                 </p>
 
               </div>

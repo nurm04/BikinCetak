@@ -105,10 +105,20 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const availablePengerjaan = useMemo(() => sku?.harga_pengerjaan || [], [sku]);
   
+  // REVISI: Logika Default Pengerjaan
   useEffect(() => {
     if (availablePengerjaan.length > 0) {
         if (!availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle)) {
-            setSelectedPengerjaanTitle(availablePengerjaan[0].pengerjaan);
+            // Cari yang harganya 0
+            const freeSla = availablePengerjaan.find(p => Number(p.nilai) === 0);
+            
+            if (freeSla) {
+              setSelectedPengerjaanTitle(freeSla.pengerjaan);
+            } else {
+              // Kalau nggak ada yang 0, urutkan dari yang termurah
+              const lowestSla = [...availablePengerjaan].sort((a, b) => Number(a.nilai) - Number(b.nilai))[0];
+              setSelectedPengerjaanTitle(lowestSla.pengerjaan);
+            }
         }
     } else {
         setSelectedPengerjaanTitle("Reguler");
@@ -455,20 +465,21 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Daftar Harga Grosir</p>
-                  <div className="overflow-hidden border border-base-content/10 rounded-xl">
-                    <table className="table table-xs w-full bg-base-100">
-                      <thead className="bg-base-200/50">
-                        <tr>
-                          <th className="font-black uppercase py-3">Jumlah (Pcs)</th>
-                          <th className="font-black uppercase py-3 text-right">Harga Satuan</th>
-                        </tr>
-                      </thead>
-                      <tbody className="font-bold">
-                        {sku ? (
-                          sku.harga_bertingkat && sku.harga_bertingkat.length > 0 ? (
-                            sku.harga_bertingkat.map((rule, idx) => {
+                {/* REVISI: Menyembunyikan Daftar Harga Grosir jika Kosong */}
+                {sku && sku.harga_bertingkat && sku.harga_bertingkat.length > 0 && (
+                  <>
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Daftar Harga Grosir</p>
+                      <div className="overflow-hidden border border-base-content/10 rounded-xl">
+                        <table className="table table-xs w-full bg-base-100">
+                          <thead className="bg-base-200/50">
+                            <tr>
+                              <th className="font-black uppercase py-3">Jumlah (Pcs)</th>
+                              <th className="font-black uppercase py-3 text-right">Harga Satuan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="font-bold">
+                            {sku.harga_bertingkat.map((rule, idx) => {
                               const discount = rule.tipe === 'persen' 
                                 ? hargaDasarAwal * (rule.nilai / 100) 
                                 : rule.nilai;
@@ -481,19 +492,14 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                                   <td className="py-3 text-right">Rp {pricePerPcs.toLocaleString("id-ID")}</td>
                                 </tr>
                               );
-                            })
-                          ) : (
-                            <tr><td colSpan={2} className="py-4 text-center opacity-50 font-normal normal-case">Tidak ada jatah harga grosir khusus.</td></tr>
-                          )
-                        ) : (
-                          <tr><td colSpan={2} className="py-4 text-center opacity-50 font-normal normal-case">Sedang memuat harga grosir...</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div className="divider opacity-5 my-0"></div>
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div className="divider opacity-5 my-0"></div>
+                  </>
+                )}
 
                 <div className="space-y-4">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Konfigurasi Pesanan</p>
