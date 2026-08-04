@@ -25,9 +25,10 @@ interface ProductClientLayoutProps {
   }[];
   activeRoleId?: string | null;
   idAlamatUtama?: string;
+  isLoggedIn?: boolean; 
 }
 
-export default function ProductClientLayout({ itemDetail, initialSku, recommendations, activeRoleId, idAlamatUtama }: ProductClientLayoutProps) {
+export default function ProductClientLayout({ itemDetail, initialSku, recommendations, activeRoleId, idAlamatUtama, isLoggedIn }: ProductClientLayoutProps) {
   const router = useRouter();
   const [cartLoading, setCartLoading] = useState<boolean>(false);
 
@@ -39,6 +40,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       catatan: "", 
       id_sku: targetSku?.id_sku || "",
       jumlah_halaman: "1",
+      Panjang: "1",
+      Lebar: "1"
     };
   });
   
@@ -105,17 +108,14 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const availablePengerjaan = useMemo(() => sku?.harga_pengerjaan || [], [sku]);
   
-  // REVISI: Logika Default Pengerjaan
   useEffect(() => {
     if (availablePengerjaan.length > 0) {
         if (!availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle)) {
-            // Cari yang harganya 0
             const freeSla = availablePengerjaan.find(p => Number(p.nilai) === 0);
             
             if (freeSla) {
               setSelectedPengerjaanTitle(freeSla.pengerjaan);
             } else {
-              // Kalau nggak ada yang 0, urutkan dari yang termurah
               const lowestSla = [...availablePengerjaan].sort((a, b) => Number(a.nilai) - Number(b.nilai))[0];
               setSelectedPengerjaanTitle(lowestSla.pengerjaan);
             }
@@ -124,6 +124,42 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         setSelectedPengerjaanTitle("Reguler");
     }
   }, [availablePengerjaan, selectedPengerjaanTitle]);
+
+  const valPanjang = selectedOptions['Panjang'];
+  const valLebar = selectedOptions['Lebar'];
+
+  useEffect(() => {
+    if (sku?.tipe_kalkulasi === 'cetak_meteran') {
+      const p = parseFloat(valPanjang) || 1;
+      const l = parseFloat(valLebar) || 1;
+      const luasMurni = p * l;
+
+      const minDim = Math.min(p, l);
+      const maxDim = Math.max(p, l);
+
+      const rollSizes = [0.9, 1.2, 1.5, 1.6, 1.8, 2.0, 2.2, 2.5, 2.6, 2.8, 3.2];
+      let lebarBahan = rollSizes.find(size => size >= minDim);
+      
+      if (!lebarBahan) {
+          lebarBahan = Math.ceil(minDim);
+      }
+
+      const luasDihargai = lebarBahan * maxDim;
+
+      if (
+        selectedOptions['Luas Murni (m2)'] !== luasMurni.toFixed(2) ||
+        selectedOptions['Lebar Bahan Dihitung'] !== lebarBahan.toFixed(2) ||
+        selectedOptions['Luas Dihargai (m2)'] !== luasDihargai.toFixed(2)
+      ) {
+        setSelectedOptions(prev => ({
+          ...prev,
+          'Luas Murni (m2)': luasMurni.toFixed(2),
+          'Lebar Bahan Dihitung': lebarBahan.toFixed(2),
+          'Luas Dihargai (m2)': luasDihargai.toFixed(2)
+        }));
+      }
+    }
+  }, [valPanjang, valLebar, sku?.tipe_kalkulasi]);
   
   const sisiCetakMultiplier = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
@@ -183,11 +219,30 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   }, [activeDiscount, hargaDasarAwal]);
 
   const totalDiskonSatuan = useMemo(() => diskonGrosirPerPcs + diskonMemberPerPcs, [diskonGrosirPerPcs, diskonMemberPerPcs]);
+  
   const hargaSatuanNet = useMemo(() => Math.max(0, hargaDasarAwal - totalDiskonSatuan), [hargaDasarAwal, totalDiskonSatuan]);
   
   const hargaSatuProdukFull = useMemo(() => {
-    return hargaSatuanNet + biayaHalamanPerBuku;
-  }, [hargaSatuanNet, biayaHalamanPerBuku]);
+    let net = hargaSatuanNet + biayaHalamanPerBuku;
+    
+    if (sku?.tipe_kalkulasi === 'cetak_meteran') {
+      let luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+      if (isNaN(luas) || luas < 1) luas = 1;
+      net = net * luas;
+    }
+    
+    return net;
+  }, [hargaSatuanNet, biayaHalamanPerBuku, sku?.tipe_kalkulasi, selectedOptions]);
+
+  const hargaDasarFullUI = useMemo(() => {
+    let base = hargaDasarAwal;
+    if (sku?.tipe_kalkulasi === 'cetak_meteran') {
+      let luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+      if (isNaN(luas) || luas < 1) luas = 1;
+      base = base * luas;
+    }
+    return base;
+  }, [hargaDasarAwal, sku?.tipe_kalkulasi, selectedOptions]);
   
   const totalFinishing = useMemo(() => {
     let total = 0;
@@ -198,7 +253,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       const tipeFinishing = fin.tipe || 'nominal'; 
       
       if (tipeFinishing === 'persen') {
-        biaya = hargaSatuProdukFull * (Number(fin.harga_tambahan) / 100);
+        const hargaFisikSatuBarang = sku?.tipe_kalkulasi === 'cetak_meteran' 
+          ? hargaSatuProdukFull * (parseFloat(selectedOptions['Luas Dihargai (m2)']) || 1)
+          : hargaSatuProdukFull;
+
+        biaya = hargaFisikSatuBarang * (Number(fin.harga_tambahan) / 100);
       } else {
         biaya = Number(fin.harga_tambahan) || 0;
       }
@@ -210,7 +269,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       total += biaya;
     });
     return total;
-  }, [selectedFinishing, hargaSatuProdukFull, currentQty]);
+  }, [selectedFinishing, hargaSatuProdukFull, currentQty, sku?.tipe_kalkulasi, selectedOptions]);
 
   const totalHargaProdukUtama = useMemo(() => hargaSatuProdukFull * currentQty, [hargaSatuProdukFull, currentQty]);
   const totalProduk = useMemo(() => totalHargaProdukUtama + totalFinishing, [totalHargaProdukUtama, totalFinishing]);
@@ -298,17 +357,39 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   };
 
   const handleAddToCart = async () => {
+    // ==========================================
+    // 1. REVISI: Cek Login Dulu!
+    // ==========================================
+    // Jika isLoggedIn explicit `false` ATAU (isLoggedIn tidak di-pass/undefined DAN activeRoleId kosong)
+    if (isLoggedIn === false || (isLoggedIn === undefined && !activeRoleId)) {
+      setPopup({ 
+        isOpen: true, 
+        title: "Perlu Login", 
+        message: "Silakan login terlebih dahulu untuk melanjutkan pesanan.", 
+        type: "warning",
+        link: '/login'
+      });
+      return;
+    }
+
+    // ==========================================
+    // 2. Cek Alamat Pengiriman
+    // ==========================================
     if (!idAlamatUtama) {
       setPopup({ 
-        isOpen: true, title: "Alamat Kosong", 
-        message: "Silakan tambahkan alamat pengiriman di menu Profil terlebih dahulu sebelum memesan.", type: "warning",
+        isOpen: true, 
+        title: "Alamat Kosong", 
+        message: "Silakan tambahkan alamat pengiriman di menu Profil terlebih dahulu sebelum memesan.", 
+        type: "warning",
         link: '/profil/alamat/tambah'
       });
       return;
     }
 
+    // 3. Cek SKU
     if (!sku) return;
 
+    // 4. Cek Kelengkapan Data Buku
     if (sku.tipe_kalkulasi === 'cetak_buku' && (!selectedOptions.jumlah_halaman || jumlahHalaman < 1)) {
       setPopup({ 
         isOpen: true, title: "Data Tidak Lengkap", 
@@ -317,7 +398,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return;
     }
 
-    // VALIDASI: Wajib lampirkan Desain
+    // 5. Cek Kelengkapan File
     if (fileDesain.tipe_file === "upload" && !fileDesain.file) {
       setPopup({ isOpen: true, title: "File Desain Wajib!", message: "Anda wajib mengunggah file desain untuk melanjutkan pesanan.", type: "warning" });
       return;
@@ -326,8 +407,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       setPopup({ isOpen: true, title: "Link Desain Wajib!", message: "Anda wajib memasukkan link Google Drive/Cloud desain pesanan Anda.", type: "warning" });
       return;
     }
-
-    // VALIDASI: Cek Format & Ukuran untuk Upload Langsung
     if (fileDesain.tipe_file === "upload" && fileDesain.file) {
       const allowedExtensions = ['jpg', 'jpeg', 'png', 'tif', 'tiff'];
       const fileName = fileDesain.file.name.toLowerCase();
@@ -387,6 +466,15 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       
       if (sku.tipe_kalkulasi === 'cetak_buku') {
         atributCustom['Jumlah Halaman'] = jumlahHalaman;
+      } else if (sku.tipe_kalkulasi === 'cetak_meteran') {
+        ['Panjang', 'Lebar', 'Luas Murni (m2)', 'Lebar Bahan Dihitung', 'Luas Dihargai (m2)'].forEach(key => {
+          if (selectedOptions[key] !== undefined) {
+            atributCustom[key] = selectedOptions[key];
+          }
+        });
+        if (!atributCustom['Luas Dihargai (m2)']) {
+          atributCustom['Luas Dihargai (m2)'] = 1;
+        }
       }
 
       const result = await addCart(
@@ -397,7 +485,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             jumlah: currentQty,
             nama_produk_snapshot: sku.nama_sku,
             harga_satuan_snapshot: hargaSatuanNet,
-            harga_dasar_awal_snapshot: hargaDasarAwal,
+            harga_dasar_awal_snapshot: hargaDasarAwal, 
             total_diskon_snapshot: totalDiskonSatuan,
             rincian_diskon_snapshot: rincianDiskon,
             estimasi_pengerjaan: activePengerjaanObj?.pengerjaan || "Reguler",
@@ -465,7 +553,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                 </div>
 
-                {/* REVISI: Menyembunyikan Daftar Harga Grosir jika Kosong */}
                 {sku && sku.harga_bertingkat && sku.harga_bertingkat.length > 0 && (
                   <>
                     <div className="space-y-3">
@@ -577,10 +664,13 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                           {sku?.tipe_kalkulasi === 'cetak_buku' && (
                               <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
                           )}
+                          {sku?.tipe_kalkulasi === 'cetak_meteran' && (
+                              <span className="text-[9px] lowercase opacity-70">ukuran: {selectedOptions['Luas Dihargai (m2)'] || 1} m²</span>
+                          )}
                         </span>
                         <div className="text-right flex items-center">
                            {(diskonMemberPerPcs > 0 || diskonGrosirPerPcs > 0) && (
-                             <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarAwal.toLocaleString("id-ID")}</span>
+                             <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                            )}
                            <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
                         </div>
@@ -638,12 +728,15 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <span className="opacity-60 flex flex-col">
                     Harga ({currentQty} {sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs'})
                     {sku?.tipe_kalkulasi === 'cetak_buku' && (
-                       <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
+                        <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
+                    )}
+                    {sku?.tipe_kalkulasi === 'cetak_meteran' && (
+                        <span className="text-[9px] lowercase opacity-70">ukuran: {selectedOptions['Luas Dihargai (m2)'] || 1} m²</span>
                     )}
                   </span>
                   <div className="text-right flex items-center">
                      {(diskonMemberPerPcs > 0 || diskonGrosirPerPcs > 0) && (
-                       <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarAwal.toLocaleString("id-ID")}</span>
+                       <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                      )}
                      <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
                   </div>
@@ -652,7 +745,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                 {activeDiscount && (
                   <div className="flex justify-end">
                     <span className="text-[9px] font-black uppercase tracking-widest text-success bg-success/10 px-2 py-0.5 rounded">
-                       ✨ Diskon Member {activeDiscount.tipe === 'persen' ? `${activeDiscount.nilai}%` : `Rp ${Number(activeDiscount.nilai).toLocaleString("id-ID")}`}
+                        ✨ Diskon Member {activeDiscount.tipe === 'persen' ? `${activeDiscount.nilai}%` : `Rp ${Number(activeDiscount.nilai).toLocaleString("id-ID")}`}
                     </span>
                   </div>
                 )}

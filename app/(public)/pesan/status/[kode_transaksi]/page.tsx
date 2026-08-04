@@ -115,6 +115,15 @@ export default function StatusPesananPage({params}: Props) {
         }
       }
 
+      // ==========================================================
+      // REVISI: Ambil Multiplier Luas Dihargai (Khusus Meteran)
+      // ==========================================================
+      let multiplierLuas = 1;
+      if (atribut && atribut["Luas Dihargai (m2)"] !== undefined) {
+        multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
+        if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
+      }
+
       // Ekstrak Sisi Cetak
       let sisi = 1;
       item.pesanan_item_finishing?.forEach((fin) => {
@@ -130,7 +139,9 @@ export default function StatusPesananPage({params}: Props) {
       }
 
       const finishingTotal = item.pesanan_item_finishing?.reduce((acc, fin) => acc + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
-      const subtotalItem = (hargaDasar + finishingTotal) * (Number(item.jumlah) || 1);
+      
+      // REVISI: Kalikan hargaDasar dengan luas sebelum ditambah finishing & Qty
+      const subtotalItem = ((hargaDasar * multiplierLuas) + finishingTotal) * (Number(item.jumlah) || 1);
 
       totalHargaMurniProduk += subtotalItem;
       totalBiayaPengerjaan += Number(item.harga_pengerjaan_snapshot) || 0;
@@ -334,7 +345,6 @@ export default function StatusPesananPage({params}: Props) {
           </div>
         )}
 
-        {/* UBAH DISINI: Grid kolom otomatis jadi 3 jika ada nomor_resi */}
         <div className={`grid gap-4 ${nomorResi ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div className="bg-base-100 rounded-2xl p-6 border border-base-content/5">
             <div className="flex items-center gap-2 mb-3 opacity-50">

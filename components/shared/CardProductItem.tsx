@@ -106,11 +106,22 @@ export default function CartProductItem({
       paperCost = (Math.max(0, hal - 1) * sisi * 1500);
   }
 
-  // Harga dasar per pcs (Harga SKU awal + Harga Kertas Tambahan)
-  const basePrice = harga_satuan + paperCost;
-  let subtotalItem = basePrice * jumlah;
+  // 3. REVISI: Ambil Multiplier Luas Dihargai
+  let multiplierLuas = 1;
+  let isMeteran = false;
+  if (parsedAtribut && parsedAtribut['Luas Dihargai (m2)'] !== undefined) {
+      isMeteran = true;
+      multiplierLuas = parseFloat(String(parsedAtribut['Luas Dihargai (m2)']));
+      if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
+  }
 
-  // 3. Hitung Biaya Finishing
+  // Harga dasar murni per item/meter (Harga SKU awal + Harga Kertas Tambahan)
+  const basePrice = harga_satuan + paperCost;
+  
+  // REVISI: Subtotal produk utama sekarang dikali Luas Dihargai (kalau ada)
+  let subtotalItem = (basePrice * multiplierLuas) * jumlah;
+
+  // 4. Hitung Biaya Finishing
   finishing.forEach((f) => {
     const isKaliQty = f.kali_jumlah_pesan === true || f.kali_jumlah_pesan === 1;
     const val = f.harga_tambahan || 0;
@@ -207,7 +218,10 @@ export default function CartProductItem({
         
         {/* Harga Satuan Dasar */}
         <p className="text-[10px] sm:text-xs font-bold text-primary mb-1.5 flex items-center gap-1">
-          Rp {basePrice.toLocaleString("id-ID")} <span className="opacity-60 text-base-content font-medium">/ pcs</span>
+          Rp {basePrice.toLocaleString("id-ID")} 
+          <span className="opacity-60 text-base-content font-medium">
+            {isMeteran ? '/ m²' : '/ pcs'}
+          </span>
         </p>
 
         {/* Badges */}
@@ -228,7 +242,7 @@ export default function CartProductItem({
         <div className="w-full bg-base-200/50 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-lg border border-base-content/5 space-y-1.5 mt-0.5">
           
           <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-tight leading-relaxed text-base-content/80">
-            {/* Atribut Custom (cth: Jumlah Halaman) */}
+            {/* Atribut Custom (cth: Jumlah Halaman, Luas Murni, dll) */}
             {parsedAtribut && Object.keys(parsedAtribut).length > 0 && (
               <div className="mb-1 text-primary flex flex-wrap gap-1">
                 {Object.entries(parsedAtribut).map(([key, val], idx) => (
@@ -329,7 +343,7 @@ export default function CartProductItem({
                 Rp {rowTotal.toLocaleString("id-ID")}
               </p>
               {/* Tanda Bintang Jika Ada Biaya Tambahan Finishing Fix Atau Pengerjaan */}
-              {(harga_pengerjaan_snapshot > 0 || rowTotal > (basePrice * jumlah)) && (
+              {(harga_pengerjaan_snapshot > 0 || rowTotal > (basePrice * jumlah * multiplierLuas)) && (
                 <span className="text-[7.5px] opacity-40 uppercase font-black tracking-wider mt-1">
                   *Termasuk Biaya Jasa
                 </span>

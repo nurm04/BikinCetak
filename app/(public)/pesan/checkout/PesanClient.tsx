@@ -34,6 +34,7 @@ interface CheckoutItem {
     id: number;
     nama_finishing: string;
     harga_tambahan: number;
+    kali_jumlah_pesan?: number | boolean; // DITAMBAHKAN BIAR KALKULASI SINKRON
   }[];
 }
 
@@ -265,12 +266,11 @@ export default function PesanClient() {
   }, [alamatUtama]);
 
   const hitungRowTotal = (item: CheckoutItem) => {
-    let hargaDasar = item.harga_satuan;
-
-    let jumlahHalaman = 1;
+    let hargaDasar = item.harga_satuan || 0;
+    
+    // 1. Parsing Atribut Custom
+    let atribut: Record<string, CustomAttributeValue> = {};
     if (item.atribut_custom_snapshot) {
-      let atribut: Record<string, CustomAttributeValue> = {};
-      
       if (typeof item.atribut_custom_snapshot === "string") {
         try {
           atribut = JSON.parse(item.atribut_custom_snapshot) as Record<string, CustomAttributeValue>;
@@ -280,15 +280,9 @@ export default function PesanClient() {
       } else {
         atribut = item.atribut_custom_snapshot;
       }
-
-      if (atribut["Jumlah Halaman"]) {
-        const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
-        if (!isNaN(val) && val > 0) {
-          jumlahHalaman = val;
-        }
-      }
     }
 
+    // 2. Cari Sisi Cetak
     let sisi = 1;
     item.finishing.forEach((fin) => {
       const label = fin.nama_finishing.toLowerCase();
@@ -297,15 +291,39 @@ export default function PesanClient() {
       }
     });
 
+    // 3. Hitung Biaya Halaman
+    let jumlahHalaman = 1;
+    if (atribut["Jumlah Halaman"]) {
+      const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
+      if (!isNaN(val) && val > 0) {
+        jumlahHalaman = val;
+      }
+    }
     if (jumlahHalaman > 1) {
       hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
     }
 
-    const finishingTotal = item.finishing.reduce((sum, fin) => sum + fin.harga_tambahan, 0);
-    const hargaPerPcs = hargaDasar + finishingTotal;
+    // ==========================================================
+    // 4. REVISI: KALIKAN LUAS DIHARGAI (Khusus Cetak Meteran)
+    // ==========================================================
+    let multiplierLuas = 1;
+    if (atribut["Luas Dihargai (m2)"] !== undefined) {
+        multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
+        if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
+    }
+
+    let subtotalItem = (hargaDasar * multiplierLuas) * item.jumlah;
+
+    // 5. Hitung Biaya Finishing Sesuai Opsi Kali Qty
+    item.finishing.forEach((fin) => {
+      const isKaliQty = fin.kali_jumlah_pesan === true || fin.kali_jumlah_pesan === 1;
+      const val = fin.harga_tambahan || 0;
+      subtotalItem += isKaliQty ? (val * item.jumlah) : val;
+    });
+
     const biayaPengerjaan = item.harga_pengerjaan_snapshot || 0;
     
-    return (hargaPerPcs * item.jumlah) + biayaPengerjaan;
+    return subtotalItem + biayaPengerjaan;
   };
 
   const subTotal = items.reduce((acc, item) => acc + hitungRowTotal(item), 0);
@@ -584,7 +602,6 @@ export default function PesanClient() {
             
             <div className="fixed bottom-16 left-0 right-0 z-40 bg-base-100 border-t border-base-content/10 px-4 py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.08)] lg:static lg:bg-transparent lg:border-none lg:p-0 lg:shadow-none lg:z-auto">
               
-              {/* FIX: Ganti lg:space-y-4 jadi flex-col dengan gap-6 khusus desktop */}
               <div className="lg:sticky lg:top-24 flex flex-col gap-0 lg:gap-6">
                 
                 {/* CARD VOUCHER */}

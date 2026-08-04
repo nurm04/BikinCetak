@@ -60,6 +60,15 @@ export default async function DetailPesananPage({ params }: {
       }
     }
 
+    // ==========================================================
+    // REVISI: Ambil Multiplier Luas Dihargai (Khusus Meteran)
+    // ==========================================================
+    let multiplierLuas = 1;
+    if (atribut && atribut["Luas Dihargai (m2)"] !== undefined) {
+      multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
+      if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
+    }
+
     // 2. Deteksi Sisi Cetak
     let sisi = 1;
     item.pesanan_item_finishing?.forEach((fin) => {
@@ -74,9 +83,11 @@ export default async function DetailPesananPage({ params }: {
       hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
     }
 
-    // 4. Kalkulasi Subtotal Produk (Harga Dasar + Kertas + Finishing)
+    // 4. Kalkulasi Subtotal Produk (Harga Dasar * Luas + Finishing)
     const finishingTotal = item.pesanan_item_finishing?.reduce((acc, fin) => acc + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
-    const subtotalItem = (hargaDasar + finishingTotal) * (Number(item.jumlah) || 1);
+    
+    // REVISI: Kalikan hargaDasar dengan luas sebelum ditambah finishing & Qty
+    const subtotalItem = ((hargaDasar * multiplierLuas) + finishingTotal) * (Number(item.jumlah) || 1);
 
     totalHargaMurniProduk += subtotalItem;
     totalBiayaPengerjaan += Number(item.harga_pengerjaan_snapshot) || 0;
@@ -161,15 +172,16 @@ export default async function DetailPesananPage({ params }: {
                         isReadOnly={true}
                         id={item.id}
                         nama_sku={item.nama_produk_snapshot}
-                        harga_satuan={item.harga_satuan_snapshot}
-                        jumlah={item.jumlah}
+                        harga_satuan={Number(item.harga_satuan_snapshot) || 0}
+                        jumlah={Number(item.jumlah) || 1}
                         finishing={item.pesanan_item_finishing?.map(f => ({
                             nama_finishing: f.nama_finishing_snapshot,
-                            harga_tambahan: f.harga_finishing_snapshot
+                            harga_tambahan: Number(f.harga_finishing_snapshot) || 0,
+                            kali_jumlah_pesan: true // <--- FIX NYA DISINI BANG!
                         }))}
                         rincian_diskon_snapshot={parsedDiskon}
                         estimasi_pengerjaan={item.estimasi_pengerjaan_snapshot}
-                        harga_pengerjaan_snapshot={item.harga_pengerjaan_snapshot}
+                        harga_pengerjaan_snapshot={Number(item.harga_pengerjaan_snapshot) || 0}
                         catatan={item.catatan}
                         file_desain={parsedFileDesain}
                         atribut_custom_snapshot={item.atribut_custom_snapshot}

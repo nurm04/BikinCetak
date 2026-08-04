@@ -184,9 +184,18 @@ export default function CartClient() {
           hargaAwal += (Math.max(0, hal - 1) * sisi * 1500);
       }
 
-      let subtotalItem = hargaAwal * item.jumlah;
+      // ==========================================================
+      // 3. REVISI: KALIKAN LUAS DIHARGAI (Khusus Cetak Meteran)
+      // ==========================================================
+      let multiplierLuas = 1;
+      if (attr && attr['Luas Dihargai (m2)'] !== undefined) {
+          multiplierLuas = parseFloat(String(attr['Luas Dihargai (m2)']));
+          if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
+      }
 
-      // 3. HITUNG BIAYA FINISHING
+      let subtotalItem = (hargaAwal * multiplierLuas) * item.jumlah;
+
+      // 4. HITUNG BIAYA FINISHING
       finishings.forEach((f) => {
         // Validasi ketat untuk status kali_jumlah_pesan
         const isKaliQty = f.kali_jumlah_pesan === true || f.kali_jumlah_pesan === 1;

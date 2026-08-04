@@ -50,7 +50,16 @@ export default function CardPesanan({ pesanan }: Props) {
       }
     }
 
-    // 2. Deteksi Sisi Cetak
+    // ==========================================================
+    // 2. REVISI: Ambil Multiplier Luas Dihargai (Khusus Meteran)
+    // ==========================================================
+    let multiplierLuas = 1;
+    if (atribut && atribut["Luas Dihargai (m2)"] !== undefined) {
+      multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
+      if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
+    }
+
+    // 3. Deteksi Sisi Cetak
     let sisi = 1;
     item.pesanan_item_finishing?.forEach((fin) => {
       const label = (fin.nama_finishing_snapshot || "").toLowerCase();
@@ -59,20 +68,21 @@ export default function CardPesanan({ pesanan }: Props) {
       }
     });
 
-    // 3. Tambahkan Biaya Kertas Halaman Dalam (halaman 1 gratis)
+    // 4. Tambahkan Biaya Kertas Halaman Dalam (halaman 1 gratis)
     if (jumlahHalaman > 1) {
       hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
     }
 
-    // 4. Kalkulasi Total (Harga Dasar + Kertas + Finishing)
+    // 5. Kalkulasi Total (Harga Dasar * Luas + Finishing) * Qty
     const finishingTotal = item.pesanan_item_finishing?.reduce((sum, fin) => sum + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
-    const hargaPerPcs = hargaDasar + finishingTotal;
+    
+    const subtotalItem = ((hargaDasar * multiplierLuas) + finishingTotal) * (Number(item.jumlah) || 1);
     const biayaPengerjaan = Number(item.harga_pengerjaan_snapshot) || 0;
 
-    return (hargaPerPcs * (Number(item.jumlah) || 1)) + biayaPengerjaan;
+    return subtotalItem + biayaPengerjaan;
   };
 
-  // 5. Timpa total tagihan dari DB dengan kalkulasi aktual frontend (termasuk kode unik)
+  // 6. Timpa total tagihan dari DB dengan kalkulasi aktual frontend (termasuk kode unik)
   const subtotalProduk = pesanan.pesanan_item?.reduce((sum, item) => sum + hitungRowTotal(item), 0) ?? 0;
   const totalTagihan = subtotalProduk + ongkir - diskon + kodeUnik;
 

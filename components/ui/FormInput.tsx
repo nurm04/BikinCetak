@@ -8,6 +8,7 @@ interface FormInputProps {
   icon?: ReactNode;
   min?: string;
   max?: string;
+  step?: string; // <-- Tambahin ini biar TS gak ngambek
   value?: string;
   defaultValue?: string;
   onChange?: (name: string, value: string) => void;
@@ -21,6 +22,7 @@ export default function FormInput({
   icon,
   min,
   max,
+  step, // <-- Destructure di sini
   value,
   onChange,
 }: FormInputProps) {
@@ -73,6 +75,7 @@ export default function FormInput({
           name={name}
           min={min}
           max={max}
+          step={step} // <-- Passing ke element input bawaan HTML
           value={value ?? ""}
           placeholder={placeholder}
           onChange={handleChange}
