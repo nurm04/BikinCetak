@@ -8,7 +8,7 @@ interface FormInputProps {
   icon?: ReactNode;
   min?: string;
   max?: string;
-  step?: string; // <-- Tambahin ini biar TS gak ngambek
+  step?: string;
   value?: string;
   defaultValue?: string;
   onChange?: (name: string, value: string) => void;
@@ -22,7 +22,7 @@ export default function FormInput({
   icon,
   min,
   max,
-  step, // <-- Destructure di sini
+  step,
   value,
   onChange,
 }: FormInputProps) {
@@ -36,10 +36,10 @@ export default function FormInput({
 
     const valueStr = e.target.value;
     
+    // PERBAIKAN: Validasi min max murni dijalankan saat kehilangan fokus (blur)
     if (valueStr === "") {
       if (min !== undefined) {
-        e.target.value = min;
-        onChange?.(name, min);
+        onChange?.(name, String(min)); 
       }
       return;
     }
@@ -49,10 +49,8 @@ export default function FormInput({
     const maxVal = max !== undefined ? parseFloat(max) : null;
 
     if (minVal !== null && numValue < minVal) {
-      e.target.value = String(minVal);
       onChange?.(name, String(minVal));
     } else if (maxVal !== null && numValue > maxVal) {
-      e.target.value = String(maxVal);
       onChange?.(name, String(maxVal));
     }
   };
@@ -75,7 +73,7 @@ export default function FormInput({
           name={name}
           min={min}
           max={max}
-          step={step} // <-- Passing ke element input bawaan HTML
+          step={step}
           value={value ?? ""}
           placeholder={placeholder}
           onChange={handleChange}

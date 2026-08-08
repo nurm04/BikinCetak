@@ -92,7 +92,7 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
                 type="number"
                 min="0.1"
                 step="0.1"
-                value={values?.Panjang || ""}
+                value={values?.Panjang ?? ""} // PAKAI ?? BUKAN ||
                 onChange={onValueChange}
               />
             </div>
@@ -103,7 +103,7 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
                 type="number"
                 min="0.1"
                 step="0.1"
-                value={values?.Lebar || ""}
+                value={values?.Lebar ?? ""} // PAKAI ?? BUKAN ||
                 onChange={onValueChange}
               />
             </div>
@@ -151,7 +151,7 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
             name="jumlah_halaman"
             type="number"
             min="1"
-            value={values?.jumlah_halaman || ""}
+            value={values?.jumlah_halaman ?? ""} // PAKAI ?? BUKAN ||
             onChange={onValueChange}
           />
         </div>
@@ -212,7 +212,8 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
             name="qty"
             type="number"
             min={String(minimumQty)}
-            value={String(values?.qty || "1")}
+            // PERBAIKAN UTAMA: Pakai ?? agar "" tidak di-convert paksa jadi "1" saat user menghapus input
+            value={values?.qty ?? String(minimumQty)} 
             onChange={onValueChange}
           />
           {minimumQty > 1 && (

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
@@ -58,7 +59,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     isOpen: boolean; title: string; message: string; type: "success" | "error" | "warning" | "info"; link?: string;
   }>({ isOpen: false, title: "", message: "", type: "info" });
 
-  const currentQty = parseInt(selectedOptions.qty || "1", 10);
+  const currentQty = parseInt(selectedOptions.qty || "0", 10) || 0;
 
   const sku = useMemo<SkuDetail | null>(() => {
     if (!itemDetail || !itemDetail.skus) return null;
@@ -304,14 +305,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return min;
   }, [selectedFinishing, sku]);
 
-  useEffect(() => {
-    setSelectedOptions((prev) => {
-      const qty = parseInt(prev.qty || "1", 10);
-      if (qty >= minimumQty) return prev;
-      return { ...prev, qty: String(minimumQty) };
-    });
-  }, [minimumQty]);
-
   const dynamicFields = useMemo(() => {
     if (!itemDetail?.skus || itemDetail.skus.length === 0) return [];
     return [
@@ -330,37 +323,58 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     ];
   }, [itemDetail]);
 
+  // ==============================================================================
+  // 1. RAW TYPING: Biarkan user mengetik bebas tanpa gangguan
+  // ==============================================================================
   const handleAttributeChange = (name: string, value: string) => {
     if (groupedAddons[name]) {
       const finObj = groupedAddons[name].find((f) => f.id_pilihan_finishing === value) || null;
       setSelectedFinishing((prev) => {
-        const updated = { ...prev, [name]: finObj };
-        let minQty = 1;
-        Object.values(updated).forEach((fin) => {
-          if (fin && fin.minimum_pesan > minQty) minQty = fin.minimum_pesan;
-        });
-        setSelectedOptions((old) => {
-          const currentQty = parseInt(old.qty || "1", 10);
-          return { ...old, [name]: value, qty: currentQty < minQty ? String(minQty) : old.qty };
-        });
-        return updated;
+        return { ...prev, [name]: finObj };
       });
+      setSelectedOptions((prev) => ({ ...prev, [name]: value }));
       return;
     }
+    
     if (name === "qty") {
-      const requestedQty = parseInt(value || "1", 10);
-      const finalQty = requestedQty < minimumQty ? minimumQty : requestedQty;
-      setSelectedOptions((prev) => ({ ...prev, qty: String(finalQty) }));
+      // Bebaskan user mengetik apa saja (misal: "000" atau ""), cukup buang huruf saja
+      const cleanValue = value.replace(/\D/g, ""); 
+      setSelectedOptions((prev) => ({ ...prev, qty: cleanValue }));
       return;
     }
+    
     setSelectedOptions((prev) => ({ ...prev, [name]: value }));
   };
 
+  // ==============================================================================
+  // 2. BLUR VALIDATION: Cek batas minimum HANYA SAAT input kehilangan fokus
+  // ==============================================================================
+  const handleBlurValidation = (e: React.FocusEvent<HTMLDivElement>) => {
+    setSelectedOptions((prev) => {
+      const currentVal = prev.qty;
+      
+      // Jika dihapus semua, kembalikan ke batas minimum
+      if (currentVal === "") {
+        return { ...prev, qty: String(minimumQty) };
+      }
+
+      const parsed = parseInt(currentVal, 10);
+      
+      // Jika angkanya lebih kecil dari batas minimum (misal ngetik 2, tapi min 300)
+      if (!isNaN(parsed) && parsed < minimumQty) {
+        return { ...prev, qty: String(minimumQty) };
+      }
+
+      // Bersihkan jika ada angka 0 berlebih di depan (misal ngetik "002000" jadi "2000")
+      if (!isNaN(parsed) && String(parsed) !== currentVal) {
+        return { ...prev, qty: String(parsed) };
+      }
+
+      return prev;
+    });
+  };
+
   const handleAddToCart = async () => {
-    // ==========================================
-    // 1. REVISI: Cek Login Dulu!
-    // ==========================================
-    // Jika isLoggedIn explicit `false` ATAU (isLoggedIn tidak di-pass/undefined DAN activeRoleId kosong)
     if (isLoggedIn === false || (isLoggedIn === undefined && !activeRoleId)) {
       setPopup({ 
         isOpen: true, 
@@ -372,9 +386,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return;
     }
 
-    // ==========================================
-    // 2. Cek Alamat Pengiriman
-    // ==========================================
     if (!idAlamatUtama) {
       setPopup({ 
         isOpen: true, 
@@ -386,10 +397,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return;
     }
 
-    // 3. Cek SKU
     if (!sku) return;
 
-    // 4. Cek Kelengkapan Data Buku
     if (sku.tipe_kalkulasi === 'cetak_buku' && (!selectedOptions.jumlah_halaman || jumlahHalaman < 1)) {
       setPopup({ 
         isOpen: true, title: "Data Tidak Lengkap", 
@@ -398,7 +407,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return;
     }
 
-    // 5. Cek Kelengkapan File
     if (fileDesain.tipe_file === "upload" && !fileDesain.file) {
       setPopup({ isOpen: true, title: "File Desain Wajib!", message: "Anda wajib mengunggah file desain untuk melanjutkan pesanan.", type: "warning" });
       return;
@@ -477,12 +485,16 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         }
       }
 
+      // Safeguard Final: Memaksa pendaftaran orderan sesuai aturan batas minimum
+      // seandainya user iseng menekan Add to Cart selagi masih mengetik angka di bawah limit.
+      const finalCartQty = Math.max(currentQty, minimumQty);
+
       const result = await addCart(
         idAlamatUtama, 
         [
           {
             id_sku: sku.id_sku,
-            jumlah: currentQty,
+            jumlah: finalCartQty,
             nama_produk_snapshot: sku.nama_sku,
             harga_satuan_snapshot: hargaSatuanNet,
             harga_dasar_awal_snapshot: hargaDasarAwal, 
@@ -590,7 +602,12 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
                 <div className="space-y-4">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Konfigurasi Pesanan</p>
-                  <div className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 space-y-4">
+                  
+                  {/* MEMICU VALIDASI SAAT KURSOR KELUAR DARI AREA FORM INI */}
+                  <div 
+                    className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 space-y-4"
+                    onBlur={handleBlurValidation}
+                  >
                     <FormPesan 
                       fields={dynamicFields} 
                       values={selectedOptions} 
