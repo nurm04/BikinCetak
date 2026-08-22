@@ -651,9 +651,21 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                           </thead>
                           <tbody className="font-bold">
                             {activeHargaTiers.map((rule, idx) => {
+                              // 👇 LOGIKA PENGGABUNGAN MIN & MAX 👇
+                              let qtyLabel = "";
+                              const satuanLabel = sku?.satuan || "pcs"; // Fallback ke "pcs" kalau satuan kosong
+
+                              if (rule.max === 0 || rule.max === null) {
+                                qtyLabel = `≥ ${rule.min} ${satuanLabel}`; // Jika max 0 (Lebih dari)
+                              } else if (rule.min === rule.max) {
+                                qtyLabel = `${rule.min} ${satuanLabel}`; // Jika min & max sama (1 pcs)
+                              } else {
+                                qtyLabel = `${rule.min} - ${rule.max} ${satuanLabel}`; // Range normal (2 - 10 pcs)
+                              }
+
                               return (
-                                <tr key={idx} className={currentQty >= rule.min && (rule.max === 0 || currentQty <= rule.max) ? "bg-primary/10 text-primary" : ""}>
-                                  <td className="py-3">{rule.min} - {rule.max === 0 ? "Lebih" : rule.max} pcs</td>
+                                <tr key={idx} className={currentQty >= rule.min && (rule.max === 0 || rule.max === null || currentQty <= rule.max) ? "bg-primary/10 text-primary" : ""}>
+                                  <td className="py-3">{qtyLabel}</td>
                                   <td className="py-3 text-right">Rp {Number(rule.nilai).toLocaleString("id-ID")}</td>
                                 </tr>
                               );
@@ -739,7 +751,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                     <div className="space-y-3 text-xs font-bold uppercase">
                       <div className="flex justify-between items-center">
                         <span className="opacity-60 flex flex-col">
-                          Harga ({currentQty} {sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs'})
+                          Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
                           {sku?.tipe_kalkulasi === 'cetak_buku' && (
                               <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
                           )}
@@ -806,7 +818,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
              <div className="space-y-3 text-xs font-bold uppercase">
                 <div className="flex justify-between items-center">
                   <span className="opacity-60 flex flex-col">
-                    Harga ({currentQty} {sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs'})
+                    Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
                     {sku?.tipe_kalkulasi === 'cetak_buku' && (
                         <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
                     )}
