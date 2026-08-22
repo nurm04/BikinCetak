@@ -1,10 +1,11 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import { useState, useMemo, ReactNode, useEffect } from "react";
+import { useState, useMemo, ReactNode, useEffect, useCallback } from "react";
 import FormPesan from "../../../../components/shared/FormPesan";
-import { ItemDetailData, SkuDetail, OpsiFinishing } from "@/services/itemService"; 
+import { ItemDetailData, SkuDetail, OpsiFinishing, HargaBertingkat } from "@/services/itemService"; 
 import { addCart, RincianDiskonAPI, CustomAttributeValue } from "@/services/cartService";
 import { useRouter } from "next/navigation";
 import ProductCarousel from "@/components/shared/ProductCarousel";
@@ -35,15 +36,54 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const targetSku = initialSku || (itemDetail?.skus?.[0] ?? null);
 
+  // ==============================================================================
+  // 🌟 HELPER: Fungsi Sakti Pemotong Nama SKU (Sesuai Instruksi '-') 🌟
+  // ==============================================================================
+  const getLabelBersih = useCallback((nama_sku: string) => {
+    const hasVarianTambahan = itemDetail.varians?.some(v => v.jenis_varian === 'tambahan') || false;
+    let labelBersih = nama_sku;
+    
+    // 1. Buang Prefix (ID Produk & Nama Produk) di awal string
+    const prefix1 = `${itemDetail.id_produk}-${itemDetail.nama_produk}-`;
+    
+    if (labelBersih.startsWith(prefix1)) {
+      labelBersih = labelBersih.substring(prefix1.length);
+    } else {
+      const escProd = itemDetail.nama_produk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`^(?:[A-Z0-9]+-\\d+-)?${escProd}-?`, 'i');
+      labelBersih = labelBersih.replace(regex, '');
+    }
+    
+    // 2. JIKA PUNYA VARIAN TAMBAHAN: Potong string setelah strip (-) TERAKHIR
+    if (hasVarianTambahan && labelBersih.includes('-')) {
+      const lastDashIndex = labelBersih.lastIndexOf('-');
+      labelBersih = labelBersih.substring(0, lastDashIndex).trim();
+    }
+
+    return labelBersih || "Standar";
+  }, [itemDetail]);
+
+  // 👇 INISIALISASI STATE
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
-    return { 
+    const defaults: Record<string, string> = { 
       qty: "1", 
       catatan: "", 
-      id_sku: targetSku?.id_sku || "",
       jumlah_halaman: "1",
       Panjang: "1",
       Lebar: "1"
     };
+
+    if (targetSku && itemDetail) {
+      defaults["kombinasi_utama"] = getLabelBersih(targetSku.nama_sku);
+
+      const varianTambahanDefs = itemDetail.varians?.filter(v => v.jenis_varian === 'tambahan') || [];
+      varianTambahanDefs.forEach(v => {
+        const matched = v.pilihan_varian.find(pv => targetSku.kombinasi_pilihan?.includes(pv.id_pilihan));
+        defaults[v.id_varian] = matched ? matched.id_pilihan : (v.pilihan_varian[0]?.id_pilihan || "");
+      });
+    }
+
+    return defaults;
   });
   
   const [selectedFinishing, setSelectedFinishing] = useState<Record<string, OpsiFinishing | null>>({});
@@ -61,10 +101,35 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const currentQty = parseInt(selectedOptions.qty || "0", 10) || 0;
 
+  // 👇 SKU MATCHING
   const sku = useMemo<SkuDetail | null>(() => {
     if (!itemDetail || !itemDetail.skus) return null;
-    return itemDetail.skus.find(s => s.id_sku === selectedOptions.id_sku) || itemDetail.skus[0] || null;
-  }, [selectedOptions.id_sku, itemDetail]);
+
+    const hasVarianTambahan = itemDetail.varians?.some(v => v.jenis_varian === 'tambahan') || false;
+    const selectedUtama = selectedOptions["kombinasi_utama"];
+    
+    const varianTambahanDefs = itemDetail.varians?.filter(v => v.jenis_varian === 'tambahan') || [];
+    const selectedTambahanIds = varianTambahanDefs.map(v => selectedOptions[v.id_varian]).filter(Boolean);
+
+    for (const s of itemDetail.skus) {
+      let isUtamaMatch = true;
+      if (selectedUtama) {
+        const labelBersih = getLabelBersih(s.nama_sku);
+        isUtamaMatch = labelBersih === selectedUtama;
+      }
+
+      let isTambahanMatch = true;
+      if (hasVarianTambahan && selectedTambahanIds.length > 0) {
+        isTambahanMatch = selectedTambahanIds.every(id => s.kombinasi_pilihan?.includes(id));
+      }
+
+      if (isUtamaMatch && isTambahanMatch) {
+        return s;
+      }
+    }
+
+    return itemDetail.skus[0] || null;
+  }, [selectedOptions, itemDetail, getLabelBersih]);
 
   useEffect(() => {
     if (sku?.nama_sku && typeof window !== "undefined") {
@@ -84,7 +149,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
 
     const defaultFinishing: Record<string, OpsiFinishing | null> = {};
-    const defaultOptions: Record<string, string> = {};
 
     if (sku.opsi_finishing) {
       const groups: Record<string, OpsiFinishing[]> = {};
@@ -97,34 +161,61 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       Object.entries(groups).forEach(([kategori, options]) => {
         if (options.length > 0) {
           defaultFinishing[kategori] = null;
-          defaultOptions[kategori] = ""; 
         }
       });
     }
 
     setSelectedFinishing(defaultFinishing);
-    setSelectedOptions(prev => ({ ...prev, ...defaultOptions }));
-
   }, [sku?.id_sku]);
 
-  const availablePengerjaan = useMemo(() => sku?.harga_pengerjaan || [], [sku]);
+  const availablePengerjaan = useMemo(() => {
+      if (!sku || !sku.harga_bertingkat) return [];
+      return Array.from(new Set(sku.harga_bertingkat.map(h => h.pengerjaan)));
+  }, [sku]);
   
   useEffect(() => {
     if (availablePengerjaan.length > 0) {
-        if (!availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle)) {
-            const freeSla = availablePengerjaan.find(p => Number(p.nilai) === 0);
-            
-            if (freeSla) {
-              setSelectedPengerjaanTitle(freeSla.pengerjaan);
-            } else {
-              const lowestSla = [...availablePengerjaan].sort((a, b) => Number(a.nilai) - Number(b.nilai))[0];
-              setSelectedPengerjaanTitle(lowestSla.pengerjaan);
-            }
+        if (!availablePengerjaan.includes(selectedPengerjaanTitle)) {
+            setSelectedPengerjaanTitle(availablePengerjaan[0]);
         }
     } else {
         setSelectedPengerjaanTitle("Reguler");
     }
   }, [availablePengerjaan, selectedPengerjaanTitle]);
+
+  const activeHargaTiers = useMemo<HargaBertingkat[]>(() => {
+      if (!sku || !sku.harga_bertingkat) return [];
+      const slaStr = selectedPengerjaanTitle || "Reguler";
+      
+      let tiers = sku.harga_bertingkat.filter(h => h.pengerjaan === slaStr);
+      if (tiers.length === 0) {
+          tiers = sku.harga_bertingkat.filter(h => h.pengerjaan === availablePengerjaan[0]);
+      }
+      return tiers;
+  }, [sku, selectedPengerjaanTitle, availablePengerjaan]);
+
+  const hargaDasarSlaQtySatu = useMemo(() => {
+      if (!sku) return 0;
+      if (activeHargaTiers.length === 0) return Number(sku.harga_dasar) || 0;
+      
+      const tier1 = activeHargaTiers.find(h => h.min === 1);
+      if (tier1) return Number(tier1.nilai);
+      
+      return Number(activeHargaTiers[0].nilai);
+  }, [sku, activeHargaTiers]);
+
+  const activeTierObj = useMemo(() => {
+      if (activeHargaTiers.length === 0) return null;
+      return [...activeHargaTiers]
+        .sort((a, b) => b.min - a.min)
+        .find(t => currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max));
+  }, [activeHargaTiers, currentQty]);
+
+  const diskonGrosirPerPcs = useMemo(() => {
+      if (!activeTierObj) return 0;
+      const curPrice = Number(activeTierObj.nilai);
+      return Math.max(0, hargaDasarSlaQtySatu - curPrice);
+  }, [hargaDasarSlaQtySatu, activeTierObj]);
 
   const valPanjang = selectedOptions['Panjang'];
   const valLebar = selectedOptions['Lebar'];
@@ -134,18 +225,15 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       const p = parseFloat(valPanjang) || 1;
       const l = parseFloat(valLebar) || 1;
       const luasMurni = p * l;
-
       const minDim = Math.min(p, l);
       const maxDim = Math.max(p, l);
 
       const rollSizes = [0.9, 1.2, 1.5, 1.6, 1.8, 2.0, 2.2, 2.5, 2.6, 2.8, 3.2];
       let lebarBahan = rollSizes.find(size => size >= minDim);
       
-      if (!lebarBahan) {
-          lebarBahan = Math.ceil(minDim);
-      }
+      if (!lebarBahan) lebarBahan = Math.ceil(minDim);
 
-      const luasDihargai = lebarBahan * maxDim;
+      const luasDihargai = Math.max(lebarBahan * maxDim, 1); 
 
       if (
         selectedOptions['Luas Murni (m2)'] !== luasMurni.toFixed(2) ||
@@ -165,17 +253,14 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   const sisiCetakMultiplier = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
       let sisi = 1;
-      Object.values(selectedFinishing).forEach((fin) => {
-        if (!fin) return;
-        const label = fin.nama_pilihan.toLowerCase();
-        if (label.includes('2 sisi') || label.includes('dua sisi') || label.includes('bolak')) {
+      const namaSku = (sku.nama_sku || '').toLowerCase();
+      if (namaSku.includes('2 sisi') || namaSku.includes('dua sisi') || namaSku.includes('bolak')) {
           sisi = 2;
-        }
-      });
+      }
       return sisi;
     }
     return 1;
-  }, [sku?.tipe_kalkulasi, selectedFinishing]);
+  }, [sku?.tipe_kalkulasi, sku?.nama_sku]);
 
   const jumlahHalaman = useMemo(() => {
     if (sku?.tipe_kalkulasi !== 'cetak_buku') return 1;
@@ -191,22 +276,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return 0;
   }, [sku?.tipe_kalkulasi, jumlahHalaman, sisiCetakMultiplier]);
 
-  const hargaDasarAwal = useMemo(() => {
-    return Number(sku?.harga_dasar) || 0;
-  }, [sku]);
-
-  const diskonGrosirPerPcs = useMemo(() => {
-      if (!sku) return 0;
-      const tier = [...(sku.harga_bertingkat || [])]
-          .sort((a, b) => b.min - a.min)
-          .find(t => currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max));
-
-      if (!tier) return 0;
-      
-      const nominalDiskon = Number(tier.nilai);
-      return tier.tipe === "persen" ? hargaDasarAwal * (Number(tier.nilai) / 100) : nominalDiskon;
-  }, [sku, currentQty, hargaDasarAwal]);
-
   const activeDiscount = useMemo(() => {
     if (!sku || !sku.diskon_customer || !activeRoleId) return null;
     return sku.diskon_customer.find(d => String(d.id_role_customer) === String(activeRoleId)) || null;
@@ -215,13 +284,17 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   const diskonMemberPerPcs = useMemo(() => {
       if (!activeDiscount) return 0;
       
+      const hargaSetelahGrosir = Math.max(0, hargaDasarSlaQtySatu - diskonGrosirPerPcs);
       const nominalDiskon = Number(activeDiscount.nilai);
-      return activeDiscount.tipe === "persen" ? hargaDasarAwal * (Number(activeDiscount.nilai) / 100) : nominalDiskon;
-  }, [activeDiscount, hargaDasarAwal]);
+      
+      return activeDiscount.tipe === "persen" 
+        ? hargaSetelahGrosir * (Number(activeDiscount.nilai) / 100) 
+        : nominalDiskon;
+  }, [activeDiscount, hargaDasarSlaQtySatu, diskonGrosirPerPcs]);
 
   const totalDiskonSatuan = useMemo(() => diskonGrosirPerPcs + diskonMemberPerPcs, [diskonGrosirPerPcs, diskonMemberPerPcs]);
   
-  const hargaSatuanNet = useMemo(() => Math.max(0, hargaDasarAwal - totalDiskonSatuan), [hargaDasarAwal, totalDiskonSatuan]);
+  const hargaSatuanNet = useMemo(() => Math.max(0, hargaDasarSlaQtySatu - totalDiskonSatuan), [hargaDasarSlaQtySatu, totalDiskonSatuan]);
   
   const hargaSatuProdukFull = useMemo(() => {
     let net = hargaSatuanNet + biayaHalamanPerBuku;
@@ -236,14 +309,34 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   }, [hargaSatuanNet, biayaHalamanPerBuku, sku?.tipe_kalkulasi, selectedOptions]);
 
   const hargaDasarFullUI = useMemo(() => {
-    let base = hargaDasarAwal;
+    let base = activeTierObj ? Number(activeTierObj.nilai) : hargaDasarSlaQtySatu;
+    let net = base + biayaHalamanPerBuku;
+
     if (sku?.tipe_kalkulasi === 'cetak_meteran') {
       let luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
       if (isNaN(luas) || luas < 1) luas = 1;
-      base = base * luas;
+      net = net * luas;
     }
-    return base;
-  }, [hargaDasarAwal, sku?.tipe_kalkulasi, selectedOptions]);
+    return net;
+  }, [activeTierObj, hargaDasarSlaQtySatu, biayaHalamanPerBuku, sku?.tipe_kalkulasi, selectedOptions]);
+
+  const getActiveFinishingPrice = (finishingObj: OpsiFinishing, qtyPesan: number) => {
+    let activeHarga = Number(finishingObj.harga_tambahan) || 0;
+    let activeTipe = finishingObj.tipe || 'nominal';
+
+    if (finishingObj.harga_bertingkat && finishingObj.harga_bertingkat.length > 0) {
+        const activeTier = [...finishingObj.harga_bertingkat]
+            .sort((a, b) => b.min - a.min)
+            .find(t => qtyPesan >= t.min && (t.max === 0 || t.max === null || qtyPesan <= t.max));
+
+        if (activeTier) {
+            activeHarga = Number(activeTier.nilai);
+            activeTipe = activeTier.tipe as "nominal" | "persen";
+        }
+    }
+
+    return { harga: activeHarga, tipe: activeTipe };
+  };
   
   const totalFinishing = useMemo(() => {
     let total = 0;
@@ -251,16 +344,16 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       if (!fin) return;
       
       let biaya = 0;
-      const tipeFinishing = fin.tipe || 'nominal'; 
+      const { harga, tipe } = getActiveFinishingPrice(fin, currentQty);
       
-      if (tipeFinishing === 'persen') {
+      if (tipe === 'persen') {
         const hargaFisikSatuBarang = sku?.tipe_kalkulasi === 'cetak_meteran' 
           ? hargaSatuProdukFull * (parseFloat(selectedOptions['Luas Dihargai (m2)']) || 1)
           : hargaSatuProdukFull;
 
-        biaya = hargaFisikSatuBarang * (Number(fin.harga_tambahan) / 100);
+        biaya = hargaFisikSatuBarang * (harga / 100);
       } else {
-        biaya = Number(fin.harga_tambahan) || 0;
+        biaya = harga || 0;
       }
 
       if (fin.kali_jumlah_pesan) {
@@ -275,27 +368,18 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   const totalHargaProdukUtama = useMemo(() => hargaSatuProdukFull * currentQty, [hargaSatuProdukFull, currentQty]);
   const totalProduk = useMemo(() => totalHargaProdukUtama + totalFinishing, [totalHargaProdukUtama, totalFinishing]);
 
-  const activePengerjaanObj = useMemo(() => {
-    if (availablePengerjaan.length === 0) return null;
-    return availablePengerjaan.find(p => p.pengerjaan === selectedPengerjaanTitle) || availablePengerjaan[0];
-  }, [availablePengerjaan, selectedPengerjaanTitle]);
-
-  const slaPrice = useMemo(() => {
-      if (!activePengerjaanObj) return 0;
-      const tipeSla = activePengerjaanObj.tipe || 'nominal'; 
-      return tipeSla === 'persen' ? totalProduk * (Number(activePengerjaanObj.nilai) / 100) : Number(activePengerjaanObj.nilai);
-  }, [activePengerjaanObj, totalProduk]);
-
+  const slaPrice = 0; 
   const totalPrice = totalProduk + slaPrice;
 
   const groupedAddons = useMemo(() => {
     const groups: Record<string, OpsiFinishing[]> = {};
     sku?.opsi_finishing?.forEach((fin) => {
       if (!groups[fin.kategori_finishing]) groups[fin.kategori_finishing] = [];
-      groups[fin.kategori_finishing].push(fin);
+      const { harga, tipe } = getActiveFinishingPrice(fin, currentQty);
+      groups[fin.kategori_finishing].push({ ...fin, harga_tambahan: harga, tipe: tipe as "nominal" | "persen" });
     });
     return groups;
-  }, [sku]);
+  }, [sku, currentQty]); 
 
   const minimumQty = useMemo(() => {
     let min = sku?.minimum_pesan || 1; 
@@ -305,39 +389,77 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return min;
   }, [selectedFinishing, sku]);
 
-  const dynamicFields = useMemo(() => {
-    if (!itemDetail?.skus || itemDetail.skus.length === 0) return [];
-    return [
-      {
-        name: "id_sku",
-        label: "Pilihan Varian",
-        options: itemDetail.skus.map(s => {
-          let varianBersih = s.nama_sku.replace(/^[A-Za-z]+-\d+-/, '');
-          const escapedProductName = itemDetail.nama_produk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const productPrefixRegex = new RegExp(`^${escapedProductName}-?`, 'i');
-          varianBersih = varianBersih.replace(productPrefixRegex, '').trim();
-          if (!varianBersih) varianBersih = "Standar";
-          return { label: varianBersih, value: s.id_sku };
-        })
-      }
-    ];
-  }, [itemDetail]);
+  // ==============================================================================
+  // 🌟 LOGIC GAMBAR PINTAR (Prioritas: Gambar SKU -> Gambar Produk) 🌟
+  // ==============================================================================
+  const displayImages = useMemo(() => {
+    // 1. Cek apakah SKU saat ini memiliki gambar spesifik
+    if (sku?.gambar && Array.isArray(sku.gambar) && sku.gambar.length > 0) {
+      return sku.gambar.map((img: string) => {
+        if (img.startsWith('http')) return img;
+        // Prefix otomatis buat nyocokin path Storage Laravel lu
+        return `http://127.0.0.1:8000/storage/${img}`;
+      });
+    }
+
+    // 2. Fallback: Kalau SKU kosong, pakai gambar induk (Produk)
+    if (itemDetail?.gambar_urls && itemDetail.gambar_urls.length > 0) {
+      return itemDetail.gambar_urls;
+    }
+
+    // 3. Fallback akhir: kosong (Biar carousel nggak error)
+    return [];
+  }, [sku?.gambar, itemDetail?.gambar_urls]);
+
 
   // ==============================================================================
-  // 1. RAW TYPING: Biarkan user mengetik bebas tanpa gangguan
+  // 🌟 GENERATE DROPDOWN FIELDS (Memisahkan Varian Utama & Tambahan) 🌟
   // ==============================================================================
+  
+  // 1. Dropdown Utama (Mengekstrak label murni)
+  const fieldsUtama = useMemo(() => {
+    if (!itemDetail?.skus || itemDetail.skus.length === 0) return [];
+    
+    const uniqueSkuLabels = new Map<string, string>(); 
+    
+    itemDetail.skus.forEach(s => {
+      const labelBersih = getLabelBersih(s.nama_sku);
+      if (!uniqueSkuLabels.has(labelBersih)) {
+        uniqueSkuLabels.set(labelBersih, labelBersih);
+      }
+    });
+
+    return [
+      {
+        name: "kombinasi_utama",
+        label: "Pilihan Spesifikasi Dasar",
+        options: Array.from(uniqueSkuLabels.keys()).map(label => ({ label, value: label }))
+      }
+    ];
+  }, [itemDetail, getLabelBersih]);
+
+  // 2. Dropdown Tambahan (Dari relasi Database 'tambahan')
+  const fieldsTambahan = useMemo(() => {
+    if (itemDetail?.varians && itemDetail.varians.length > 0) {
+      return itemDetail.varians
+        .filter(v => v.jenis_varian === 'tambahan')
+        .map(v => ({
+          name: v.id_varian,
+          label: v.nama_varian,
+          options: v.pilihan_varian.map(pv => ({ label: pv.nama_pilihan, value: pv.id_pilihan }))
+        }));
+    }
+    return [];
+  }, [itemDetail]);
+
   const handleAttributeChange = (name: string, value: string) => {
     if (groupedAddons[name]) {
-      const finObj = groupedAddons[name].find((f) => f.id_pilihan_finishing === value) || null;
-      setSelectedFinishing((prev) => {
-        return { ...prev, [name]: finObj };
-      });
-      setSelectedOptions((prev) => ({ ...prev, [name]: value }));
+      const originalFin = sku?.opsi_finishing?.find(f => f.id_pilihan_finishing === value) || null;
+      setSelectedFinishing((prev) => { return { ...prev, [name]: originalFin }; });
       return;
     }
     
     if (name === "qty") {
-      // Bebaskan user mengetik apa saja (misal: "000" atau ""), cukup buang huruf saja
       const cleanValue = value.replace(/\D/g, ""); 
       setSelectedOptions((prev) => ({ ...prev, qty: cleanValue }));
       return;
@@ -346,64 +468,32 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     setSelectedOptions((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ==============================================================================
-  // 2. BLUR VALIDATION: Cek batas minimum HANYA SAAT input kehilangan fokus
-  // ==============================================================================
   const handleBlurValidation = (e: React.FocusEvent<HTMLDivElement>) => {
     setSelectedOptions((prev) => {
       const currentVal = prev.qty;
-      
-      // Jika dihapus semua, kembalikan ke batas minimum
-      if (currentVal === "") {
-        return { ...prev, qty: String(minimumQty) };
-      }
-
+      if (currentVal === "") return { ...prev, qty: String(minimumQty) };
       const parsed = parseInt(currentVal, 10);
-      
-      // Jika angkanya lebih kecil dari batas minimum (misal ngetik 2, tapi min 300)
-      if (!isNaN(parsed) && parsed < minimumQty) {
-        return { ...prev, qty: String(minimumQty) };
-      }
-
-      // Bersihkan jika ada angka 0 berlebih di depan (misal ngetik "002000" jadi "2000")
-      if (!isNaN(parsed) && String(parsed) !== currentVal) {
-        return { ...prev, qty: String(parsed) };
-      }
-
+      if (!isNaN(parsed) && parsed < minimumQty) return { ...prev, qty: String(minimumQty) };
+      if (!isNaN(parsed) && String(parsed) !== currentVal) return { ...prev, qty: String(parsed) };
       return prev;
     });
   };
 
   const handleAddToCart = async () => {
     if (isLoggedIn === false || (isLoggedIn === undefined && !activeRoleId)) {
-      setPopup({ 
-        isOpen: true, 
-        title: "Perlu Login", 
-        message: "Silakan login terlebih dahulu untuk melanjutkan pesanan.", 
-        type: "warning",
-        link: '/login'
-      });
+      setPopup({ isOpen: true, title: "Perlu Login", message: "Silakan login terlebih dahulu untuk melanjutkan pesanan.", type: "warning", link: '/login' });
       return;
     }
 
     if (!idAlamatUtama) {
-      setPopup({ 
-        isOpen: true, 
-        title: "Alamat Kosong", 
-        message: "Silakan tambahkan alamat pengiriman di menu Profil terlebih dahulu sebelum memesan.", 
-        type: "warning",
-        link: '/profil/alamat/tambah'
-      });
+      setPopup({ isOpen: true, title: "Alamat Kosong", message: "Silakan tambahkan alamat pengiriman di menu Profil terlebih dahulu sebelum memesan.", type: "warning", link: '/profil/alamat/tambah' });
       return;
     }
 
     if (!sku) return;
 
     if (sku.tipe_kalkulasi === 'cetak_buku' && (!selectedOptions.jumlah_halaman || jumlahHalaman < 1)) {
-      setPopup({ 
-        isOpen: true, title: "Data Tidak Lengkap", 
-        message: "Harap isi Jumlah Halaman buku minimal 1 lembar.", type: "warning" 
-      });
+      setPopup({ isOpen: true, title: "Data Tidak Lengkap", message: "Harap isi Jumlah Halaman buku minimal 1 lembar.", type: "warning" });
       return;
     }
 
@@ -421,12 +511,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       const fileExt = fileName.split('.').pop() || '';
 
       if (!allowedExtensions.includes(fileExt)) {
-        setPopup({ 
-          isOpen: true, 
-          title: "Format File Ditolak!", 
-          message: "Sistem upload langsung hanya untuk format JPG, JPEG, PNG, dan TIF. Untuk format lain (CDR, PSD, PDF, dsb) wajib dikirim melalui Opsi Link Drive atau Email.", 
-          type: "warning" 
-        });
+        setPopup({ isOpen: true, title: "Format File Ditolak!", message: "Sistem upload langsung hanya untuk format JPG, JPEG, PNG, dan TIF. Untuk format lain (CDR, PSD, PDF, dsb) wajib dikirim melalui Opsi Link Drive atau Email.", type: "warning" });
         return;
       }
 
@@ -440,34 +525,28 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     setCartLoading(true);
 
     try {
+      const finalCartQty = Math.max(currentQty, minimumQty);
+
       const finishings = Object.values(selectedFinishing)
         .filter((fin): fin is OpsiFinishing => fin !== null)
         .map((fin) => {
+          const { harga, tipe } = getActiveFinishingPrice(fin, finalCartQty);
           return {
             id_sku_finishing: fin.id_sku_finishing,
             kategori_finishing: fin.kategori_finishing,
             nama_finishing_snapshot: fin.nama_pilihan,
-            harga_finishing_snapshot: fin.harga_tambahan,
-            tipe: fin.tipe || 'nominal',
+            harga_finishing_snapshot: harga,
+            tipe: tipe,
             kali_jumlah_pesan: fin.kali_jumlah_pesan ? 1 : 0
           };
         });
 
       const rincianDiskon: RincianDiskonAPI[] = [];
       if (diskonGrosirPerPcs > 0) {
-        const tier = [...(sku.harga_bertingkat || [])]
-            .sort((a, b) => b.min - a.min)
-            .find(t => currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max));
-        rincianDiskon.push({
-            nama: tier?.tipe === 'persen' ? `Harga Grosir Qty ${currentQty} (${tier.nilai}%)` : `Harga Grosir Qty ${currentQty}`,
-            nominal: diskonGrosirPerPcs
-        });
+        rincianDiskon.push({ nama: `Harga Grosir Qty ${currentQty}`, nominal: diskonGrosirPerPcs });
       }
       if (diskonMemberPerPcs > 0 && activeDiscount) {
-        rincianDiskon.push({
-            nama: activeDiscount.tipe === 'persen' ? `Diskon Member (${activeDiscount.nilai}%)` : `Diskon Member (Nominal)`,
-            nominal: diskonMemberPerPcs
-        });
+        rincianDiskon.push({ nama: activeDiscount.tipe === 'persen' ? `Diskon Member (${activeDiscount.nilai}%)` : `Diskon Member (Nominal)`, nominal: diskonMemberPerPcs });
       }
 
       const atributCustom: Record<string, CustomAttributeValue> = {};
@@ -476,31 +555,21 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         atributCustom['Jumlah Halaman'] = jumlahHalaman;
       } else if (sku.tipe_kalkulasi === 'cetak_meteran') {
         ['Panjang', 'Lebar', 'Luas Murni (m2)', 'Lebar Bahan Dihitung', 'Luas Dihargai (m2)'].forEach(key => {
-          if (selectedOptions[key] !== undefined) {
-            atributCustom[key] = selectedOptions[key];
-          }
+          if (selectedOptions[key] !== undefined) atributCustom[key] = selectedOptions[key];
         });
-        if (!atributCustom['Luas Dihargai (m2)']) {
-          atributCustom['Luas Dihargai (m2)'] = 1;
-        }
+        if (!atributCustom['Luas Dihargai (m2)']) atributCustom['Luas Dihargai (m2)'] = 1;
       }
 
-      // Safeguard Final: Memaksa pendaftaran orderan sesuai aturan batas minimum
-      // seandainya user iseng menekan Add to Cart selagi masih mengetik angka di bawah limit.
-      const finalCartQty = Math.max(currentQty, minimumQty);
-
-      const result = await addCart(
-        idAlamatUtama, 
-        [
+      const result = await addCart(idAlamatUtama, [
           {
             id_sku: sku.id_sku,
             jumlah: finalCartQty,
             nama_produk_snapshot: sku.nama_sku,
             harga_satuan_snapshot: hargaSatuanNet,
-            harga_dasar_awal_snapshot: hargaDasarAwal, 
+            harga_dasar_awal_snapshot: hargaDasarSlaQtySatu, 
             total_diskon_snapshot: totalDiskonSatuan,
             rincian_diskon_snapshot: rincianDiskon,
-            estimasi_pengerjaan: activePengerjaanObj?.pengerjaan || "Reguler",
+            estimasi_pengerjaan: selectedPengerjaanTitle || "Reguler",
             harga_pengerjaan_snapshot: slaPrice,
             catatan: selectedOptions.catatan || "",
             atribut_custom_snapshot: Object.keys(atributCustom).length > 0 ? atributCustom : undefined,
@@ -509,8 +578,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             file_desain: fileDesain.file || undefined, 
             link_file: fileDesain.link_file,
           },
-        ]
-      );
+      ]);
       
       if (result.error) {
         if (result.error.toLowerCase().includes("login") || result.error.toLowerCase().includes("sesi")) {
@@ -541,7 +609,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8 mt-2">
         <div className="lg:col-span-3 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-base-100 p-6 rounded-2xl border border-base-content/5 shadow-sm">
-            <ProductCarousel images={itemDetail?.gambar_urls} name={itemDetail?.nama_produk || "Produk"} />
+            {/* 👇 PERBAIKAN: Gunakan displayImages hasil perhitungan logic prioritas */}
+            <ProductCarousel images={displayImages} name={sku?.nama_sku || itemDetail?.nama_produk || "Produk"} />
             
             <div className="flex flex-col">
               <h1 className="text-3xl font-black uppercase mb-6 tracking-tighter">{itemDetail?.nama_produk}</h1>
@@ -565,10 +634,13 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                 </div>
 
-                {sku && sku.harga_bertingkat && sku.harga_bertingkat.length > 0 && (
+                {activeHargaTiers && activeHargaTiers.length > 0 && (
                   <>
                     <div className="space-y-3">
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Daftar Harga Grosir</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-40 flex justify-between">
+                         <span>Daftar Harga Grosir</span>
+                         <span className="text-primary tracking-normal font-bold lowercase">({selectedPengerjaanTitle})</span>
+                      </p>
                       <div className="overflow-hidden border border-base-content/10 rounded-xl">
                         <table className="table table-xs w-full bg-base-100">
                           <thead className="bg-base-200/50">
@@ -578,17 +650,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                             </tr>
                           </thead>
                           <tbody className="font-bold">
-                            {sku.harga_bertingkat.map((rule, idx) => {
-                              const discount = rule.tipe === 'persen' 
-                                ? hargaDasarAwal * (rule.nilai / 100) 
-                                : rule.nilai;
-                              
-                              const pricePerPcs = Math.max(0, hargaDasarAwal - discount);
-
+                            {activeHargaTiers.map((rule, idx) => {
                               return (
                                 <tr key={idx} className={currentQty >= rule.min && (rule.max === 0 || currentQty <= rule.max) ? "bg-primary/10 text-primary" : ""}>
                                   <td className="py-3">{rule.min} - {rule.max === 0 ? "Lebih" : rule.max} pcs</td>
-                                  <td className="py-3 text-right">Rp {pricePerPcs.toLocaleString("id-ID")}</td>
+                                  <td className="py-3 text-right">Rp {Number(rule.nilai).toLocaleString("id-ID")}</td>
                                 </tr>
                               );
                             })}
@@ -603,34 +669,33 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                 <div className="space-y-4">
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Konfigurasi Pesanan</p>
                   
-                  {/* MEMICU VALIDASI SAAT KURSOR KELUAR DARI AREA FORM INI */}
                   <div 
                     className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 space-y-4"
                     onBlur={handleBlurValidation}
                   >
                     <FormPesan 
-                      fields={dynamicFields} 
+                      fieldsUtama={fieldsUtama} 
+                      fieldsTambahan={fieldsTambahan}
                       values={selectedOptions} 
                       groupedAddons={groupedAddons} 
                       onValueChange={handleAttributeChange} 
                       minimumQty={minimumQty}
                       tipeKalkulasi={sku?.tipe_kalkulasi || "standard"} 
+                      sisiCetakMultiplier={sisiCetakMultiplier}
                     />
                   </div>
                 </div>
 
                 {availablePengerjaan.length > 0 && (
                   <div className="space-y-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Kecepatan Pengerjaan</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Estimasi / SLA Pengerjaan</p>
                     <div className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 flex flex-col gap-3">
                       {availablePengerjaan.map((p, idx) => {
-                        const calcPrice = (p.tipe || 'nominal') === 'persen' ? totalProduk * (p.nilai / 100) : p.nilai;
-                        
                         return (
                           <label
-                            key={p.id || idx}
+                            key={idx}
                             className={`flex items-center justify-between p-3 md:p-4 border rounded-xl cursor-pointer transition-all ${
-                              activePengerjaanObj?.pengerjaan === p.pengerjaan
+                              selectedPengerjaanTitle === p
                                 ? "border-primary bg-primary/5 shadow-sm"
                                 : "border-base-content/10 hover:border-base-content/30"
                             }`}
@@ -640,19 +705,16 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                                 type="radio"
                                 name="pengerjaan"
                                 className="radio radio-primary radio-sm"
-                                checked={activePengerjaanObj?.pengerjaan === p.pengerjaan}
-                                onChange={() => setSelectedPengerjaanTitle(p.pengerjaan)}
+                                checked={selectedPengerjaanTitle === p}
+                                onChange={() => setSelectedPengerjaanTitle(p)}
                               />
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold flex items-center gap-2">
-                                  <Clock size={14} className={activePengerjaanObj?.pengerjaan === p.pengerjaan ? "text-primary" : "opacity-50"} />
-                                  {p.pengerjaan}
+                                  <Clock size={14} className={selectedPengerjaanTitle === p ? "text-primary" : "opacity-50"} />
+                                  {p}
                                 </span>
                               </div>
                             </div>
-                            <span className="text-xs font-black text-primary">
-                              {calcPrice > 0 ? `+ Rp ${calcPrice.toLocaleString("id-ID")}` : "Gratis"}
-                            </span>
                           </label>
                         );
                       })}
@@ -686,7 +748,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                           )}
                         </span>
                         <div className="text-right flex items-center">
-                           {(diskonMemberPerPcs > 0 || diskonGrosirPerPcs > 0) && (
+                           {hargaDasarFullUI > hargaSatuProdukFull && (
                              <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                            )}
                            <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
@@ -708,10 +770,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                         </div>
                       )}
 
-                      {slaPrice > 0 && (
-                        <div className="flex justify-between items-center text-primary mt-2">
-                          <span className="opacity-60">Biaya {activePengerjaanObj?.pengerjaan}</span>
-                          <span>+ Rp {slaPrice.toLocaleString("id-ID")}</span>
+                      {/* ESTIMASI PENGERJAAN - MOBILE */}
+                      {selectedPengerjaanTitle && (
+                        <div className="flex justify-between items-center text-base-content mt-2">
+                          <span className="opacity-60 flex items-center gap-1.5"><Clock size={12}/> Estimasi Waktu</span>
+                          <span className="text-warning font-black tracking-widest">{selectedPengerjaanTitle}</span>
                         </div>
                       )}
                       
@@ -752,7 +815,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                     )}
                   </span>
                   <div className="text-right flex items-center">
-                     {(diskonMemberPerPcs > 0 || diskonGrosirPerPcs > 0) && (
+                     {hargaDasarFullUI > hargaSatuProdukFull && (
                        <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                      )}
                      <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
@@ -774,10 +837,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                 )}
 
-                {slaPrice > 0 && (
-                  <div className="flex justify-between items-center text-primary mt-2">
-                    <span className="opacity-60">Biaya {activePengerjaanObj?.pengerjaan}</span>
-                    <span>+ Rp {slaPrice.toLocaleString("id-ID")}</span>
+                {/* ESTIMASI PENGERJAAN - DESKTOP */}
+                {selectedPengerjaanTitle && (
+                  <div className="flex justify-between items-center text-base-content mt-2">
+                    <span className="opacity-60 flex items-center gap-1.5"><Clock size={12}/> Estimasi Waktu</span>
+                    <span className="text-warning font-black tracking-widest">{selectedPengerjaanTitle}</span>
                   </div>
                 )}
                 

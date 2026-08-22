@@ -1,11 +1,14 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { ArrowLeft, CheckCircle2, CircleDot, Clock, CreditCard, Package, Truck, XCircle, Copy } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleDot, Clock, CreditCard, Package, Truck, XCircle, Copy, Wallet, Coins } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, use } from "react";
-import { getStatusPesanan, Pesanan, CustomAttributeValue } from "@/services/pesanService";
+import { getStatusPesanan, getQrisData, Pesanan, CustomAttributeValue, QrisData } from "@/services/pesanService";
+import { QRCodeSVG } from "qrcode.react";
 
-interface Props {params: Promise<{kode_transaksi: string}>}
+interface Props { params: Promise<{ kode_transaksi: string }> }
 
 type StepId =
   | "belum_lunas"
@@ -14,79 +17,51 @@ type StepId =
   | "proses_pengantaran"
   | "selesai";
 
-export default function StatusPesananPage({params}: Props) {
+export default function StatusPesananPage({ params }: Props) {
   const unwrappedParams = use(params);
   const kode_transaksi = unwrappedParams.kode_transaksi;
+  
   const [pesanan, setPesanan] = useState<Pesanan | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copiedRekening, setCopiedRekening] = useState(false);
   const [copiedNominal, setCopiedNominal] = useState(false);
 
-  useEffect(() => {
+  const [qrisData, setQrisData] = useState<QrisData | null>(null);
+  const [loadingQris, setLoadingQris] = useState(false);
+
+  // State untuk Kasir (Opsi Pembayaran)
+  const [opsiBayar, setOpsiBayar] = useState<"lunas" | "dp" | null>(null);
+  const [nominalDp, setNominalDp] = useState<string>("");
+  const [errorDp, setErrorDp] = useState<string>("");
+
+  const loadData = async () => {
     if (!kode_transaksi) return;
+    const result = await getStatusPesanan(kode_transaksi);
+    if (result.success && result.data) {
+      setPesanan(result.data as Pesanan);
+    }
+    setLoading(false);
+  };
 
-    const loadData = async () => {
-      const result = await getStatusPesanan(kode_transaksi);
-      if (result.success && result.data) {
-        setPesanan(result.data as Pesanan);
-      }
-
-      setLoading(false);
-    };
-
+  useEffect(() => {
     loadData();
   }, [kode_transaksi]);
 
-  const steps = useMemo(
-    () => [
-      {
-        id: "belum_lunas",
-        label: "Menunggu Dibayar",
-        icon: <CreditCard size={18} />,
-      },
-      {
-        id: "proses_pengerjaan",
-        label: "Proses Produksi",
-        icon: <Package size={18} />,
-      },
-      {
-        id: "proses_pengantaran",
-        label: "Proses Pengiriman",
-        icon: <Truck size={18} />,
-      },
-      {
-        id: "selesai",
-        label: "Diterima",
-        icon: <CheckCircle2 size={18} />,
-      },
-    ],
-    []
-  );
-
-  const bankName = process.env.NEXT_PUBLIC_BANK_NAME || "BCA";
-  const bankNumber = process.env.NEXT_PUBLIC_BANK_NUMBER || "1234567890";
-  const bankOwner = process.env.NEXT_PUBLIC_BANK_OWNER || "Bikin Cetak";
-
-  const batasWaktuTransfer = useMemo(() => {
-    if (!pesanan?.tanggal_pesan) return "";
-    const tglPesan = new Date(pesanan.tanggal_pesan);
-    tglPesan.setDate(tglPesan.getDate() + 3);
-    return tglPesan.toLocaleString("id-ID", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }) + " WIB";
-  }, [pesanan]);
+  useEffect(() => {
+    // Polling hanya berjalan jika statusnya belum_lunas atau dibayar_sebagian (kalau masih ada tagihan sisa)
+    if (!pesanan || (pesanan.status_pembayaran === 'lunas')) {
+        return;
+    }
+    const interval = setInterval(() => {
+        loadData();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [pesanan?.status_pembayaran, kode_transaksi]);
 
   // ==========================================
-  // KALKULASI ULANG HARGA MURNI (USE MEMO)
+  // KALKULASI HARGA MURNI
   // ==========================================
   const total_tagihan_akurat = useMemo(() => {
     if (!pesanan) return 0;
-
     let totalHargaMurniProduk = 0;
     let totalBiayaPengerjaan = 0;
 
@@ -95,52 +70,35 @@ export default function StatusPesananPage({params}: Props) {
       let jumlahHalaman = 1;
       let atribut: Record<string, CustomAttributeValue> = {};
 
-      // Ekstrak Halaman
       if (item.atribut_custom_snapshot) {
         if (typeof item.atribut_custom_snapshot === "string") {
-          try {
-            atribut = JSON.parse(item.atribut_custom_snapshot);
-          } catch (e) {
-            console.error("Gagal parse atribut_custom_snapshot", e);
-          }
+          try { atribut = JSON.parse(item.atribut_custom_snapshot); } catch (e) { console.error(e); }
         } else {
           atribut = item.atribut_custom_snapshot as Record<string, CustomAttributeValue>;
         }
-
         if (atribut && atribut["Jumlah Halaman"] !== undefined) {
           const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
-          if (!isNaN(val) && val > 0) {
-            jumlahHalaman = val;
-          }
+          if (!isNaN(val) && val > 0) jumlahHalaman = val;
         }
       }
 
-      // ==========================================================
-      // REVISI: Ambil Multiplier Luas Dihargai (Khusus Meteran)
-      // ==========================================================
       let multiplierLuas = 1;
       if (atribut && atribut["Luas Dihargai (m2)"] !== undefined) {
         multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
         if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
       }
 
-      // Ekstrak Sisi Cetak
       let sisi = 1;
       item.pesanan_item_finishing?.forEach((fin) => {
         const label = (fin.nama_finishing_snapshot || "").toLowerCase();
-        if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) {
-          sisi = 2;
-        }
+        if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) sisi = 2;
       });
 
-      // Tambahkan biaya kertas
       if (jumlahHalaman > 1) {
         hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
       }
 
       const finishingTotal = item.pesanan_item_finishing?.reduce((acc, fin) => acc + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
-      
-      // REVISI: Kalikan hargaDasar dengan luas sebelum ditambah finishing & Qty
       const subtotalItem = ((hargaDasar * multiplierLuas) + finishingTotal) * (Number(item.jumlah) || 1);
 
       totalHargaMurniProduk += subtotalItem;
@@ -154,12 +112,82 @@ export default function StatusPesananPage({params}: Props) {
     return totalHargaMurniProduk + totalBiayaPengerjaan + ongkir - diskon + kodeUnik;
   }, [pesanan]);
 
+  // Kalkulasi Sisa Tagihan (Berguna kalau sebelumnya udah bayar DP)
+  const sisaTagihan = useMemo(() => {
+    if (!pesanan) return 0;
+    const dibayar = Number(pesanan.total_dibayar || 0);
+    return Math.max(0, total_tagihan_akurat - dibayar);
+  }, [pesanan, total_tagihan_akurat]);
 
-  const handleCopyRekening = () => {
-    navigator.clipboard.writeText(bankNumber);
-    setCopiedRekening(true);
-    setTimeout(() => setCopiedRekening(false), 2000);
+  // ==========================================
+  // FUNGSI GENERATE QRIS DINAMIS
+  // ==========================================
+  const handleGenerateQris = (nominal?: number) => {
+    if (!pesanan?.id_pesan) return;
+    setLoadingQris(true);
+    setErrorDp("");
+    
+    getQrisData(pesanan.id_pesan, nominal).then((res) => {
+      if (res.success && res.data) {
+        setQrisData(res.data);
+      } else {
+        setErrorDp(res.error || "Gagal membuat QRIS. Silakan coba lagi.");
+      }
+      setLoadingQris(false);
+    });
   };
+
+  // 👇 INI USE-EFFECT YANG BENAR (SUDAH DI-MERGE) 👇
+  useEffect(() => {
+    // Kalau pesanan butuh dibayar DAN QRIS belum digenerate
+    if (pesanan?.id_pesan && (pesanan.status_pembayaran === "belum_lunas" || pesanan.status_pembayaran === "dibayar_sebagian") && !qrisData && !loadingQris) {
+      
+      // Jika pesanan dari e-commerce (bukan kasir), langsung generate QRIS otomatis!
+      if (pesanan.sumber_pesanan !== 'pos_kasir') {
+        handleGenerateQris();
+      }
+      // Jika dari kasir, kita biarkan saja (jangan generate dulu) supaya opsi tampil.
+    }
+  }, [pesanan, qrisData]);
+
+  // Handler untuk Submit Nominal DP dari Kasir
+  // Handler untuk Submit Nominal DP dari Kasir
+  const handleBayarDp = () => {
+    const inputNominal = parseInt(nominalDp.replace(/\D/g, ""), 10);
+
+    // Hapus aturan 50%, ganti dengan syarat minimal QRIS (Rp 1.000)
+    if (isNaN(inputNominal) || inputNominal < 1000) {
+      setErrorDp(`Minimal pembayaran QRIS adalah Rp 1.000`);
+      return;
+    }
+    
+    if (inputNominal > sisaTagihan) {
+      setErrorDp(`Maksimal bayar adalah sisa tagihan (Rp ${sisaTagihan.toLocaleString("id-ID")})`);
+      return;
+    }
+
+    handleGenerateQris(inputNominal);
+  };
+
+
+  const steps = useMemo(
+    () => [
+      { id: "belum_lunas", label: "Menunggu Dibayar", icon: <CreditCard size={18} /> },
+      { id: "proses_pengerjaan", label: "Proses Produksi", icon: <Package size={18} /> },
+      { id: "proses_pengantaran", label: "Proses Pengiriman", icon: <Truck size={18} /> },
+      { id: "selesai", label: "Diterima", icon: <CheckCircle2 size={18} /> },
+    ],
+    []
+  );
+
+  const batasWaktuTransfer = useMemo(() => {
+    if (!pesanan?.tanggal_pesan) return "";
+    const tglPesan = new Date(pesanan.tanggal_pesan);
+    tglPesan.setDate(tglPesan.getDate() + 3);
+    return tglPesan.toLocaleString("id-ID", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit",
+    }) + " WIB";
+  }, [pesanan]);
 
   const handleCopyNominal = (nominal: number) => {
     navigator.clipboard.writeText(nominal.toString());
@@ -190,9 +218,9 @@ export default function StatusPesananPage({params}: Props) {
       <main className="min-h-screen bg-base-200 py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="bg-base-100 rounded-3xl p-10 text-center border border-base-content/5">
-            <XCircle size={64} className="mx-auto text-error mb-4"/>
+            <XCircle size={64} className="mx-auto text-error mb-4" />
             <h1 className="text-2xl font-black uppercase">Transaksi Dibatalkan</h1>
-            <p className="opacity-60 mt-2">Transaksi ini sudah dibatalkan.</p>
+            <p className="opacity-60 mt-2">Transaksi ini sudah dibatalkan oleh sistem atau admin.</p>
           </div>
         </div>
       </main>
@@ -200,18 +228,14 @@ export default function StatusPesananPage({params}: Props) {
   }
 
   let currentStep: StepId = "belum_lunas";
-
-  if (pesanan.status_pembayaran === "lunas" || pesanan.status_pembayaran === "dibayar_sebagian") {
+  // Menyesuaikan step jika statusnya lunas ATAU pembayaran dp namun operasional jalan
+  if (pesanan.status_pembayaran === "lunas" || (pesanan.status_pembayaran === "dibayar_sebagian" && pesanan.status_operasional !== 'keranjang')) {
     currentStep = pesanan.status_operasional as StepId;
   }
 
   let currentIndex = steps.findIndex((s) => s.id === currentStep);
-  
-  if (currentStep === "menunggu_diproses") {
-    currentIndex = 1;
-  }
+  if (currentStep === "menunggu_diproses") currentIndex = 1;
 
-  const kodeUnikPesanan = Number(pesanan.kode_unik) || 0;
   const nomorResi = pesanan.nomor_resi;
 
   return (
@@ -219,8 +243,7 @@ export default function StatusPesananPage({params}: Props) {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <Link href="/pesan" className="btn btn-ghost btn-sm">
-            <ArrowLeft size={16} />
-            Kembali
+            <ArrowLeft size={16} /> Kembali
           </Link>
 
           <div className="text-right">
@@ -240,111 +263,161 @@ export default function StatusPesananPage({params}: Props) {
               <div className="absolute top-5 left-0 h-1 w-full bg-base-200"></div>
               <div
                 className="absolute top-5 left-0 h-1 bg-primary transition-all"
-                style={{width: `${(currentIndex / (steps.length - 1)) * 100}%`}}
+                style={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
               />
 
-              {steps.map(
-                (step, index) => {
-                  const active = index <= currentIndex;
-                  const current = index === currentIndex;
-                  return (
-                    <div key={step.id} className="z-10 flex flex-col items-center w-1/4">
-                      <div
-                        className={`
-                        w-11 h-11 rounded-full flex items-center justify-center
-                        border-4 border-base-100
-                        ${active ? "bg-primary text-white" : "bg-base-200"}
-                        ${current ? "ring-4 ring-primary/20" : ""}
-                      `}
-                      >
-                        {current ? (<CircleDot />) : (step.icon)}
-                      </div>
-
-                      <p
-                        className={`
-                        text-[10px] text-center mt-3 font-black uppercase
-                        ${active ? "text-primary" : "opacity-40"}
-                      `}
-                      >
-                        {step.label}
-                      </p>
+              {steps.map((step, index) => {
+                const active = index <= currentIndex;
+                const current = index === currentIndex;
+                return (
+                  <div key={step.id} className="z-10 flex flex-col items-center w-1/4">
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center border-4 border-base-100 ${active ? "bg-primary text-white" : "bg-base-200"} ${current ? "ring-4 ring-primary/20" : ""}`}>
+                      {current ? (<CircleDot />) : (step.icon)}
                     </div>
-                  );
-                }
-              )}
+                    <p className={`text-[10px] text-center mt-3 font-black uppercase ${active ? "text-primary" : "opacity-40"}`}>
+                      {step.label}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {currentStep === "belum_lunas" && (
-          <div className="bg-base-100 rounded-2xl p-6 border-2 border-warning/30 shadow-md mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-base-200 pb-4 mb-4">
-              <div>
-                <h3 className="text-sm font-black uppercase text-warning tracking-wider flex items-center gap-2">
-                  ⚠️ Segera Selesaikan Pembayaran
-                </h3>
-                <p className="text-xs opacity-65 mt-1">Transfer tepat hingga <strong className="text-base-content font-black">3 digit terakhir</strong> agar otomatis terverifikasi.</p>
-              </div>
-              <div className="bg-warning/10 text-warning px-4 py-2 rounded-xl text-center md:text-right border border-warning/20">
-                <p className="text-[9px] font-black uppercase tracking-tight opacity-60">Batas Waktu Transfer</p>
-                <p className="text-xs font-black">{batasWaktuTransfer}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-base-200/50 p-4 rounded-xl border border-base-content/5">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase opacity-40">Bank Tujuan</span>
-                <span className="text-lg font-black text-base-content uppercase mt-0.5">{bankName}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase opacity-40">Nomor Rekening</span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-lg font-black text-primary tracking-wider">{bankNumber}</span>
-                  <button 
-                    onClick={handleCopyRekening} 
-                    className="btn btn-ghost btn-xs btn-circle text-primary tooltip tooltip-bottom" 
-                    data-tip={copiedRekening ? "Tersalin!" : "Salin No. Rek"}
-                  >
-                    <Copy size={14} className={copiedRekening ? "text-success" : ""} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase opacity-40">Nama Pemilik</span>
-                <span className="text-sm font-bold text-base-content mt-1">{bankOwner}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 bg-warning/5 border border-warning/20 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
-              <div>
-                <span className="text-[10px] font-black uppercase opacity-60">Total Harus Ditransfer</span>
-                <div className="flex items-center gap-2 mt-1">
-                  {/* Gunakan variabel akurat */}
-                  <span className="text-2xl font-black text-warning">Rp {total_tagihan_akurat.toLocaleString("id-ID")}</span>
-                  <button 
-                    onClick={() => handleCopyNominal(total_tagihan_akurat)} 
-                    className="btn btn-ghost btn-xs btn-circle text-warning tooltip tooltip-top" 
-                    data-tip={copiedNominal ? "Tersalin!" : "Salin Nominal"}
-                  >
-                    <Copy size={14} className={copiedNominal ? "text-success" : ""} />
-                  </button>
-                </div>
-              </div>
+        {/* 👇 BLOK PEMBAYARAN QRIS 👇 */}
+        {/* Tampilkan box ini JIKA status masih belum lunas ATAU masih dibayar_sebagian (ada sisa tagihan) */}
+        {(pesanan.status_pembayaran === "belum_lunas" || pesanan.status_pembayaran === "dibayar_sebagian") && (
+          <div className="bg-base-100 rounded-3xl p-6 md:p-10 border-2 border-primary/30 shadow-xl mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-black uppercase text-primary tracking-tighter">
+                Bayar dengan QRIS {pesanan.sumber_pesanan}
+              </h3>
+              <p className="text-sm opacity-70 mt-2 max-w-md mx-auto">
+                Scan QR Code di bawah ini menggunakan aplikasi M-Banking atau E-Wallet Anda (Gopay, OVO, Dana, ShopeePay, BCA Mobile, dll).
+              </p>
               
-              <div className="text-right text-xs font-bold opacity-70 bg-base-100 p-3 rounded-lg border border-base-content/5 w-full md:w-auto">
-                <div className="flex justify-between gap-6 mb-1">
-                  <span>Subtotal Tagihan:</span>
-                  <span>Rp {(total_tagihan_akurat - kodeUnikPesanan).toLocaleString("id-ID")}</span>
+              {/* Notif jika statusnya DP */}
+              {pesanan.status_pembayaran === 'dibayar_sebagian' && (
+                <div className="badge badge-warning mt-4 font-bold p-3">Sisa Tagihan: Rp {sisaTagihan.toLocaleString("id-ID")}</div>
+              )}
+            </div>
+
+            {/* LOGIKA JIKA SUMBER PESANAN DARI KASIR & QR BELUM DIGENERATE */}
+            {pesanan.sumber_pesanan === 'pos_kasir' && !qrisData && !loadingQris && (
+              <div className="max-w-sm mx-auto mb-8 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => { setOpsiBayar('lunas'); setErrorDp(""); }}
+                    className={`btn h-auto py-4 flex flex-col items-center gap-2 ${opsiBayar === 'lunas' ? 'btn-primary' : 'btn-outline'}`}
+                  >
+                    <Wallet size={24} />
+                    <span>Bayar Lunas</span>
+                  </button>
+                  <button 
+                    onClick={() => { setOpsiBayar('dp'); setErrorDp(""); }}
+                    // Disable opsi DP kalau statusnya emang udah DP (dibayar_sebagian) biar gak dobel DP
+                    disabled={pesanan.status_pembayaran === 'dibayar_sebagian'}
+                    className={`btn h-auto py-4 flex flex-col items-center gap-2 ${opsiBayar === 'dp' ? 'btn-primary' : 'btn-outline'}`}
+                  >
+                    <Coins size={24} />
+                    <span>Bayar Sebagian (DP)</span>
+                  </button>
                 </div>
-                <div className="flex justify-between gap-6 text-warning">
-                  <span>Kode Unik:</span>
-                  <span>+ Rp {kodeUnikPesanan.toLocaleString("id-ID")}</span>
+
+                {opsiBayar === 'lunas' && (
+                  <button onClick={() => handleGenerateQris(sisaTagihan)} className="btn btn-primary btn-block mt-4">
+                    Tampilkan QRIS Lunas (Rp {sisaTagihan.toLocaleString("id-ID")})
+                  </button>
+                )}
+
+                {opsiBayar === 'dp' && (
+                  <div className="mt-4 p-4 bg-base-200 rounded-xl space-y-4">
+                    <div>
+                      <label className="label"><span className="label-text font-bold">Masukkan Nominal DP</span></label>
+                      <input 
+                        type="text" 
+                        className="input input-bordered w-full font-black text-lg text-primary" 
+                        placeholder="Rp 0"
+                        value={nominalDp ? `Rp ${parseInt(nominalDp.replace(/\D/g, "") || "0", 10).toLocaleString("id-ID")}` : ""}
+                        onChange={(e) => setNominalDp(e.target.value)}
+                      />
+                      {errorDp && <span className="label-text-alt text-error font-semibold mt-2 block">{errorDp}</span>}
+                    </div>
+                    <button onClick={handleBayarDp} className="btn btn-primary btn-block">
+                      Tampilkan QRIS DP
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AREA RENDER QRIS BILA SUDAH DIGENERATE ATAU SEDANG LOADING */}
+            {(qrisData || loadingQris) && (
+              <div className="flex flex-col items-center justify-center bg-base-200/50 p-8 rounded-3xl border border-base-content/5 mb-8 max-w-sm mx-auto relative">
+                
+                {/* Tombol Batal/Ubah Opsi (Khusus Kasir) */}
+                {pesanan.sumber_pesanan === 'pos_kasir' && !loadingQris && (
+                  <button 
+                    onClick={() => { setQrisData(null); setOpsiBayar(null); setNominalDp(""); }}
+                    className="absolute top-4 right-4 btn btn-xs btn-ghost text-error"
+                  >
+                    Ubah Nominal
+                  </button>
+                )}
+
+                {loadingQris ? (
+                  <div className="w-48 h-48 flex flex-col items-center justify-center gap-4">
+                    <span className="loading loading-spinner loading-lg text-primary"></span>
+                    <span className="text-xs font-bold opacity-50 uppercase tracking-widest">Menyiapkan QRIS...</span>
+                  </div>
+                ) : qrisData?.qr_string ? (
+                  <div className="bg-white p-4 rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300 cursor-pointer">
+                    <QRCodeSVG value={qrisData.qr_string} size={220} />
+                  </div>
+                ) : qrisData?.qr_url ? (
+                  <div className="bg-white p-4 rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300 cursor-pointer">
+                    <img src={qrisData.qr_url} alt="QRIS" className="w-55 h-55 object-contain" />
+                  </div>
+                ) : (
+                  <div className="w-48 h-48 flex flex-col items-center justify-center text-center">
+                    <XCircle size={32} className="text-error mb-2" />
+                    <p className="text-xs font-bold text-error">{errorDp || "Gagal memuat QRIS"}</p>
+                    <button onClick={() => window.location.reload()} className="btn btn-xs btn-outline mt-2">Muat Ulang Halaman</button>
+                  </div>
+                )}
+
+                <div className="mt-8 text-center w-full">
+                  <span className="text-[10px] font-black uppercase opacity-50 tracking-widest">
+                    {pesanan.sumber_pesanan === 'kasir' && opsiBayar === 'dp' ? 'Nominal DP' : 'Tagihan Pembayaran'}
+                  </span>
+                  <div className="flex items-center justify-center gap-2 mt-1">
+                    <p className="text-4xl font-black text-primary">
+                      Rp {(qrisData?.amount || sisaTagihan).toLocaleString("id-ID")}
+                    </p>
+                    <button 
+                      onClick={() => handleCopyNominal(qrisData?.amount || sisaTagihan)} 
+                      className="btn btn-ghost btn-sm btn-circle text-primary tooltip tooltip-top" 
+                      data-tip={copiedNominal ? "Tersalin!" : "Salin Nominal"}
+                    >
+                      <Copy size={16} className={copiedNominal ? "text-success" : ""} />
+                    </button>
+                  </div>
+                  <p className="text-[10px] font-bold opacity-50 mt-3 text-warning">
+                    *Batas Pembayaran: {batasWaktuTransfer}
+                  </p>
                 </div>
               </div>
+            )}
+
+            <div className="bg-primary/10 text-primary p-5 rounded-2xl text-center border border-primary/20">
+              <p className="text-xs font-bold leading-relaxed">
+                ✅ Pembayaran Anda akan diverifikasi secara <strong>Otomatis</strong> oleh sistem dalam hitungan detik setelah Anda berhasil scan dan bayar. Tidak perlu mengirimkan bukti transfer!
+              </p>
             </div>
           </div>
         )}
 
+        {/* ... (Blok Tanggal Pesan & Total Tagihan) ... */}
         <div className={`grid gap-4 ${nomorResi ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           <div className="bg-base-100 rounded-2xl p-6 border border-base-content/5">
             <div className="flex items-center gap-2 mb-3 opacity-50">
@@ -364,9 +437,12 @@ export default function StatusPesananPage({params}: Props) {
             <p className="text-2xl font-black text-primary">
               Rp {total_tagihan_akurat.toLocaleString("id-ID")}
             </p>
+            {/* Tampilkan informasi telah dibayar jika statusnya DP */}
+            {pesanan.total_dibayar && pesanan.total_dibayar > 0 && pesanan.status_pembayaran !== 'lunas' && (
+              <p className="text-xs font-bold text-success mt-1">Telah Dibayar: Rp {Number(pesanan.total_dibayar).toLocaleString("id-ID")}</p>
+            )}
           </div>
 
-          {/* BOX RESI - Tampil HANYA Jika nomorResi isi */}
           {nomorResi && (
             <div className="bg-base-100 rounded-2xl p-6 border border-base-content/5">
               <div className="flex items-center gap-2 mb-3 opacity-50">

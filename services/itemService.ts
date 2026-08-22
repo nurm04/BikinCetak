@@ -12,7 +12,7 @@ export interface ItemData {
   gambar_urls: string[];
   harga_mulai_dari?: number;
   diskon_roles?: Record<string, number>;
-  dataSkus?: { nama_sku: string; harga: number; tipe_kalkulasi?: string }[];
+  dataSkus?: { nama_sku: string; harga: number; satuan?: string; tipe_kalkulasi?: string }[];
 }
 
 export interface PilihanVarian {
@@ -26,24 +26,18 @@ export interface PilihanVarian {
 export interface Varian {
   id_varian: string;
   nama_varian: string;
+  jenis_varian?: "utama" | "tambahan"; 
   created_at?: string;
   updated_at?: string;
   pilihan_varian: PilihanVarian[];
 }
 
 export interface HargaBertingkat {
-  id: number;
-  id_sku: string;
+  id?: number; 
+  id_sku?: string;
+  pengerjaan: string; 
   min: number;
   max: number;
-  tipe: "nominal" | "persen";
-  nilai: number; 
-}
-
-export interface HargaPengerjaan {
-  id: number;
-  id_sku: string;
-  pengerjaan: string;
   tipe: "nominal" | "persen";
   nilai: number; 
 }
@@ -65,18 +59,21 @@ export interface OpsiFinishing {
   harga_tambahan: number;
   tipe: "nominal" | "persen";
   kali_jumlah_pesan: boolean;
+  harga_bertingkat?: HargaBertingkat[]; 
 }
 
 export interface SkuDetail {
   id_sku: string;
   nama_sku: string;
+  // 👇 PERBAIKAN FATAL: Tipe data gambar sekarang adalah ARRAY string
+  gambar?: string[] | null; 
+  satuan?: string;        
   deskripsi: string | null;
   tipe_kalkulasi: string;
   minimum_pesan: number;
   harga_dasar: number;
   kombinasi_pilihan: string[];
   harga_bertingkat: HargaBertingkat[];
-  harga_pengerjaan: HargaPengerjaan[];
   diskon_customer: DiskonCustomer[];
   opsi_finishing: OpsiFinishing[];
 }
@@ -102,44 +99,36 @@ export async function getItems(): Promise<ItemData[]> {
   const cacheKey = "bikincetak:items_all";
 
   try {
+    // 👇 HAPUS CACHE LAMA BIAR DATA BARU MASUK
+    try { await redis.del(cacheKey); } catch(e) {}
+
     let cachedItems = null;
     try {
       cachedItems = await redis.get(cacheKey);
-    } catch (redisError) {
-      console.error("[getItems] Redis bermasalah, lanjut tembak API:", redisError instanceof Error ? redisError.message : String(redisError));
-    }
+    } catch (redisError) {}
 
     if (cachedItems) {
-      console.log("[getItems] HIT - Mengambil dari Redis");
       return JSON.parse(cachedItems);
     }
 
-    console.log("[getItems] MISS - Menembak API Laravel");
     const response = await fetch(`${API_BASE_URL}/items`, {
       method: "GET",
       cache: "no-store", 
     });
 
-    if (!response.ok) {
-      const textRes = await response.text();
-      console.error(`[getItems] Error ${response.status}:`, textRes);
-      return [];
-    }
+    if (!response.ok) return [];
 
     const result: ApiItemsResponse = await response.json();
     
     if (result.success) {
       try {
         await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
-      } catch (setCacheError) {
-        console.error("[getItems] Gagal set cache Redis, tapi data tetap dikirim ke user");
-      }
+      } catch (setCacheError) {}
       return result.data;
     }
 
     return [];
   } catch (error) {
-    if (error instanceof Error) console.error("[getItems] Catch Error:", error.message);
     return [];
   }
 }
@@ -148,41 +137,34 @@ export async function getItemDetail(idProduk: string): Promise<ItemDetailData | 
   const cacheKey = `bikincetak:item_detail:${idProduk}`;
   
   try {
+    // 👇 HAPUS CACHE LAMA BIAR DATA BARU (GAMBAR ARRAY & JENIS VARIAN) BISA MUNCUL
+    try { await redis.del(cacheKey); } catch(e) {}
+
     let cachedDetail = null;
     try {
       cachedDetail = await redis.get(cacheKey);
-    } catch (redisError) {
-      console.error(`[getItemDetail] Redis bermasalah, lanjut tembak API:`, redisError instanceof Error ? redisError.message : String(redisError));
-    }
+    } catch (redisError) {}
 
     if (cachedDetail) {
-      console.log(`[getItemDetail] HIT - Mengambil dari Redis untuk ID: ${idProduk}`);
       return JSON.parse(cachedDetail);
     }
 
-    console.log(`[getItemDetail] MISS - Menembak API Laravel untuk ID: ${idProduk}`);
     const url = `${API_BASE_URL}/item/${encodeURIComponent(idProduk)}`;
     const response = await fetch(url, { method: "GET", cache: "no-store" });
 
-    if (!response.ok) {
-      console.error(`[getItemDetail] Error ${response.status}`);
-      return null;
-    }
+    if (!response.ok) return null;
 
     const result: ApiItemDetailResponse = await response.json();
     
     if (result.success) {
       try {
         await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
-      } catch (setCacheError) {
-        console.error("[getItemDetail] Gagal set cache Redis, tapi data tetap dikirim ke user");
-      }
+      } catch (setCacheError) {}
       return result.data;
     }
 
     return null;
   } catch (error: unknown) {
-    if (error instanceof Error) console.error("[getItemDetail] Catch Error:", error.message);
     return null;
   }
 }

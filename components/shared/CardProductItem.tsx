@@ -231,9 +231,11 @@ export default function CartProductItem({
               ✨ {rincian_diskon_snapshot[0].nama}
             </span>
           )}
-          {harga_pengerjaan_snapshot > 0 && (
+          {/* 👇 PERBAIKAN: Syarat Muncul Badge Berubah */}
+          {estimasi_pengerjaan && (
             <span className="text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-warning bg-warning/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Clock size={9}/> {estimasi_pengerjaan} (+ Rp {harga_pengerjaan_snapshot.toLocaleString("id-ID")})
+              <Clock size={9}/> {estimasi_pengerjaan} 
+              {harga_pengerjaan_snapshot > 0 && ` (+ Rp ${harga_pengerjaan_snapshot.toLocaleString("id-ID")})`}
             </span>
           )}
         </div>

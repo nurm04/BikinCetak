@@ -101,6 +101,8 @@ export interface Pesanan {
   id_customer: string;
   id_alamat: string;
 
+  sumber_pesanan?: string;
+
   tanggal_pesan: string;
   tanggal_selesai?: string | null;
 
@@ -329,6 +331,44 @@ export async function completePesanan(
     return {
       error:
         "Terjadi kesalahan saat menyelesaikan pesanan.",
+    };
+  }
+}
+
+export interface QrisData {
+  order_id: string;
+  amount: number;
+  qr_string?: string;
+  qr_url?: string;
+}
+
+export async function getQrisData(id_pesan: string, nominal?: number): Promise<PesanServiceResponse<QrisData>> {
+  try {
+    const endpointUrl = nominal 
+      ? `${API_URL}/pembayaran/qris/${id_pesan}?nominal=${nominal}`
+      : `${API_URL}/pembayaran/qris/${id_pesan}`;
+
+    const response = await fetch(endpointUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      cache: "no-store", 
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return {
+        error: result.message || "Gagal mengambil data QRIS.",
+      };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      error: "Terjadi kesalahan server saat mengambil QRIS.",
     };
   }
 }

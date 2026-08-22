@@ -67,7 +67,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-
 export default async function Produk({ params }: PageProps) {
   const { slug } = await params;
   
@@ -110,7 +109,6 @@ export default async function Produk({ params }: PageProps) {
     
     if (itemDetail.skus && itemDetail.skus.length > 0) {
       const matchedSku = itemDetail.skus.find(sku => slugify(sku.nama_sku) === slug.trim());
-      
       initialSku = matchedSku || itemDetail.skus[0];
     }
 

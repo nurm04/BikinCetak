@@ -19,26 +19,42 @@ interface FormField {
 }
 
 interface FormPesanProps {
-  fields: FormField[];
+  fieldsUtama?: FormField[];     // Varian Utama (Kombinasi String)
+  fieldsTambahan?: FormField[];  // Varian Tambahan (Sisi, Halaman, dll - pakai ID Varian Asli)
+  fields?: FormField[];          // Fallback backward compatibility
   values?: Record<string, string>;
   onValueChange?: (name: string, value: string) => void;
   groupedAddons?: Record<string, OpsiFinishing[]>;
   minimumQty?: number;
   tipeKalkulasi?: string;
+  sisiCetakMultiplier?: number;
 }
 
-export default function FormPesan({ fields, values, onValueChange, groupedAddons, minimumQty = 1, tipeKalkulasi = "standard" }: FormPesanProps) {
+export default function FormPesan({ 
+  fieldsUtama, 
+  fieldsTambahan, 
+  fields, 
+  values, 
+  onValueChange, 
+  groupedAddons, 
+  minimumQty = 1, 
+  tipeKalkulasi = "standard", 
+  sisiCetakMultiplier = 1 
+}: FormPesanProps) {
   
   useEffect(() => {
     if (!groupedAddons || !onValueChange) return;
 
     Object.entries(groupedAddons).forEach(([groupName, addons]) => {
-      if (values?.[groupName] === undefined) {
-        
-        const zeroAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
-        
-        if (zeroAddon) {
-          onValueChange(groupName, zeroAddon.id_pilihan_finishing);
+      const currentValue = values?.[groupName];
+      const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
+
+      if (currentValue === undefined || (currentValue === "" && hasZero)) {
+        if (hasZero) {
+          const zeroAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
+          if (zeroAddon) {
+            onValueChange(groupName, zeroAddon.id_pilihan_finishing);
+          }
         } else {
           onValueChange(groupName, "");
         }
@@ -46,26 +62,36 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
     });
   }, [groupedAddons]); 
 
-  // Daftar roll standar (bisa lu sesuaikan)
+  useEffect(() => {
+    if (!onValueChange) return;
+
+    const currentQty = parseInt(values?.qty || "0", 10);
+    if (isNaN(currentQty) || currentQty < minimumQty) {
+      onValueChange("qty", String(minimumQty));
+    }
+  }, [minimumQty]); 
+
   const availableRolls = useMemo(() => [0.9, 1.2, 1.6, 1.8, 2.0], []);
   
   const currentRoll = parseFloat(values?.['Lebar Bahan Dihitung'] || "1.20");
   const currentPanjang = parseFloat(values?.Panjang || "1");
   const currentLebar = parseFloat(values?.Lebar || "1");
   
-  // Mencari sisi terpanjang buat pengali
   const maxDim = Math.max(currentPanjang, currentLebar);
   const qtyInput = parseInt(values?.qty || String(minimumQty), 10);
+
+  // Fallback rendering
+  const renderUtama = fieldsUtama?.length ? fieldsUtama : (fields || []);
 
   return (
     <div className="grid grid-cols-1 gap-4">
 
       {/* 1. LOOPING VARIAN UTAMA */}
-      {fields.map((field, index) => {
+      {renderUtama.map((field, index) => {
         const selectOptions = field.options || [];
 
         return (
-          <div key={index} className="pt-2">
+          <div key={`utama-${index}`} className="pt-2">
             <FormSelect 
               label={field.label} 
               name={field.name} 
@@ -80,32 +106,16 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
       })}
 
       {/* ========================================================= */}
-      {/* KHUSUS CETAK METERAN: PINDAH KE BAWAH VARIAN */}
+      {/* KHUSUS CETAK METERAN */}
       {/* ========================================================= */}
       {tipeKalkulasi === "cetak_meteran" && (
         <div className="space-y-4 pt-4 border-t border-base-content/5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <FormInput
-                label="Panjang (Meter)"
-                name="Panjang"
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={values?.Panjang ?? ""} // PAKAI ?? BUKAN ||
-                onChange={onValueChange}
-              />
+              <FormInput label="Panjang (Meter)" name="Panjang" type="number" min="0.1" step="0.1" value={values?.Panjang ?? ""} onChange={onValueChange} />
             </div>
             <div>
-              <FormInput
-                label="Lebar (Meter)"
-                name="Lebar"
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={values?.Lebar ?? ""} // PAKAI ?? BUKAN ||
-                onChange={onValueChange}
-              />
+              <FormInput label="Lebar (Meter)" name="Lebar" type="number" min="0.1" step="0.1" value={values?.Lebar ?? ""} onChange={onValueChange} />
             </div>
           </div>
           
@@ -114,18 +124,10 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
               <label className="text-[10px] font-black uppercase opacity-60 mb-2 block tracking-widest px-1">Lebar Bahan Terpilih</label>
               <div className="flex flex-wrap gap-2 px-1">
                 {availableRolls.map(roll => (
-                  <div 
-                    key={roll} 
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                      currentRoll === roll 
-                        ? 'bg-primary text-primary-content border-primary shadow-sm' 
-                        : 'bg-base-200/50 text-base-content/50 border-base-content/10'
-                    }`}
-                  >
+                  <div key={roll} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${currentRoll === roll ? 'bg-primary text-primary-content border-primary shadow-sm' : 'bg-base-200/50 text-base-content/50 border-base-content/10'}`}>
                     {roll}
                   </div>
                 ))}
-                {/* Tampilan kalau minDim ngelewatin roll 2.0 (fallback ke Math.ceil) */}
                 {!availableRolls.includes(currentRoll) && (
                    <div className="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-primary-content border-primary shadow-sm border">
                      {currentRoll}
@@ -136,73 +138,116 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
             
             <div className="bg-base-200/50 border border-base-content/10 p-3 rounded-xl text-xs font-bold text-base-content/70">
                Perhitungan: {qtyInput} x {currentRoll} x {maxDim} = <span className="text-primary font-black ml-1">{((qtyInput * currentRoll * maxDim)).toFixed(1).replace(/\.0$/, '')} m²</span>
+               {((qtyInput * currentRoll * maxDim)) < 1 && (
+                  <div className="text-[9px] font-bold text-error italic mt-1 block">
+                      *Minimal order dihitung 1 m²
+                  </div>
+               )}
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================= */}
-      {/* KHUSUS CETAK BUKU: UI JUMLAH HALAMAN */}
+      {/* KHUSUS CETAK BUKU */}
       {/* ========================================================= */}
       {tipeKalkulasi === "cetak_buku" && (
         <div className="pt-4 border-t border-base-content/5 grid grid-cols-1">
-          <FormInput
-            label="Jumlah Halaman"
-            name="jumlah_halaman"
-            type="number"
-            min="1"
-            value={values?.jumlah_halaman ?? ""} // PAKAI ?? BUKAN ||
-            onChange={onValueChange}
-          />
+          <FormInput label="Jumlah Halaman" name="jumlah_halaman" type="number" min="1" value={values?.jumlah_halaman ?? ""} onChange={onValueChange} />
+          {(() => {
+             const inputHal = parseInt(values?.jumlah_halaman || "1", 10);
+             const halValid = isNaN(inputHal) || inputHal < 1 ? 1 : inputHal;
+             const tambahanHalaman = Math.max(0, halValid - 1);
+             const biayaHalaman = tambahanHalaman * sisiCetakMultiplier * 1500;
+             if (biayaHalaman > 0) {
+                 return (
+                    <div className="mt-2 text-[10px] font-bold text-info px-1">
+                        * Kalkulasi: Tambahan {tambahanHalaman} Halaman ({sisiCetakMultiplier} Sisi) = + Rp {biayaHalaman.toLocaleString('id-ID')} / pcs
+                    </div>
+                 );
+             }
+             return null;
+          })()}
         </div>
       )}
 
-      {/* 2. LOOPING ADDONS / FINISHING */}
-      {groupedAddons && Object.entries(groupedAddons).map(([groupName, addons]) => {
-        const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
-        const addonOptions: FormFieldOption[] = [];
+      {/* ========================================================= */}
+      {/* 2. LOOPING VARIAN TAMBAHAN & FINISHING */}
+      {/* ========================================================= */}
+      {(fieldsTambahan && fieldsTambahan.length > 0 || (groupedAddons && Object.keys(groupedAddons).length > 0)) && (
+        <div className="pt-4 border-t border-base-content/5 space-y-4">
+          <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Spesifikasi Tambahan</p>
+          
+          {/* VARIAN TAMBAHAN (Dari SKU) */}
+          {fieldsTambahan && fieldsTambahan.map((field, index) => {
+            const selectOptions = field.options || [];
+            return (
+              <div key={`tambahan-${index}`}>
+                <FormSelect 
+                  label={field.label} 
+                  name={field.name} 
+                  options={selectOptions}
+                  value={values?.[field.name] || ""} 
+                  onChange={(name, val) => {
+                    if (onValueChange) onValueChange(name, val);
+                  }}
+                />
+              </div>
+            );
+          })}
 
-        if (!hasZero) {
-          addonOptions.push({
-            value: "",
-            label: `Tanpa ${groupName} (+ Rp 0)`
-          });
-        }
+          {/* FINISHING TAMBAHAN */}
+          {groupedAddons && Object.entries(groupedAddons).map(([groupName, addons]) => {
+            const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
+            const addonOptions: FormFieldOption[] = [];
 
-        addons.forEach(a => {
-          addonOptions.push({
-            value: a.id_pilihan_finishing,
-            label: `${a.nama_pilihan} (+ Rp ${Number(a.harga_tambahan).toLocaleString("id-ID")})`
-          });
-        });
+            if (!hasZero) {
+              addonOptions.push({
+                value: "",
+                label: `Tanpa ${groupName} (+ Rp 0)`
+              });
+            }
 
-        const selectedAddonId = values?.[groupName] !== undefined 
-          ? values[groupName] 
-          : (hasZero ? addons.find(a => Number(a.harga_tambahan) === 0)?.id_pilihan_finishing || "" : "");
+            addons.forEach(a => {
+              const labelBiaya = a.tipe === 'persen' 
+                ? `${a.harga_tambahan}%` 
+                : `Rp ${Number(a.harga_tambahan).toLocaleString("id-ID")}`;
 
-        const selectedAddonInfo = addons.find(a => a.id_pilihan_finishing === selectedAddonId);
+              addonOptions.push({
+                value: a.id_pilihan_finishing,
+                label: `${a.nama_pilihan} (+ ${labelBiaya})`
+              });
+            });
 
-        return (
-          <div key={groupName} className="pt-2 border-t border-base-content/5">
-            <FormSelect 
-              label={groupName} 
-              name={groupName} 
-              options={addonOptions}
-              value={selectedAddonId}
-              onChange={(name, val) => {
-                if (onValueChange) onValueChange(groupName, val);
-              }}
-            />
-            
-            {/* Teks Info Minimum Pesan khusus Finishing */}
-            {selectedAddonInfo && selectedAddonInfo.minimum_pesan > 1 && (
-              <p className="text-[11px] text-warning font-bold mt-1 px-1">
-                * Minimum pesan {selectedAddonInfo.minimum_pesan} pcs untuk finishing ini
-              </p>
-            )}
-          </div>
-        );
-      })}
+            const currentValue = values?.[groupName];
+            const selectedAddonId = (currentValue === undefined || (currentValue === "" && hasZero))
+              ? (hasZero ? addons.find(a => Number(a.harga_tambahan) === 0)?.id_pilihan_finishing || "" : "")
+              : currentValue;
+
+            const selectedAddonInfo = addons.find(a => a.id_pilihan_finishing === selectedAddonId);
+
+            return (
+              <div key={groupName}>
+                <FormSelect 
+                  label={groupName} 
+                  name={groupName} 
+                  options={addonOptions}
+                  value={selectedAddonId}
+                  onChange={(name, val) => {
+                    if (onValueChange) onValueChange(groupName, val);
+                  }}
+                />
+                
+                {selectedAddonInfo && selectedAddonInfo.minimum_pesan > 1 && (
+                  <p className="text-[11px] text-warning font-bold mt-1 px-1">
+                    * Minimum pesan {selectedAddonInfo.minimum_pesan} pcs untuk finishing ini
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       
       {/* 4. INPUT QTY & CATATAN */}
       <div className="pt-4 space-y-4 border-t border-base-content/5">
@@ -212,13 +257,12 @@ export default function FormPesan({ fields, values, onValueChange, groupedAddons
             name="qty"
             type="number"
             min={String(minimumQty)}
-            // PERBAIKAN UTAMA: Pakai ?? agar "" tidak di-convert paksa jadi "1" saat user menghapus input
             value={values?.qty ?? String(minimumQty)} 
             onChange={onValueChange}
           />
           {minimumQty > 1 && (
             <p className="text-[11px] text-warning font-bold mt-1 leading-tight px-1">
-              * Konfigurasi produk ini mewajibkan minimum pesanan {minimumQty} pcs
+              * Konfigurasi pesanan ini mewajibkan minimum {minimumQty} pcs
             </p>
           )}
         </div>

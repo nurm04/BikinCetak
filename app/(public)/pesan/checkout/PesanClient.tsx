@@ -34,7 +34,7 @@ interface CheckoutItem {
     id: number;
     nama_finishing: string;
     harga_tambahan: number;
-    kali_jumlah_pesan?: number | boolean; // DITAMBAHKAN BIAR KALKULASI SINKRON
+    kali_jumlah_pesan?: number | boolean;
   }[];
 }
 
@@ -185,6 +185,7 @@ export default function PesanClient() {
       setOngkirError(null);
       setCouriers([]);
 
+      // OPSI 1: AMBIL DI TOKO
       const manualPickup: CourierOption = {
         code: "toko",
         name: "Ambil di Toko",
@@ -196,7 +197,19 @@ export default function PesanClient() {
         }]
       };
 
-      let normalizedCouriers: CourierOption[] = [manualPickup];
+      // OPSI 2: REQUEST CARGO / EKSPEDISI CUSTOM
+      const requestCargo: CourierOption = {
+        code: "cargo",
+        name: "Request Expedisi Cargo",
+        costs: [{
+          service: "Cargo / Custom",
+          description: "Pembayaran ongkir bisa tujuan / transfer belakangan (sesuai kesepakatan)",
+          cost: 0,
+          etd: "Menyesuaikan"
+        }]
+      };
+
+      let normalizedCouriers: CourierOption[] = [manualPickup, requestCargo];
       
       try {
         const result = await getShippingCost(alamatUtama.id_alamat);
@@ -248,8 +261,8 @@ export default function PesanClient() {
           normalizedCouriers = [...normalizedCouriers, ...apiCouriers];
         }
 
-        if (normalizedCouriers.length === 1) {
-            setOngkirError("Tidak ada layanan pengiriman ke alamat ini.");
+        if (normalizedCouriers.length === 2) {
+            setOngkirError("Tidak ada layanan pengiriman otomatis ke alamat ini. Anda masih bisa menggunakan opsi manual.");
         } 
         
         setCouriers(normalizedCouriers);
@@ -268,7 +281,6 @@ export default function PesanClient() {
   const hitungRowTotal = (item: CheckoutItem) => {
     let hargaDasar = item.harga_satuan || 0;
     
-    // 1. Parsing Atribut Custom
     let atribut: Record<string, CustomAttributeValue> = {};
     if (item.atribut_custom_snapshot) {
       if (typeof item.atribut_custom_snapshot === "string") {
@@ -282,7 +294,6 @@ export default function PesanClient() {
       }
     }
 
-    // 2. Cari Sisi Cetak
     let sisi = 1;
     item.finishing.forEach((fin) => {
       const label = fin.nama_finishing.toLowerCase();
@@ -291,7 +302,6 @@ export default function PesanClient() {
       }
     });
 
-    // 3. Hitung Biaya Halaman
     let jumlahHalaman = 1;
     if (atribut["Jumlah Halaman"]) {
       const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
@@ -303,9 +313,6 @@ export default function PesanClient() {
       hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
     }
 
-    // ==========================================================
-    // 4. REVISI: KALIKAN LUAS DIHARGAI (Khusus Cetak Meteran)
-    // ==========================================================
     let multiplierLuas = 1;
     if (atribut["Luas Dihargai (m2)"] !== undefined) {
         multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
@@ -314,7 +321,6 @@ export default function PesanClient() {
 
     let subtotalItem = (hargaDasar * multiplierLuas) * item.jumlah;
 
-    // 5. Hitung Biaya Finishing Sesuai Opsi Kali Qty
     item.finishing.forEach((fin) => {
       const isKaliQty = fin.kali_jumlah_pesan === true || fin.kali_jumlah_pesan === 1;
       const val = fin.harga_tambahan || 0;
@@ -554,7 +560,7 @@ export default function PesanClient() {
                       {couriers.map((courier) => (
                         courier.costs.map((srv, idx) => {
                           const isSelected = selectedShipping?.courier_code === courier.code && selectedShipping?.service === srv.service;
-                          const isPickup = courier.code === "toko";
+                          const isManualPickupOrCargo = courier.code === "toko" || courier.code === "cargo";
                           
                           return (
                             <div 
@@ -579,12 +585,17 @@ export default function PesanClient() {
                                     {courier.name} - {srv.service}
                                   </p>
                                   <p className="text-[10px] font-bold opacity-60 mt-1">
-                                    {isPickup ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}
+                                    {isManualPickupOrCargo ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}
                                   </p>
                                 </div>
                               </div>
-                              <div className="text-right font-black text-primary">
-                                {srv.cost === 0 ? "GRATIS" : `Rp ${srv.cost.toLocaleString("id-ID")}`}
+                              <div className="text-right font-black text-primary text-xs sm:text-sm">
+                                {courier.code === "cargo" 
+                                  ? "BAYAR TUJUAN" 
+                                  : srv.cost === 0 
+                                    ? "GRATIS" 
+                                    : `Rp ${srv.cost.toLocaleString("id-ID")}`
+                                }
                               </div>
                             </div>
                           );
@@ -669,7 +680,13 @@ export default function PesanClient() {
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[10px] font-bold uppercase opacity-60">Ongkos Kirim</span>
                       <span className="font-bold text-success">
-                        {selectedShipping ? `+ Rp ${selectedShipping.cost.toLocaleString("id-ID")}` : "-"}
+                        {selectedShipping 
+                          ? selectedShipping.courier_code === "cargo" 
+                            ? "Bayar Tujuan"
+                            : selectedShipping.cost === 0 
+                              ? "Gratis" 
+                              : `+ Rp ${selectedShipping.cost.toLocaleString("id-ID")}`
+                          : "-"}
                       </span>
                     </div>
 

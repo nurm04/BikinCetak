@@ -23,6 +23,9 @@ interface SkuGridItem {
   harga: number;
   image: string;
   diskon_roles: Record<string, number>;
+  // Tambahan untuk membantu parsing jika ada nama asli SKU
+  nama_sku_asli?: string; 
+  nama_produk?: string;
 }
 
 interface KatalogClientProps {
@@ -38,6 +41,39 @@ const formatRupiah = (angka: number) => {
     maximumFractionDigits: 0,
   }).format(angka);
 };
+
+// ==============================================================================
+// 🌟 HELPER: Fungsi Sakti Pemotong Nama SKU untuk Katalog 🌟
+// ==============================================================================
+const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
+    let labelBersih = skuName;
+    
+    // 1. Buang Prefix (Kode Produk & Nama Produk)
+    // Coba buang PRD-XXX-NamaProduk-
+    const prefix1Match = labelBersih.match(/^[A-Z0-9]+-\d+-/i);
+    if (prefix1Match) {
+      labelBersih = labelBersih.replace(prefix1Match[0], '');
+    }
+
+    if (productName) {
+       const escProd = productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+       const regexProd = new RegExp(`^${escProd}-?`, 'i');
+       labelBersih = labelBersih.replace(regexProd, '').trim();
+    }
+
+    // 2. Potong Varian Tambahan (Asumsi: Selalu setelah strip terakhir JIKA nama sangat panjang)
+    // Karena di Katalog kita tidak punya relasi 'varians', kita buat tebakan aman:
+    // Jika string masih mengandung '-' dan panjang, kemungkinan itu varian tambahan.
+    if (labelBersih.includes('-')) {
+        const lastDashIndex = labelBersih.lastIndexOf('-');
+        // Kita hanya memotong jika bagian setelah '-' cukup pendek (misal: "1 Sisi", "2 Lembar")
+        // Ini menghindari pemotongan nama varian utama yang kebetulan ada strip-nya.
+        labelBersih = labelBersih.substring(0, lastDashIndex).trim();
+    }
+
+    return labelBersih || "Standar";
+};
+
 
 function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientProps) {
   const searchParams = useSearchParams();
@@ -68,7 +104,10 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
 
     if (queryParam) {
       const q = queryParam.toLowerCase();
-      result = result.filter(item => item.nama_sku_bersih.toLowerCase().includes(q));
+      // Pencarian tetap menggunakan nama asli/kotor agar lebih akurat jika user mengetik "1 sisi"
+      result = result.filter(item => 
+          (item.nama_sku_asli || item.nama_sku_bersih).toLowerCase().includes(q)
+      );
     }
 
     // Filter by Kategori atau by Produk (dari klik Sidebar)
@@ -78,21 +117,44 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
       result = result.filter(item => slugify(item.kategori) === categoryParam);
     }
 
+    // Filter Duplikat Label Bersih
+    // Karena satu produk bisa punya banyak varian tambahan, kita hanya perlu nampilin 1 card
+    // per Kombinasi Utama.
+    const uniqueItems = new Map<string, SkuGridItem>();
+    
+    result.forEach(item => {
+        // Generate label bersih saat on-the-fly
+        const displayLabel = getCleanKatalogLabel(item.nama_sku_asli || item.nama_sku_bersih, item.nama_produk);
+        
+        // Simpan hanya jika belum ada label tersebut, ATAU jika yang baru harganya lebih murah
+        if (!uniqueItems.has(displayLabel)) {
+            uniqueItems.set(displayLabel, { ...item, nama_sku_bersih: displayLabel });
+        } else {
+            const existing = uniqueItems.get(displayLabel)!;
+            if (item.harga < existing.harga) {
+                uniqueItems.set(displayLabel, { ...item, nama_sku_bersih: displayLabel });
+            }
+        }
+    });
+    
+    let finalResult = Array.from(uniqueItems.values());
+
+
     switch (sortBy) {
       case 'terbaru':
-        result = result.reverse(); 
+        finalResult = finalResult.reverse(); 
         break;
       case 'harga-rendah':
-        result.sort((a, b) => a.harga - b.harga);
+        finalResult.sort((a, b) => a.harga - b.harga);
         break;
       case 'harga-tinggi':
-        result.sort((a, b) => b.harga - a.harga);
+        finalResult.sort((a, b) => b.harga - a.harga);
         break;
       default:
         break; 
     }
 
-    return result;
+    return finalResult;
   }, [skuItems, queryParam, categoryParam, productParam, sortBy]);
 
   const handleToggleCategory = (catKey: string) => {
