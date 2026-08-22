@@ -645,7 +645,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                         <table className="table table-xs w-full bg-base-100">
                           <thead className="bg-base-200/50">
                             <tr>
-                              <th className="font-black uppercase py-3">Jumlah (Pcs)</th>
+                              <th className="font-black uppercase py-3">Jumlah ({sku?.satuan || "pcs"})</th>
                               <th className="font-black uppercase py-3 text-right">Harga Satuan</th>
                             </tr>
                           </thead>
