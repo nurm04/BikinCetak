@@ -2,7 +2,7 @@
 "use server";
 import { cookies } from "next/headers";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 async function getAuthHeader(isFormData = false) {
   const cookieStore = await cookies();
@@ -142,7 +142,7 @@ export async function getCartItems(): Promise<CartServiceResponse<CartDataAPI>> 
       return { error: "Silakan login terlebih dahulu." };
     }
 
-    const response = await fetch(`${API_URL}/cart`, {
+    const response = await fetch(`${API_URL}/api/cart`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -239,7 +239,7 @@ export async function addCart(id_alamat: string, items: AddCartItem[]): Promise<
       }
     });
 
-    const response = await fetch(`${API_URL}/cart`, {
+    const response = await fetch(`${API_URL}/api/cart`, {
       method: "POST",
       headers,
       body: formData,
@@ -271,7 +271,7 @@ export async function updateCartItemQty(id: number, jumlah: number): Promise<Car
       return { error: "Silakan login terlebih dahulu." };
     }
 
-    const response = await fetch(`${API_URL}/cart/item/${id}`, {
+    const response = await fetch(`${API_URL}/api/cart/item/${id}`, {
       method: "PATCH",
       headers,
       body: JSON.stringify({ jumlah }),
@@ -301,7 +301,7 @@ export async function deleteCartItem(id: number): Promise<CartServiceResponse<nu
       return { error: "Silakan login terlebih dahulu." };
     }
 
-    const response = await fetch(`${API_URL}/cart/item/${id}`, {
+    const response = await fetch(`${API_URL}/api/cart/item/${id}`, {
       method: "DELETE",
       headers,
     });
@@ -330,7 +330,7 @@ export async function checkoutCart(payload: CheckoutPayload): Promise<CartServic
       return { error: "Silakan login terlebih dahulu." };
     }
 
-    const response = await fetch(`${API_URL}/cart/checkout`, {
+    const response = await fetch(`${API_URL}/api/cart/checkout`, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
@@ -360,7 +360,7 @@ export async function getShippingCost(id_alamat: string): Promise<CartServiceRes
       return { error: "Silakan login terlebih dahulu." };
     }
 
-    const response = await fetch(`${API_URL}/shipping/cost`, {
+    const response = await fetch(`${API_URL}/api/shipping/cost`, {
       method: "POST",
       headers,
       body: JSON.stringify({ id_alamat }),

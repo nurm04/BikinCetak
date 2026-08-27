@@ -3,7 +3,7 @@
 
 import { cookies } from "next/headers";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export interface RegisterPayload {
   email: string;
@@ -41,7 +41,7 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthRespon
       no_hp: payload.number,
     };
 
-    const response = await fetch(`${BASE_URL}/register`, {
+    const response = await fetch(`${BASE_URL}/api/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(laravelPayload),
@@ -61,7 +61,7 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthRespon
 
 export async function loginUser(payload: Pick<RegisterPayload, 'email' | 'password'>): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${BASE_URL}/login`, {
+    const response = await fetch(`${BASE_URL}/api/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -115,7 +115,7 @@ export async function logoutAction(): Promise<void> {
 
 export async function sendResetLink(payload: { email: string }): Promise<{ message?: string; error?: string }> {
   try {
-    const response = await fetch(`${BASE_URL}/forgot-password`, {
+    const response = await fetch(`${BASE_URL}/api/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -135,7 +135,7 @@ export async function sendResetLink(payload: { email: string }): Promise<{ messa
 
 export async function resetPassword(payload: ResetPasswordPayload): Promise<{ message?: string; error?: string }> {
   try {
-    const response = await fetch(`${BASE_URL}/reset-password`, {
+    const response = await fetch(`${BASE_URL}/api/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

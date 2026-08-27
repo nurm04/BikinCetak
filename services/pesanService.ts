@@ -3,7 +3,7 @@
 
 import { cookies } from "next/headers";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 async function getAuthHeader() {
   const cookieStore = await cookies();
@@ -159,7 +159,7 @@ export async function getPesanan(): Promise<PesanServiceResponse<Pesanan[]>> {
     }
 
     const response = await fetch(
-      `${API_URL}/pesanan`,
+      `${API_URL}/api/pesanan`,
       {
         method: "GET",
         headers,
@@ -200,7 +200,7 @@ export async function getPesananByKodeTransaksi(
     }
 
     const response = await fetch(
-      `${API_URL}/pesanan/${kode_transaksi}`,
+      `${API_URL}/api/pesanan/${kode_transaksi}`,
       {
         method: "GET",
         headers,
@@ -233,7 +233,7 @@ export async function getStatusPesanan(
 ): Promise<PesanServiceResponse<Pesanan>> {
     try {
         const response = await fetch(
-            `${API_URL}/pesanan/status/${kode_transaksi}`,
+            `${API_URL}/api/pesanan/status/${kode_transaksi}`,
             {
                 cache: "no-store",
             }
@@ -268,7 +268,7 @@ export async function cancelPesanan(
     }
 
     const response = await fetch(
-      `${API_URL}/pesanan/${id_pesan}/cancel`,
+      `${API_URL}/api/pesanan/${id_pesan}/cancel`,
       {
         method: "PATCH",
         headers,
@@ -308,7 +308,7 @@ export async function completePesanan(
     }
 
     const response = await fetch(
-      `${API_URL}/pesanan/${id_pesan}/selesai`,
+      `${API_URL}/api/pesanan/${id_pesan}/selesai`,
       {
         method: "PUT",
         headers,
@@ -345,8 +345,8 @@ export interface QrisData {
 export async function getQrisData(id_pesan: string, nominal?: number): Promise<PesanServiceResponse<QrisData>> {
   try {
     const endpointUrl = nominal 
-      ? `${API_URL}/pembayaran/qris/${id_pesan}?nominal=${nominal}`
-      : `${API_URL}/pembayaran/qris/${id_pesan}`;
+      ? `${API_URL}/api/pembayaran/qris/${id_pesan}?nominal=${nominal}`
+      : `${API_URL}/api/pembayaran/qris/${id_pesan}`;
 
     const response = await fetch(endpointUrl, {
       method: "GET",

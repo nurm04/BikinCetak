@@ -24,7 +24,7 @@ export interface UserProfile {
   customer: CustomerProfile | null;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 async function getAuthHeader() {
   const cookieStore = await cookies();
   const jwtCookie = cookieStore.get("jwt");
@@ -56,7 +56,7 @@ export async function getUserProfile(): Promise<{
     }
 
     const response = await fetch(
-      `${BASE_URL}/me`,
+      `${BASE_URL}/api/me`,
       {
         method: "GET",
         headers,
@@ -116,7 +116,7 @@ export async function updateUserProfile(
     }
 
     const response = await fetch(
-      `${BASE_URL}/profile`,
+      `${BASE_URL}/api/profile`,
       {
         method: "PUT",
         headers,
@@ -167,7 +167,7 @@ export async function updatePassword(
     }
 
     const response = await fetch(
-      `${BASE_URL}/profile/password`,
+      `${BASE_URL}/api/profile/password`,
       {
         method: "PUT",
         headers,

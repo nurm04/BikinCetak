@@ -93,7 +93,7 @@ export interface ApiItemDetailResponse {
   data: ItemDetailData;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export async function getItems(): Promise<ItemData[]> {
   const cacheKey = "bikincetak:items_all";
@@ -111,7 +111,7 @@ export async function getItems(): Promise<ItemData[]> {
       return JSON.parse(cachedItems);
     }
 
-    const response = await fetch(`${API_BASE_URL}/items`, {
+    const response = await fetch(`${API_BASE_URL}/api/items`, {
       method: "GET",
       cache: "no-store", 
     });
@@ -149,7 +149,7 @@ export async function getItemDetail(idProduk: string): Promise<ItemDetailData | 
       return JSON.parse(cachedDetail);
     }
 
-    const url = `${API_BASE_URL}/item/${encodeURIComponent(idProduk)}`;
+    const url = `${API_BASE_URL}/api/item/${encodeURIComponent(idProduk)}`;
     const response = await fetch(url, { method: "GET", cache: "no-store" });
 
     if (!response.ok) return null;

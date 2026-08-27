@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 async function getAuthHeader() {
   const cookieStore = await cookies();
@@ -63,7 +63,7 @@ export async function getVouchers(): Promise<ApiResponse<Voucher[]>> {
         "Content-Type": "application/json",
     };
 
-    const response = await fetch(`${API_URL}/vouchers`, {
+    const response = await fetch(`${API_URL}/api/vouchers`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -87,7 +87,7 @@ export async function cekVoucher(
       return { error: "Silakan login terlebih dahulu untuk klaim voucher." };
     }
 
-    const response = await fetch(`${API_URL}/vouchers/${kode_voucher}`, {
+    const response = await fetch(`${API_URL}/api/vouchers/${kode_voucher}`, {
       method: "GET",
       headers,
       cache: "no-store",

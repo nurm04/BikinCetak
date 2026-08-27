@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/";
 
 async function getAuthHeader(): Promise<Record<string, string> | null> {
   const cookieStore = await cookies();
@@ -127,7 +127,7 @@ export async function getAlamat(): Promise<ApiResponse<Alamat[]>> {
     const headers = await getAuthHeader();
     if (!headers) return { error: "Silakan login terlebih dahulu." };
 
-    const response = await fetch(`${API_URL}/alamat`, {
+    const response = await fetch(`${API_URL}/api/alamat`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -144,7 +144,7 @@ export async function getAlamatById(id_alamat: string): Promise<ApiResponse<Alam
     const headers = await getAuthHeader();
     if (!headers) return { error: "Silakan login terlebih dahulu." };
 
-    const response = await fetch(`${API_URL}/alamat/${id_alamat}`, {
+    const response = await fetch(`${API_URL}/api/alamat/${id_alamat}`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -161,7 +161,7 @@ export async function createAlamat(data: AlamatPayload): Promise<ApiResponse<Ala
     const headers = await getAuthHeader();
     if (!headers) return { error: "Silakan login terlebih dahulu." };
 
-    const response = await fetch(`${API_URL}/alamat`, {
+    const response = await fetch(`${API_URL}/api/alamat`, {
       method: "POST",
       headers,
       body: JSON.stringify(data),
@@ -178,7 +178,7 @@ export async function updateAlamat(id_alamat: string, data: AlamatPayload): Prom
     const headers = await getAuthHeader();
     if (!headers) return { error: "Silakan login terlebih dahulu." };
 
-    const response = await fetch(`${API_URL}/alamat/${id_alamat}`, {
+    const response = await fetch(`${API_URL}/api/alamat/${id_alamat}`, {
       method: "PUT",
       headers,
       body: JSON.stringify(data),
@@ -195,7 +195,7 @@ export async function deleteAlamat(id_alamat: string): Promise<ApiResponse<null>
     const headers = await getAuthHeader();
     if (!headers) return { error: "Silakan login terlebih dahulu." };
 
-    const response = await fetch(`${API_URL}/alamat/${id_alamat}`, {
+    const response = await fetch(`${API_URL}/api/alamat/${id_alamat}`, {
       method: "DELETE",
       headers,
     });
@@ -211,7 +211,7 @@ export async function setDefaultAlamat(id_alamat: string): Promise<AlamatService
     const headers = await getAuthHeader();
     if (!headers) return { error: "Silakan login terlebih dahulu." };
 
-    const response = await fetch(`${API_URL}/alamat/${id_alamat}/default`, {
+    const response = await fetch(`${API_URL}/api/alamat/${id_alamat}/default`, {
       method: "PATCH",
       headers,
     });
@@ -224,7 +224,7 @@ export async function setDefaultAlamat(id_alamat: string): Promise<AlamatService
 
 export async function getProvinces(): Promise<ApiResponse<ProvinceResult[]>> {
   try {
-    const response = await fetch(`${API_URL}/shipping/provinces`, {
+    const response = await fetch(`${API_URL}/api/shipping/provinces`, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -241,7 +241,7 @@ export async function getProvinces(): Promise<ApiResponse<ProvinceResult[]>> {
 
 export async function getCities(provinceId: string | number): Promise<ApiResponse<CityResult[]>> {
   try {
-    const response = await fetch(`${API_URL}/shipping/cities/${provinceId}`, {
+    const response = await fetch(`${API_URL}/api/shipping/cities/${provinceId}`, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -258,7 +258,7 @@ export async function getCities(provinceId: string | number): Promise<ApiRespons
 
 export async function getDistricts(cityId: string | number): Promise<ApiResponse<DistrictResult[]>> {
   try {
-    const response = await fetch(`${API_URL}/shipping/districts/${cityId}`, {
+    const response = await fetch(`${API_URL}/api/shipping/districts/${cityId}`, {
       method: "GET",
       headers: {
         Accept: "application/json",

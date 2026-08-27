@@ -33,7 +33,7 @@ interface ProductClientLayoutProps {
 export default function ProductClientLayout({ itemDetail, initialSku, recommendations, activeRoleId, idAlamatUtama, isLoggedIn }: ProductClientLayoutProps) {
   const router = useRouter();
   const [cartLoading, setCartLoading] = useState<boolean>(false);
-
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
   const targetSku = initialSku || (itemDetail?.skus?.[0] ?? null);
 
   // ==============================================================================
@@ -397,8 +397,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     if (sku?.gambar && Array.isArray(sku.gambar) && sku.gambar.length > 0) {
       return sku.gambar.map((img: string) => {
         if (img.startsWith('http')) return img;
-        // Prefix otomatis buat nyocokin path Storage Laravel lu
-        return `http://127.0.0.1:8000/storage/${img}`;
+        // 👇 PERBAIKAN: Gunakan API_URL yang dinamis 👇
+        return `${API_URL}/storage/${img}`;
       });
     }
 
@@ -409,7 +409,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
     // 3. Fallback akhir: kosong (Biar carousel nggak error)
     return [];
-  }, [sku?.gambar, itemDetail?.gambar_urls]);
+}, [sku?.gambar, itemDetail?.gambar_urls]);
 
 
   // ==============================================================================
