@@ -680,7 +680,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                                 <tr key={idx} className={isActive ? "bg-primary/10 text-primary" : ""}>
                                   <td className="py-3">
                                     {qtyLabel}
-                                    <span className="block text-[9px] opacity-50 font-normal">{rule.pengerjaan}</span>
                                   </td>
                                   <td className="py-3 text-right">Rp {Number(rule.nilai).toLocaleString("id-ID")}</td>
                                 </tr>
