@@ -33,7 +33,7 @@ interface ProductClientLayoutProps {
 export default function ProductClientLayout({ itemDetail, initialSku, recommendations, activeRoleId, idAlamatUtama, isLoggedIn }: ProductClientLayoutProps) {
   const router = useRouter();
   const [cartLoading, setCartLoading] = useState<boolean>(false);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
   const targetSku = initialSku || (itemDetail?.skus?.[0] ?? null);
 
   // ==============================================================================
@@ -170,8 +170,15 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const availablePengerjaan = useMemo(() => {
       if (!sku || !sku.harga_bertingkat) return [];
-      return Array.from(new Set(sku.harga_bertingkat.map(h => h.pengerjaan)));
-  }, [sku]);
+      
+      const validTiersForQty = sku.harga_bertingkat.filter(t => {
+          const isQtyValid = currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max);
+          const hasPrice = Number(t.nilai) > 0;
+          return isQtyValid && hasPrice;
+      });
+      
+      return Array.from(new Set(validTiersForQty.map(h => h.pengerjaan)));
+  }, [sku, currentQty]);
   
   useEffect(() => {
     if (availablePengerjaan.length > 0) {
@@ -179,37 +186,42 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             setSelectedPengerjaanTitle(availablePengerjaan[0]);
         }
     } else {
-        setSelectedPengerjaanTitle("Reguler");
+        setSelectedPengerjaanTitle("");
     }
   }, [availablePengerjaan, selectedPengerjaanTitle]);
 
   const activeHargaTiers = useMemo<HargaBertingkat[]>(() => {
       if (!sku || !sku.harga_bertingkat) return [];
-      const slaStr = selectedPengerjaanTitle || "Reguler";
-      
-      let tiers = sku.harga_bertingkat.filter(h => h.pengerjaan === slaStr);
-      if (tiers.length === 0) {
-          tiers = sku.harga_bertingkat.filter(h => h.pengerjaan === availablePengerjaan[0]);
-      }
-      return tiers;
-  }, [sku, selectedPengerjaanTitle, availablePengerjaan]);
+      return sku.harga_bertingkat
+        .filter(h => Number(h.nilai) > 0)
+        .sort((a, b) => a.min - b.min);
+  }, [sku]);
 
   const hargaDasarSlaQtySatu = useMemo(() => {
-      if (!sku) return 0;
-      if (activeHargaTiers.length === 0) return Number(sku.harga_dasar) || 0;
+      if (!sku || !sku.harga_bertingkat) return 0;
+      const slaStr = selectedPengerjaanTitle || (availablePengerjaan[0] ?? "");
       
-      const tier1 = activeHargaTiers.find(h => h.min === 1);
+      const tier1 = sku.harga_bertingkat.find(h => h.pengerjaan === slaStr && h.min === 1 && Number(h.nilai) > 0);
       if (tier1) return Number(tier1.nilai);
       
-      return Number(activeHargaTiers[0].nilai);
-  }, [sku, activeHargaTiers]);
+      const smallestTier = [...sku.harga_bertingkat]
+          .filter(h => h.pengerjaan === slaStr && Number(h.nilai) > 0)
+          .sort((a, b) => a.min - b.min)[0];
+      
+      if (smallestTier) return Number(smallestTier.nilai);
+      
+      return Number(sku.harga_dasar) || 0;
+  }, [sku, selectedPengerjaanTitle, availablePengerjaan]);
 
   const activeTierObj = useMemo(() => {
-      if (activeHargaTiers.length === 0) return null;
-      return [...activeHargaTiers]
-        .sort((a, b) => b.min - a.min)
-        .find(t => currentQty >= t.min && (t.max === 0 || t.max === null || currentQty <= t.max));
-  }, [activeHargaTiers, currentQty]);
+      if (!sku || !sku.harga_bertingkat || !selectedPengerjaanTitle) return null;
+      return sku.harga_bertingkat.find(t => 
+          t.pengerjaan === selectedPengerjaanTitle && 
+          currentQty >= t.min && 
+          (t.max === 0 || t.max === null || currentQty <= t.max) &&
+          Number(t.nilai) > 0
+      ) || null;
+  }, [sku, currentQty, selectedPengerjaanTitle]);
 
   const diskonGrosirPerPcs = useMemo(() => {
       if (!activeTierObj) return 0;
@@ -397,8 +409,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     if (sku?.gambar && Array.isArray(sku.gambar) && sku.gambar.length > 0) {
       return sku.gambar.map((img: string) => {
         if (img.startsWith('http')) return img;
-        // 👇 PERBAIKAN: Gunakan API_URL yang dinamis 👇
-        return `${API_URL}/storage/${img}`;
+        // Prefix otomatis buat nyocokin path Storage Laravel lu
+        return `http://127.0.0.1:8000/storage/${img}`;
       });
     }
 
@@ -409,7 +421,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
     // 3. Fallback akhir: kosong (Biar carousel nggak error)
     return [];
-}, [sku?.gambar, itemDetail?.gambar_urls]);
+  }, [sku?.gambar, itemDetail?.gambar_urls]);
 
 
   // ==============================================================================
@@ -639,7 +651,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                     <div className="space-y-3">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-40 flex justify-between">
                          <span>Daftar Harga Grosir</span>
-                         <span className="text-primary tracking-normal font-bold lowercase">({selectedPengerjaanTitle})</span>
                       </p>
                       <div className="overflow-hidden border border-base-content/10 rounded-xl">
                         <table className="table table-xs w-full bg-base-100">
@@ -651,21 +662,26 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                           </thead>
                           <tbody className="font-bold">
                             {activeHargaTiers.map((rule, idx) => {
-                              // 👇 LOGIKA PENGGABUNGAN MIN & MAX 👇
                               let qtyLabel = "";
-                              const satuanLabel = sku?.satuan || "pcs"; // Fallback ke "pcs" kalau satuan kosong
+                              const satuanLabel = sku?.satuan || "pcs";
 
                               if (rule.max === 0 || rule.max === null) {
-                                qtyLabel = `≥ ${rule.min} ${satuanLabel}`; // Jika max 0 (Lebih dari)
+                                qtyLabel = `≥ ${rule.min} ${satuanLabel}`; 
                               } else if (rule.min === rule.max) {
-                                qtyLabel = `${rule.min} ${satuanLabel}`; // Jika min & max sama (1 pcs)
+                                qtyLabel = `${rule.min} ${satuanLabel}`; 
                               } else {
-                                qtyLabel = `${rule.min} - ${rule.max} ${satuanLabel}`; // Range normal (2 - 10 pcs)
+                                qtyLabel = `${rule.min} - ${rule.max} ${satuanLabel}`; 
                               }
 
+                              // Cek baris mana yang sedang aktif
+                              const isActive = currentQty >= rule.min && (rule.max === 0 || rule.max === null || currentQty <= rule.max) && selectedPengerjaanTitle === rule.pengerjaan;
+
                               return (
-                                <tr key={idx} className={currentQty >= rule.min && (rule.max === 0 || rule.max === null || currentQty <= rule.max) ? "bg-primary/10 text-primary" : ""}>
-                                  <td className="py-3">{qtyLabel}</td>
+                                <tr key={idx} className={isActive ? "bg-primary/10 text-primary" : ""}>
+                                  <td className="py-3">
+                                    {qtyLabel}
+                                    <span className="block text-[9px] opacity-50 font-normal">{rule.pengerjaan}</span>
+                                  </td>
                                   <td className="py-3 text-right">Rp {Number(rule.nilai).toLocaleString("id-ID")}</td>
                                 </tr>
                               );
