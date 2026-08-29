@@ -19,13 +19,15 @@ interface FormField {
 }
 
 interface FormPesanProps {
-  fieldsUtama?: FormField[];     // Varian Utama (Kombinasi String)
-  fieldsTambahan?: FormField[];  // Varian Tambahan (Sisi, Halaman, dll - pakai ID Varian Asli)
-  fields?: FormField[];          // Fallback backward compatibility
+  fieldsUtama?: FormField[];     
+  fieldsTambahan?: FormField[];  
+  fields?: FormField[];          
   values?: Record<string, string>;
+  selectedFinishing?: Record<string, OpsiFinishing | null>;
   onValueChange?: (name: string, value: string) => void;
   groupedAddons?: Record<string, OpsiFinishing[]>;
   minimumQty?: number;
+  kelipatanQty?: number; 
   tipeKalkulasi?: string;
   sisiCetakMultiplier?: number;
 }
@@ -34,26 +36,28 @@ export default function FormPesan({
   fieldsUtama, 
   fieldsTambahan, 
   fields, 
-  values, 
+  values,
+  selectedFinishing, 
   onValueChange, 
   groupedAddons, 
   minimumQty = 1, 
+  kelipatanQty = 1,
   tipeKalkulasi = "standard", 
   sisiCetakMultiplier = 1 
 }: FormPesanProps) {
   
   useEffect(() => {
-    if (!groupedAddons || !onValueChange) return;
+    if (!groupedAddons || !onValueChange || !selectedFinishing) return;
 
     Object.entries(groupedAddons).forEach(([groupName, addons]) => {
-      const currentValue = values?.[groupName];
+      const currentFinishingObj = selectedFinishing[groupName];
       const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
 
-      if (currentValue === undefined || (currentValue === "" && hasZero)) {
+      if (currentFinishingObj === undefined) {
         if (hasZero) {
           const zeroAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
           if (zeroAddon) {
-            onValueChange(groupName, zeroAddon.id_pilihan_finishing);
+            onValueChange(groupName, String(zeroAddon.id_sku_finishing));
           }
         } else {
           onValueChange(groupName, "");
@@ -65,11 +69,19 @@ export default function FormPesan({
   useEffect(() => {
     if (!onValueChange) return;
 
-    const currentQty = parseInt(values?.qty || "0", 10);
+    let currentQty = parseInt(values?.qty || "0", 10);
     if (isNaN(currentQty) || currentQty < minimumQty) {
-      onValueChange("qty", String(minimumQty));
+        currentQty = minimumQty;
     }
-  }, [minimumQty]); 
+
+    if (kelipatanQty > 1 && currentQty % kelipatanQty !== 0) {
+        currentQty = Math.ceil(currentQty / kelipatanQty) * kelipatanQty;
+    }
+
+    if (String(currentQty) !== values?.qty) {
+        onValueChange("qty", String(currentQty));
+    }
+  }, [minimumQty, kelipatanQty]); 
 
   const availableRolls = useMemo(() => [0.9, 1.2, 1.6, 1.8, 2.0], []);
   
@@ -80,13 +92,11 @@ export default function FormPesan({
   const maxDim = Math.max(currentPanjang, currentLebar);
   const qtyInput = parseInt(values?.qty || String(minimumQty), 10);
 
-  // Fallback rendering
   const renderUtama = fieldsUtama?.length ? fieldsUtama : (fields || []);
 
   return (
     <div className="grid grid-cols-1 gap-4">
 
-      {/* 1. LOOPING VARIAN UTAMA */}
       {renderUtama.map((field, index) => {
         const selectOptions = field.options || [];
 
@@ -105,9 +115,6 @@ export default function FormPesan({
         );
       })}
 
-      {/* ========================================================= */}
-      {/* KHUSUS CETAK METERAN */}
-      {/* ========================================================= */}
       {tipeKalkulasi === "cetak_meteran" && (
         <div className="space-y-4 pt-4 border-t border-base-content/5">
           <div className="grid grid-cols-2 gap-4">
@@ -148,9 +155,6 @@ export default function FormPesan({
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* KHUSUS CETAK BUKU */}
-      {/* ========================================================= */}
       {tipeKalkulasi === "cetak_buku" && (
         <div className="pt-4 border-t border-base-content/5 grid grid-cols-1">
           <FormInput label="Jumlah Halaman" name="jumlah_halaman" type="number" min="1" value={values?.jumlah_halaman ?? ""} onChange={onValueChange} />
@@ -171,14 +175,10 @@ export default function FormPesan({
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. LOOPING VARIAN TAMBAHAN & FINISHING */}
-      {/* ========================================================= */}
       {(fieldsTambahan && fieldsTambahan.length > 0 || (groupedAddons && Object.keys(groupedAddons).length > 0)) && (
         <div className="pt-4 border-t border-base-content/5 space-y-4">
           <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Spesifikasi Tambahan</p>
           
-          {/* VARIAN TAMBAHAN (Dari SKU) */}
           {fieldsTambahan && fieldsTambahan.map((field, index) => {
             const selectOptions = field.options || [];
             return (
@@ -196,7 +196,6 @@ export default function FormPesan({
             );
           })}
 
-          {/* FINISHING TAMBAHAN */}
           {groupedAddons && Object.entries(groupedAddons).map(([groupName, addons]) => {
             const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
             const addonOptions: FormFieldOption[] = [];
@@ -214,17 +213,23 @@ export default function FormPesan({
                 : `Rp ${Number(a.harga_tambahan).toLocaleString("id-ID")}`;
 
               addonOptions.push({
-                value: a.id_pilihan_finishing,
+                value: String(a.id_sku_finishing), 
                 label: `${a.nama_pilihan} (+ ${labelBiaya})`
               });
             });
 
-            const currentValue = values?.[groupName];
-            const selectedAddonId = (currentValue === undefined || (currentValue === "" && hasZero))
-              ? (hasZero ? addons.find(a => Number(a.harga_tambahan) === 0)?.id_pilihan_finishing || "" : "")
-              : currentValue;
+            const currentFinishingObj = selectedFinishing ? selectedFinishing[groupName] : undefined;
+            let selectedAddonId = "";
 
-            const selectedAddonInfo = addons.find(a => a.id_pilihan_finishing === selectedAddonId);
+            if (currentFinishingObj !== undefined && currentFinishingObj !== null) {
+                selectedAddonId = String(currentFinishingObj.id_sku_finishing);
+            } else if (currentFinishingObj === null) {
+                selectedAddonId = ""; 
+            } else {
+                selectedAddonId = hasZero ? String(addons.find(a => Number(a.harga_tambahan) === 0)?.id_sku_finishing || "") : "";
+            }
+
+            const selectedAddonInfo = addons.find(a => String(a.id_sku_finishing) === selectedAddonId);
 
             return (
               <div key={groupName}>
@@ -249,20 +254,25 @@ export default function FormPesan({
         </div>
       )}
       
-      {/* 4. INPUT QTY & CATATAN */}
       <div className="pt-4 space-y-4 border-t border-base-content/5">
-        <div>
+        <div className="form-control">
           <FormInput
             label="Jumlah Pesanan (Qty)"
             name="qty"
             type="number"
             min={String(minimumQty)}
+            step={String(kelipatanQty)} 
             value={values?.qty ?? String(minimumQty)} 
             onChange={onValueChange}
           />
-          {minimumQty > 1 && (
+          {minimumQty > 1 && kelipatanQty === 1 && (
             <p className="text-[11px] text-warning font-bold mt-1 leading-tight px-1">
               * Konfigurasi pesanan ini mewajibkan minimum {minimumQty} pcs
+            </p>
+          )}
+          {kelipatanQty > 1 && (
+            <p className="text-[11px] text-warning font-bold mt-1 leading-tight px-1">
+              * Minimum order {minimumQty} pcs dan harus kelipatan {kelipatanQty} pcs
             </p>
           )}
         </div>

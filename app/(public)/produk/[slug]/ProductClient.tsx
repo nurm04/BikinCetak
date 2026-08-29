@@ -117,9 +117,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         isTambahanMatch = selectedTambahanIds.every(id => s.kombinasi_pilihan?.includes(id));
       }
 
-      if (isUtamaMatch && isTambahanMatch) {
-        return s;
-      }
+      if (isUtamaMatch && isTambahanMatch) return s;
     }
 
     return itemDetail.skus[0] || null;
@@ -129,7 +127,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     if (sku?.nama_sku && typeof window !== "undefined") {
       const skuSlug = slugify(sku.nama_sku);
       const targetPath = `/produk/${skuSlug}`;
-      
       if (window.location.pathname !== targetPath) {
         window.history.replaceState(null, "", targetPath);
       }
@@ -141,32 +138,24 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       setSelectedFinishing({});
       return;
     }
-
     const defaultFinishing: Record<string, OpsiFinishing | null> = {};
-
     if (sku.opsi_finishing) {
       const groups: Record<string, OpsiFinishing[]> = {};
-      
       sku.opsi_finishing.forEach((fin) => {
         if (!groups[fin.kategori_finishing]) groups[fin.kategori_finishing] = [];
         groups[fin.kategori_finishing].push(fin);
       });
-
       Object.entries(groups).forEach(([kategori, options]) => {
-        if (options.length > 0) {
-          defaultFinishing[kategori] = null;
-        }
+        if (options.length > 0) defaultFinishing[kategori] = null;
       });
     }
-
     setSelectedFinishing(defaultFinishing);
   }, [sku?.id_sku]);
 
-  // ==============================================================================
-  // 🌟 LOGIKA HARGA BERTINGKAT (FIXED: PERHITUNGAN MATEMATIKA ANTI-BUG) 🌟
-  // ==============================================================================
+  const kelipatanOrder = useMemo(() => {
+      return Number(sku?.kelipatan_pesan) || 1;
+  }, [sku]);
 
-  // 1. QTY AKTIF: Khusus cetak meteran, Qty patokan tier adalah Qty x Total Luas
   const effectiveQtyForTier = useMemo(() => {
       let baseQty = currentQty;
       if (sku?.tipe_kalkulasi === 'cetak_meteran') {
@@ -178,7 +167,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return baseQty;
   }, [currentQty, selectedOptions, sku?.tipe_kalkulasi]);
 
-  // 2. Radio Button SLA: Cek murni berdasarkan baris Qty saat ini
   const availablePengerjaan = useMemo(() => {
       if (!sku || !sku.harga_bertingkat) return [];
       
@@ -186,14 +174,12 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       const uniqueMins = Array.from(new Set(sku.harga_bertingkat.map(t => Number(t.min)))).sort((a, b) => a - b);
       
       let activeMinRow = uniqueMins[0] || 1;
-      // Logika Step Murni (Cari range yang pas)
       for (let i = 0; i < uniqueMins.length; i++) {
           if (effectiveQtyForTier >= uniqueMins[i]) {
               activeMinRow = uniqueMins[i];
           }
       }
 
-      // Tarik SLA yang HARGANYA > 0 di baris ini aja
       const validSlasInActiveRow = sku.harga_bertingkat
           .filter(t => Number(t.min) === activeMinRow && Number(t.nilai) > 0)
           .map(t => t.pengerjaan);
@@ -201,7 +187,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return originalSlaOrder.filter(sla => validSlasInActiveRow.includes(sla));
   }, [sku, effectiveQtyForTier]);
   
-  // 3. Auto-Select SLA: Kalau SLA yang dipilih ilang karena Qty berubah
   useEffect(() => {
     if (availablePengerjaan.length > 0) {
         if (!availablePengerjaan.includes(selectedPengerjaanTitle)) {
@@ -212,7 +197,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
   }, [availablePengerjaan, selectedPengerjaanTitle]);
 
-  // 4. Tabel Grosir: Tampilkan SEMUA range Qty & Fallback SLA
   const activeHargaTiers = useMemo<HargaBertingkat[]>(() => {
       if (!sku || !sku.harga_bertingkat) return [];
 
@@ -225,13 +209,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
       uniqueMins.forEach(minQty => {
           const tiersInRow = sku.harga_bertingkat.filter(t => Number(t.min) === minQty);
-          
           const selectedTier = tiersInRow.find(t => t.pengerjaan === selectedPengerjaanTitle && Number(t.nilai) > 0);
 
           if (selectedTier) {
               finalTiers.push(selectedTier);
           } else {
-              // Cari SLA dari urutan terlama yg ada harganya di baris ini
               for (const sla of originalSlaOrder) {
                   const fallbackTier = tiersInRow.find(t => t.pengerjaan === sla && Number(t.nilai) > 0);
                   if (fallbackTier) {
@@ -245,7 +227,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return finalTiers.sort((a, b) => Number(a.min) - Number(b.min));
   }, [sku, selectedPengerjaanTitle]);
 
-  // 5. Harga Dasar Awal
   const hargaDasarSlaQtySatu = useMemo(() => {
       if (activeHargaTiers.length === 0) return Number(sku?.harga_dasar) || 0;
       const tier1 = activeHargaTiers.find(h => Number(h.min) === 1);
@@ -253,7 +234,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return Number(activeHargaTiers[0].nilai);
   }, [activeHargaTiers, sku]);
 
-  // 6. Tier Aktif Untuk Perhitungan Keranjang Saat Ini
   const activeTierObj = useMemo(() => {
       if (activeHargaTiers.length === 0) return null;
       let active: HargaBertingkat | null = null;
@@ -265,7 +245,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       return active;
   }, [activeHargaTiers, effectiveQtyForTier]);
 
-  // 👇 PERBAIKAN MATEMATIKA TOTAL: Langsung ambil harga Tier murni
   const currentTierPrice = useMemo(() => {
       if (activeTierObj) return Number(activeTierObj.nilai);
       return hargaDasarSlaQtySatu;
@@ -283,7 +262,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   const diskonMemberPerPcs = useMemo(() => {
       if (!activeDiscount) return 0;
       const nominalDiskon = Number(activeDiscount.nilai);
-      // Diskon dipotong dari harga tier yang aktif
       return activeDiscount.tipe === "persen" 
         ? currentTierPrice * (Number(activeDiscount.nilai) / 100) 
         : nominalDiskon;
@@ -292,8 +270,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   const totalDiskonSatuan = useMemo(() => diskonGrosirPerPcs + diskonMemberPerPcs, [diskonGrosirPerPcs, diskonMemberPerPcs]);
   
   const hargaSatuanNet = useMemo(() => Math.max(0, currentTierPrice - diskonMemberPerPcs), [currentTierPrice, diskonMemberPerPcs]);
-
-  // ==============================================================================
 
   const valPanjang = selectedOptions['Panjang'];
   const valLebar = selectedOptions['Lebar'];
@@ -356,20 +332,17 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const hargaSatuProdukFull = useMemo(() => {
     let net = hargaSatuanNet + biayaHalamanPerBuku;
-    
     if (sku?.tipe_kalkulasi === 'cetak_meteran') {
       let luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
       if (isNaN(luas) || luas < 1) luas = 1;
       net = net * luas;
     }
-    
     return net;
   }, [hargaSatuanNet, biayaHalamanPerBuku, sku?.tipe_kalkulasi, selectedOptions]);
 
   const hargaDasarFullUI = useMemo(() => {
     let base = currentTierPrice;
     let net = base + biayaHalamanPerBuku;
-
     if (sku?.tipe_kalkulasi === 'cetak_meteran') {
       let luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
       if (isNaN(luas) || luas < 1) luas = 1;
@@ -378,6 +351,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return net;
   }, [currentTierPrice, biayaHalamanPerBuku, sku?.tipe_kalkulasi, selectedOptions]);
 
+  // 👇 PERBAIKAN: Jika tier.nilai adalah 0, HIRAUKAN tier dan pakai base harga_tambahan
   const getActiveFinishingPrice = (finishingObj: OpsiFinishing, qtyPesan: number) => {
     let activeHarga = Number(finishingObj.harga_tambahan) || 0;
     let activeTipe = finishingObj.tipe || 'nominal';
@@ -385,18 +359,19 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     if (finishingObj.harga_bertingkat && finishingObj.harga_bertingkat.length > 0) {
         const sortedTiers = [...finishingObj.harga_bertingkat].sort((a, b) => Number(a.min) - Number(b.min));
         let activeTier: HargaBertingkat | null = null;
+        
         for (let i = 0; i < sortedTiers.length; i++) {
             if (qtyPesan >= Number(sortedTiers[i].min)) {
                 activeTier = sortedTiers[i];
             }
         }
-
-        if (activeTier) {
+        
+        // KUNCI: Override HANYA JIKA tier harganya benar-benar BUKAN 0
+        if (activeTier && Number(activeTier.nilai) !== 0) {
             activeHarga = Number(activeTier.nilai);
             activeTipe = activeTier.tipe as "nominal" | "persen";
         }
     }
-
     return { harga: activeHarga, tipe: activeTipe };
   };
   
@@ -404,15 +379,12 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     let total = 0;
     Object.values(selectedFinishing).forEach((fin) => {
       if (!fin) return;
-      
       let biaya = 0;
       const { harga, tipe } = getActiveFinishingPrice(fin, effectiveQtyForTier);
-      
       if (tipe === 'persen') {
         const hargaFisikSatuBarang = sku?.tipe_kalkulasi === 'cetak_meteran' 
           ? hargaSatuProdukFull * (parseFloat(selectedOptions['Luas Dihargai (m2)']) || 1)
           : hargaSatuProdukFull;
-
         biaya = hargaFisikSatuBarang * (harga / 100);
       } else {
         biaya = harga || 0;
@@ -421,7 +393,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       if (fin.kali_jumlah_pesan) {
         biaya = biaya * currentQty;
       }
-      
       total += biaya;
     });
     return total;
@@ -451,9 +422,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return min;
   }, [selectedFinishing, sku]);
 
-  // ==============================================================================
-  // 🌟 LOGIC GAMBAR PINTAR (Prioritas: Gambar SKU -> Gambar Produk) 🌟
-  // ==============================================================================
   const displayImages = useMemo(() => {
     if (sku?.gambar && Array.isArray(sku.gambar) && sku.gambar.length > 0) {
       return sku.gambar.map((img: string) => {
@@ -465,19 +433,12 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     if (itemDetail?.gambar_urls && itemDetail.gambar_urls.length > 0) {
       return itemDetail.gambar_urls;
     }
-
     return [];
   }, [sku?.gambar, itemDetail?.gambar_urls]);
-
-
-  // ==============================================================================
-  // 🌟 GENERATE DROPDOWN FIELDS (Memisahkan Varian Utama & Tambahan) 🌟
-  // ==============================================================================
   
   const fieldsUtama = useMemo(() => {
     if (!itemDetail?.skus || itemDetail.skus.length === 0) return [];
     const uniqueSkuLabels = new Map<string, string>(); 
-    
     itemDetail.skus.forEach(s => {
       const labelBersih = getLabelBersih(s.nama_sku);
       if (!uniqueSkuLabels.has(labelBersih)) {
@@ -509,7 +470,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const handleAttributeChange = (name: string, value: string) => {
     if (groupedAddons[name]) {
-      const originalFin = sku?.opsi_finishing?.find(f => f.id_pilihan_finishing === value) || null;
+      const originalFin = sku?.opsi_finishing?.find(f => String(f.id_sku_finishing) === String(value)) || null;
       setSelectedFinishing((prev) => { return { ...prev, [name]: originalFin }; });
       return;
     }
@@ -527,9 +488,17 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     setSelectedOptions((prev) => {
       const currentVal = prev.qty;
       if (currentVal === "") return { ...prev, qty: String(minimumQty) };
-      const parsed = parseInt(currentVal, 10);
-      if (!isNaN(parsed) && parsed < minimumQty) return { ...prev, qty: String(minimumQty) };
-      if (!isNaN(parsed) && String(parsed) !== currentVal) return { ...prev, qty: String(parsed) };
+      
+      let parsed = parseInt(currentVal, 10);
+      if (isNaN(parsed) || parsed < minimumQty) {
+          parsed = minimumQty;
+      }
+
+      if (kelipatanOrder > 1 && parsed % kelipatanOrder !== 0) {
+          parsed = Math.ceil(parsed / kelipatanOrder) * kelipatanOrder;
+      }
+
+      if (String(parsed) !== currentVal) return { ...prev, qty: String(parsed) };
       return prev;
     });
   };
@@ -580,7 +549,10 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     setCartLoading(true);
 
     try {
-      const finalCartQty = Math.max(currentQty, minimumQty);
+      let finalCartQty = Math.max(currentQty, minimumQty);
+      if (kelipatanOrder > 1 && finalCartQty % kelipatanOrder !== 0) {
+          finalCartQty = Math.ceil(finalCartQty / kelipatanOrder) * kelipatanOrder;
+      }
       
       let finalEffectiveCartQty = finalCartQty;
       if (sku.tipe_kalkulasi === 'cetak_meteran') {
@@ -756,9 +728,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                       fieldsUtama={fieldsUtama} 
                       fieldsTambahan={fieldsTambahan}
                       values={selectedOptions} 
+                      selectedFinishing={selectedFinishing}
                       groupedAddons={groupedAddons} 
                       onValueChange={handleAttributeChange} 
                       minimumQty={minimumQty}
+                      kelipatanQty={kelipatanOrder}
                       tipeKalkulasi={sku?.tipe_kalkulasi || "standard"} 
                       sisiCetakMultiplier={sisiCetakMultiplier}
                     />

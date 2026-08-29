@@ -71,6 +71,7 @@ export interface SkuDetail {
   deskripsi: string | null;
   tipe_kalkulasi: string;
   minimum_pesan: number;
+  kelipatan_pesan: number;
   harga_dasar: number;
   kombinasi_pilihan: string[];
   harga_bertingkat: HargaBertingkat[];

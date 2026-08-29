@@ -36,22 +36,35 @@ export default function FormInput({
 
     const valueStr = e.target.value;
     
-    // PERBAIKAN: Validasi min max murni dijalankan saat kehilangan fokus (blur)
     if (valueStr === "") {
-      if (min !== undefined) {
+      if (min !== undefined && min !== "") {
         onChange?.(name, String(min)); 
       }
       return;
     }
 
-    const numValue = parseFloat(valueStr);
-    const minVal = min !== undefined ? parseFloat(min) : null;
-    const maxVal = max !== undefined ? parseFloat(max) : null;
+    let numValue = parseFloat(valueStr);
+    const minVal = min !== undefined && min !== "" ? parseFloat(min) : null;
+    const maxVal = max !== undefined && max !== "" ? parseFloat(max) : null;
+    const stepVal = step !== undefined && step !== "" ? parseFloat(step) : null;
 
+    // 1. Batas Minimum / Maksimum
     if (minVal !== null && numValue < minVal) {
-      onChange?.(name, String(minVal));
+      numValue = minVal;
     } else if (maxVal !== null && numValue > maxVal) {
-      onChange?.(name, String(maxVal));
+      numValue = maxVal;
+    }
+
+    // 2. LOGIKA KELIPATAN (STEP): Langsung bulatkan ke atas
+    if (stepVal !== null && stepVal > 0) {
+      if (numValue % stepVal !== 0) {
+        numValue = Math.ceil(numValue / stepVal) * stepVal;
+      }
+    }
+
+    // Eksekusi perubahan ke parent state jika angka berubah
+    if (String(numValue) !== value) {
+      onChange?.(name, String(numValue));
     }
   };
 
