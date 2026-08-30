@@ -7,14 +7,18 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 const slides = [
   {
     id: 1,
-    src: "https://bikincetak.id/wp-content/uploads/2025/05/cetak-kalender-murah.jpg",
+    src: "/hero1.webp",
   },
   {
     id: 2,
-    src: "https://bikincetak.id/wp-content/uploads/2025/05/cetak-foto-murah.jpg",
+    src: "https://bikincetak.id/wp-content/uploads/2025/05/cetak-kalender-murah.jpg",
   },
   {
     id: 3,
+    src: "https://bikincetak.id/wp-content/uploads/2025/05/cetak-foto-murah.jpg",
+  },
+  {
+    id: 4,
     src: "https://bikincetak.id/wp-content/uploads/2026/04/PRINT-A3-CETAK-ART-PAPER-CARTON-STIKER.jpg",
   },
 ];
