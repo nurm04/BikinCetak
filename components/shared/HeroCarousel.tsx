@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 const slides = [
   {
     id: 1,
-    src: "/hero1.webp",
+    src: "https://admin.bikincetak.co.id/storage/hero_carousel/hero1.webp",
   },
   {
     id: 2,
