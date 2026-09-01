@@ -6,7 +6,7 @@ import Footer from "./Footer";
 import MobileBottomNav from "./MobileBottomNav";
 import { ItemData } from "@/services/itemService";
 import { slugify } from "@/lib/utils";
-
+  
 interface ConditionalLayoutProps {
   children: React.ReactNode;
   items: ItemData[];

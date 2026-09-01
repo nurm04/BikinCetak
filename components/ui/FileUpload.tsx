@@ -182,7 +182,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
           <Mail className="mb-3 opacity-20 text-primary transition-all shrink-0" size={28} />
           <p className="text-[10px] font-bold opacity-70 text-center mb-2">Kirim file desain ke email:</p>
           <div className="bg-base-100 px-4 py-2 rounded-xl border border-base-300 shadow-sm">
-             <span className="text-sm font-black text-primary select-all">cs@bikincetak.com</span>
+             <span className="text-sm font-black text-primary select-all">order@bikincetak.co.id</span>
           </div>
           <p className="text-[8px] mt-3 uppercase font-black text-center tracking-widest opacity-30 w-full shrink-0">Sertakan Kode Transaksi pada subjek</p>
         </div>

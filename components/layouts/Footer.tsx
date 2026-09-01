@@ -134,7 +134,7 @@ const Footer = ({ items = [] }: FooterProps) => {
                 <span>0812-1313-9490</span>
               </a>
               <div className="flex items-center gap-3">
-                <Mail size={16} /> <span>bikinkancetak@gmail.com</span>
+                <Mail size={16} /> <span>info@bikincetak.co.id</span>
               </div>
               <div className="flex items-center gap-3">
                 <MapPin size={16} /> <span>Layanan Online - Seluruh Indonesia</span>
