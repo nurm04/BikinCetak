@@ -37,7 +37,7 @@ export default async function Home() {
     groupedItems[categoryName].push({
       id: item.id_produk,
       name: item.nama_produk,
-      image: item.gambar_urls || "/favicon.ico",
+      image: item.gambar_urls || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico",
       harga_mulai_dari: item.harga_mulai_dari,
       diskon_roles: item.diskon_roles,
     });

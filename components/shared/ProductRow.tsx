@@ -120,7 +120,7 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
                     unoptimized
                     draggable={false}
                     alt={item.name}
-                    src={item.image?.[0] || "/favicon.ico"}
+                    src={item.image?.[0] || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"}
                     className="object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none"
                   />
                 </figure>

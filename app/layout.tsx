@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     siteName: "BikinCetak",
     images: [
       {
-        url: "/PRD.png",
+        url: "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png",
         width: 1200,
         height: 630,
         alt: "BikinCetak Cover",

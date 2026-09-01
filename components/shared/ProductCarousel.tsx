@@ -8,7 +8,7 @@ interface ProductCarouselProps {
 }
 
 const ProductCarousel = ({ images, name }: ProductCarouselProps) => {
-  const finalImages = images && images.length > 0 ? images : ["/images/placeholder-product.jpg"];
+  const finalImages = images && images.length > 0 ? images : ["https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"];
   
   // Membuat referensi untuk mengakses elemen DOM secara langsung
   const carouselRef = useRef<HTMLDivElement>(null);

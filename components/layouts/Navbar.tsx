@@ -102,12 +102,12 @@ const Navbar = ({ items = [] }: NavbarProps) => {
         
         {/* KIRI: LOGO */}
         <div className="navbar-start w-auto">
-          <Link href="/" className="btn btn-ghost p-0 px-2 flex items-center gap-2 hover:bg-transparent">
-            <div className="relative w-8 h-8 md:w-10 md:h-10">
-              <Image src="/favicon.ico" alt="BikinCetak Logo" fill className="object-contain" priority />
+          <Link href="/" className="btn btn-ghost p-0 px-2 flex items-center gap-0.5 hover:bg-transparent">
+            <div className="relative w-4 h-4 md:w-6 md:h-6">
+              <Image src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico" alt="BikinCetak Logo" fill className="object-contain" priority />
             </div>
             <span className="text-xl font-black text-primary tracking-tighter hidden md:block">
-              BIKIN<span className="text-base-content">CETAK</span>
+              <span className="text-base-content">BIKIN CETAK</span>
             </span>
           </Link>
         </div>

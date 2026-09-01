@@ -198,7 +198,7 @@ export default function CartProductItem({
 
         <div className="relative w-17 h-17 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-base-200 border border-base-content/10 shrink-0">
           <Image 
-            src="/favicon.ico"
+            src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"
             alt={productName} 
             fill 
             unoptimized
@@ -284,7 +284,7 @@ export default function CartProductItem({
             <div className="pt-1.5 border-t border-base-content/5">
               <div className="flex flex-wrap gap-1.5">
                 {parsedFileDesain.tipe === "upload" && (
-                  <a href={`http://127.0.0.1:8000/storage/${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group hover:border-primary">
+                  <a href={`https://admin.bikincetak.co.id/storage/${parsedFileDesain.nilai}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-base-100 border border-base-content/10 px-2 py-1 rounded text-[8.5px] font-bold shadow-sm cursor-pointer group hover:border-primary">
                     <Paperclip size={10} className="text-primary"/>
                     <span className="truncate max-w-25">Lampiran File</span>
                   </a>

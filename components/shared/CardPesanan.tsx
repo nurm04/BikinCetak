@@ -128,7 +128,7 @@ export default function CardPesanan({ pesanan }: Props) {
               
               <div className="relative w-16 h-16 overflow-hidden border shrink-0 bg-base-200 rounded-xl border-base-300">
                 <Image
-                  src="/favicon.ico"
+                  src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"
                   alt={cleanProductName || "Produk"}
                   fill
                   className="object-cover"

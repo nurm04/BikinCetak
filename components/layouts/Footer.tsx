@@ -78,12 +78,12 @@ const Footer = ({ items = [] }: FooterProps) => {
           <div className="lg:col-span-2">
             
             {/* Logo BikinCetak */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="relative w-10 h-10 md:w-12 md:h-12 bg-white rounded-full p-1 shadow-sm flex items-center justify-center overflow-hidden">
-                <Image src="/favicon.ico" alt="BikinCetak Logo" fill className="object-contain p-1" priority />
+            <div className="flex items-center gap-0.5 mb-4">
+              <div className="relative w-7 h-7 md:w-9 md:h-9 bg-white rounded-full p-1 shadow-sm flex items-center justify-center overflow-hidden">
+                <Image src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico" alt="BikinCetak Logo" fill className="object-contain p-1" priority />
               </div>
               <h2 className="text-3xl md:text-4xl font-black text-white tracking-tighter">
-                BIKIN<span className="text-black">CETAK</span>
+                <span className="text-black">BIKIN CETAK</span>
               </h2>
             </div>
 
