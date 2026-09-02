@@ -351,7 +351,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return net;
   }, [currentTierPrice, biayaHalamanPerBuku, sku?.tipe_kalkulasi, selectedOptions]);
 
-  // 👇 PERBAIKAN: Jika tier.nilai adalah 0, HIRAUKAN tier dan pakai base harga_tambahan
   const getActiveFinishingPrice = (finishingObj: OpsiFinishing, qtyPesan: number) => {
     let activeHarga = Number(finishingObj.harga_tambahan) || 0;
     let activeTipe = finishingObj.tipe || 'nominal';
@@ -366,7 +365,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             }
         }
         
-        // KUNCI: Override HANYA JIKA tier harganya benar-benar BUKAN 0
         if (activeTier && Number(activeTier.nilai) !== 0) {
             activeHarga = Number(activeTier.nilai);
             activeTipe = activeTier.tipe as "nominal" | "persen";
@@ -375,21 +373,31 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return { harga: activeHarga, tipe: activeTipe };
   };
   
+  // 👇 PERBAIKAN LOGIKA FINISHING METERAN DI UI 👇
   const totalFinishing = useMemo(() => {
     let total = 0;
     Object.values(selectedFinishing).forEach((fin) => {
       if (!fin) return;
       let biaya = 0;
       const { harga, tipe } = getActiveFinishingPrice(fin, effectiveQtyForTier);
+
       if (tipe === 'persen') {
-        const hargaFisikSatuBarang = sku?.tipe_kalkulasi === 'cetak_meteran' 
-          ? hargaSatuProdukFull * (parseFloat(selectedOptions['Luas Dihargai (m2)']) || 1)
-          : hargaSatuProdukFull;
-        biaya = hargaFisikSatuBarang * (harga / 100);
+        // Karena hargaSatuProdukFull sudah mengandung (Harga Dasar x Luas) untuk tipe meteran,
+        // kita tidak perlu mengkalikannya dengan luas lagi.
+        biaya = hargaSatuProdukFull * (harga / 100);
       } else {
         biaya = harga || 0;
+        // Jika produk adalah cetak meteran dan finishing ini mengikuti QTY pesanan, 
+        // kita harus mengkalikannya dengan luas (m2) per 1 Pcs-nya.
+        if (fin.kali_jumlah_pesan && sku?.tipe_kalkulasi === 'cetak_meteran') {
+          const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+          if (!isNaN(luas) && luas > 0) {
+            biaya = biaya * luas;
+          }
+        }
       }
 
+      // Terakhir, kita kalikan dengan jumlah qty pesanan yang dimasukkan user
       if (fin.kali_jumlah_pesan) {
         biaya = biaya * currentQty;
       }
@@ -560,10 +568,21 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
           if (!isNaN(luas) && luas > 0) finalEffectiveCartQty *= luas;
       }
 
+      // 👇 PERBAIKAN LOGIKA BACKEND SNAPSHOT 👇
       const finishings = Object.values(selectedFinishing)
         .filter((fin): fin is OpsiFinishing => fin !== null)
         .map((fin) => {
-          const { harga, tipe } = getActiveFinishingPrice(fin, finalEffectiveCartQty);
+          let { harga, tipe } = getActiveFinishingPrice(fin, finalEffectiveCartQty);
+
+          // Jika ini cetak meteran, & opsi finishing ini dikali qty pemesanan, 
+          // maka snapshot harga yang dikirim ke database harus dikali luas meteran terlebih dahulu
+          if (sku.tipe_kalkulasi === 'cetak_meteran' && fin.kali_jumlah_pesan && tipe === 'nominal') {
+             const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+             if (!isNaN(luas) && luas > 0) {
+                 harga = harga * luas;
+             }
+          }
+
           return {
             id_sku_finishing: fin.id_sku_finishing,
             kategori_finishing: fin.kategori_finishing,
@@ -633,7 +652,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   };
 
   return (
-    <main className="min-h-screen bg-base-200 py-6 px-4 md:px-8 relative">
+    <main className="relative px-4 py-6 min-h-screen bg-base-200 md:px-8">
       <AlertPopup 
         isOpen={popup.isOpen} type={popup.type} title={popup.title} message={popup.message}
         autoClose={popup.type === "success" ? 3000 : undefined} 
@@ -641,13 +660,15 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         onConfirm={popup.link ? () => router.push(popup.link!) : undefined} 
       />
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8 mt-2">
-        <div className="lg:col-span-3 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-base-100 p-6 rounded-2xl border border-base-content/5 shadow-sm">
-            <ProductCarousel images={displayImages} name={sku?.nama_sku || itemDetail?.nama_produk || "Produk"} />
+      <div className="grid max-w-7xl grid-cols-1 gap-8 mx-auto mt-2 lg:grid-cols-4">
+        <div className="space-y-6 lg:col-span-3">
+          <div className="grid grid-cols-1 p-6 border shadow-sm md:grid-cols-2 gap-8 bg-base-100 rounded-2xl border-base-content/5">
+            
+
+<ProductCarousel images={displayImages} name={sku?.nama_sku || itemDetail?.nama_produk || "Produk"} />
             
             <div className="flex flex-col">
-              <h1 className="text-3xl font-black uppercase mb-6 tracking-tighter">{itemDetail?.nama_produk}</h1>
+              <h1 className="mb-6 text-3xl font-black tracking-tighter uppercase">{itemDetail?.nama_produk}</h1>
               
               <div className="space-y-6">
                 
@@ -655,11 +676,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <div className="text-[10px] font-black uppercase tracking-widest opacity-40 flex items-center gap-1">
                     <Info size={12}/> Info & Deskripsi Produk
                   </div>
-                  <div className="bg-base-200/50 p-4 rounded-xl border border-base-content/5 text-xs leading-relaxed space-y-3">
+                  <div className="p-4 space-y-3 text-xs leading-relaxed border bg-base-200/50 rounded-xl border-base-content/5">
                     <div>
                       <span className="opacity-60">Kategori:</span> <span className="font-bold text-base-content">{itemDetail?.kategori || "Digital Printing"}</span> <br/>
                     </div>
-                    <div className="border-t border-base-content/10 pt-2">
+                    <div className="pt-2 border-t border-base-content/10">
                       <p className="font-black uppercase text-[10px] tracking-tight opacity-50 mb-1">Deskripsi Cetak:</p>
                       <p className="opacity-80 text-justify whitespace-pre-wrap">
                         {sku?.deskripsi || "Percetakan modern dengan hasil tajam dan presisi tinggi untuk kebutuhan bisnis Anda. Pastikan desain Anda dalam resolusi tinggi untuk hasil maksimal."}
@@ -675,11 +696,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                          <span>Daftar Harga Grosir</span>
                       </p>
                       <div className="overflow-hidden border border-base-content/10 rounded-xl">
-                        <table className="table table-xs w-full bg-base-100">
+                        <table className="w-full table table-xs bg-base-100">
                           <thead className="bg-base-200/50">
                             <tr>
-                              <th className="font-black uppercase py-3">Jumlah ({sku?.satuan || "pcs"})</th>
-                              <th className="font-black uppercase py-3 text-right">Harga Satuan</th>
+                              <th className="py-3 font-black uppercase">Jumlah ({sku?.satuan || "pcs"})</th>
+                              <th className="py-3 font-black text-right uppercase">Harga Satuan</th>
                             </tr>
                           </thead>
                           <tbody className="font-bold">
@@ -713,7 +734,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                         </table>
                       </div>
                     </div>
-                    <div className="divider opacity-5 my-0"></div>
+                    <div className="my-0 divider opacity-5"></div>
                   </>
                 )}
 
@@ -721,7 +742,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Konfigurasi Pesanan</p>
                   
                   <div 
-                    className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 space-y-4"
+                    className="p-4 space-y-4 border bg-base-200/30 rounded-2xl border-base-content/5"
                     onBlur={handleBlurValidation}
                   >
                     <FormPesan 
@@ -742,7 +763,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                 {availablePengerjaan.length > 0 && (
                   <div className="space-y-4">
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Estimasi / SLA Pengerjaan</p>
-                    <div className="bg-base-200/30 p-4 rounded-2xl border border-base-content/5 flex flex-col gap-3">
+                    <div className="flex flex-col gap-3 p-4 border bg-base-200/30 rounded-2xl border-base-content/5">
                       {availablePengerjaan.map((p, idx) => {
                         return (
                           <label
@@ -762,7 +783,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                                 onChange={() => setSelectedPengerjaanTitle(p)}
                               />
                               <div className="flex flex-col">
-                                <span className="text-sm font-bold flex items-center gap-2">
+                                <span className="flex items-center gap-2 text-sm font-bold">
                                   <Clock size={14} className={selectedPengerjaanTitle === p ? "text-primary" : "opacity-50"} />
                                   {p}
                                 </span>
@@ -776,7 +797,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                 )}
 
                 {/* MOBILE VIEW SUMMARY */}
-                <div className="block lg:hidden space-y-6 pt-4 border-t border-base-content/10">
+                <div className="block pt-4 space-y-6 border-t lg:hidden border-base-content/10">
                   <div className="space-y-2">
                     <FileUpload variant="minimal" onChange={setFileDesain} />
                     <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
@@ -787,11 +808,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                       </p>
                     </div>
                   </div>
-                  <div className="bg-base-200/50 p-5 rounded-2xl border border-base-content/5">
+                  <div className="p-5 border bg-base-200/50 rounded-2xl border-base-content/5">
                     <h3 className="text-[10px] font-black uppercase opacity-40 mb-4 flex items-center gap-2"><CreditCard size={14}/> Ringkasan</h3>
                     <div className="space-y-3 text-xs font-bold uppercase">
-                      <div className="flex justify-between items-center">
-                        <span className="opacity-60 flex flex-col">
+                      <div className="flex items-center justify-between">
+                        <span className="flex flex-col opacity-60">
                           Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
                           {sku?.tipe_kalkulasi === 'cetak_buku' && (
                               <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
@@ -800,7 +821,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                               <span className="text-[9px] lowercase opacity-70">ukuran: {selectedOptions['Luas Dihargai (m2)'] || 1} m²</span>
                           )}
                         </span>
-                        <div className="text-right flex items-center">
+                        <div className="flex items-center text-right">
                            {hargaDasarFullUI > hargaSatuProdukFull && (
                              <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                            )}
@@ -817,7 +838,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                       )}
 
                       {totalFinishing > 0 && (
-                        <div className="flex justify-between items-center text-primary mt-2">
+                        <div className="flex items-center justify-between mt-2 text-primary">
                           <span className="opacity-60">Jasa Tambahan</span>
                           <span>+ Rp {totalFinishing.toLocaleString("id-ID")}</span>
                         </div>
@@ -825,18 +846,18 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
                       {/* ESTIMASI PENGERJAAN - MOBILE */}
                       {selectedPengerjaanTitle && (
-                        <div className="flex justify-between items-center text-base-content mt-2">
+                        <div className="flex items-center justify-between mt-2 text-base-content">
                           <span className="opacity-60 flex items-center gap-1.5"><Clock size={12}/> Estimasi Waktu</span>
-                          <span className="text-warning font-black tracking-widest">
+                          <span className="font-black tracking-widest text-warning">
                             {activeTierObj ? activeTierObj.pengerjaan : selectedPengerjaanTitle}
                           </span>
                         </div>
                       )}
                       
-                      <div className="divider my-1 opacity-10"></div>
-                      <div className="flex justify-between items-end">
+                      <div className="my-1 opacity-10 divider"></div>
+                      <div className="flex items-end justify-between">
                         <p className="text-[10px] opacity-40 mb-1">Total Estimasi</p>
-                        <p className="text-2xl font-black text-primary tracking-tighter">Rp {totalPrice.toLocaleString("id-ID")}</p>
+                        <p className="text-2xl font-black tracking-tighter text-primary">Rp {totalPrice.toLocaleString("id-ID")}</p>
                       </div>
                     </div>
                   </div>
@@ -844,7 +865,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
               </div>
 
-              <button onClick={handleAddToCart} disabled={cartLoading || !sku} className="btn btn-primary mt-8 rounded-2xl font-black uppercase tracking-widest">
+              <button onClick={handleAddToCart} disabled={cartLoading || !sku} className="mt-8 font-black tracking-widest uppercase btn btn-primary rounded-2xl">
                 {cartLoading ? <span className="loading loading-spinner"></span> : <><ShoppingBag size={18}/> Tambah Keranjang</>}
               </button>
             </div>
@@ -855,12 +876,12 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
         {/* DESKTOP VIEW SUMMARY */}
         <div className="hidden lg:block">
-          <div className="sticky top-24 space-y-4">
-            <div className="card bg-base-100 p-6 rounded-2xl border border-base-content/10 shadow-sm">
+          <div className="sticky space-y-4 top-24">
+            <div className="p-6 border shadow-sm card bg-base-100 rounded-2xl border-base-content/10">
              <h3 className="text-[10px] font-black uppercase opacity-40 mb-4 flex items-center gap-2"><CreditCard size={14}/> Ringkasan</h3>
              <div className="space-y-3 text-xs font-bold uppercase">
-                <div className="flex justify-between items-center">
-                  <span className="opacity-60 flex flex-col">
+                <div className="flex items-center justify-between">
+                  <span className="flex flex-col opacity-60">
                     Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
                     {sku?.tipe_kalkulasi === 'cetak_buku' && (
                         <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
@@ -869,7 +890,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                         <span className="text-[9px] lowercase opacity-70">ukuran: {selectedOptions['Luas Dihargai (m2)'] || 1} m²</span>
                     )}
                   </span>
-                  <div className="text-right flex items-center">
+                  <div className="flex items-center text-right">
                      {hargaDasarFullUI > hargaSatuProdukFull && (
                        <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                      )}
@@ -886,7 +907,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                 )}
 
                 {totalFinishing > 0 && (
-                  <div className="flex justify-between items-center text-primary mt-2">
+                  <div className="flex items-center justify-between mt-2 text-primary">
                     <span className="opacity-60">Jasa Tambahan</span>
                     <span>+ Rp {totalFinishing.toLocaleString("id-ID")}</span>
                   </div>
@@ -894,18 +915,18 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
                 {/* ESTIMASI PENGERJAAN - DESKTOP */}
                 {selectedPengerjaanTitle && (
-                  <div className="flex justify-between items-center text-base-content mt-2">
+                  <div className="flex items-center justify-between mt-2 text-base-content">
                     <span className="opacity-60 flex items-center gap-1.5"><Clock size={12}/> Estimasi Waktu</span>
-                    <span className="text-warning font-black tracking-widest">
+                    <span className="font-black tracking-widest text-warning">
                        {activeTierObj ? activeTierObj.pengerjaan : selectedPengerjaanTitle}
                     </span>
                   </div>
                 )}
                 
-                <div className="divider my-1 opacity-10"></div>
-                <div className="pt-1 flex flex-col items-end">
+                <div className="my-1 opacity-10 divider"></div>
+                <div className="flex flex-col items-end pt-1">
                    <p className="text-[10px] opacity-40 mb-1">Total Estimasi</p>
-                   <p className="text-2xl font-black text-primary tracking-tighter">Rp {totalPrice.toLocaleString("id-ID")}</p>
+                   <p className="text-2xl font-black tracking-tighter text-primary">Rp {totalPrice.toLocaleString("id-ID")}</p>
                 </div>
              </div>
             </div>
@@ -921,9 +942,9 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
               </div>
             </div>
             
-            <div className="card bg-primary text-primary-content shadow-xl shadow-primary/20 rounded-2xl">
-              <div className="card-body p-6 gap-4">
-                <h3 className="font-bold flex items-center gap-2 underline underline-offset-4 uppercase text-sm">
+            <div className="shadow-xl card bg-primary text-primary-content shadow-primary/20 rounded-2xl">
+              <div className="gap-4 p-6 card-body">
+                <h3 className="flex items-center gap-2 text-sm font-bold uppercase underline underline-offset-4">
                   <Award size={20}/> LAYANAN TERBAIK
                 </h3>
                 <div className="space-y-4 text-sm leading-tight">
