@@ -59,13 +59,13 @@ export interface OpsiFinishing {
   harga_tambahan: number;
   tipe: "nominal" | "persen";
   kali_jumlah_pesan: boolean;
+  kali_dimensi: boolean; // 👈 TAMBAHAN DARI BACKEND
   harga_bertingkat?: HargaBertingkat[]; 
 }
 
 export interface SkuDetail {
   id_sku: string;
   nama_sku: string;
-  // 👇 PERBAIKAN FATAL: Tipe data gambar sekarang adalah ARRAY string
   gambar?: string[] | null; 
   satuan?: string;        
   deskripsi: string | null;
@@ -73,6 +73,7 @@ export interface SkuDetail {
   minimum_pesan: number;
   kelipatan_pesan: number;
   harga_dasar: number;
+  harga_tambahan_dimensi: number; // 👈 TAMBAHAN DARI BACKEND
   kombinasi_pilihan: string[];
   harga_bertingkat: HargaBertingkat[];
   diskon_customer: DiskonCustomer[];
@@ -100,7 +101,6 @@ export async function getItems(): Promise<ItemData[]> {
   const cacheKey = "bikincetak:items_all";
 
   try {
-    // 👇 HAPUS CACHE LAMA BIAR DATA BARU MASUK
     try { await redis.del(cacheKey); } catch(e) {}
 
     let cachedItems = null;
@@ -138,7 +138,7 @@ export async function getItemDetail(idProduk: string): Promise<ItemDetailData | 
   const cacheKey = `bikincetak:item_detail:${idProduk}`;
   
   try {
-    // 👇 HAPUS CACHE LAMA BIAR DATA BARU (GAMBAR ARRAY & JENIS VARIAN) BISA MUNCUL
+    // Hapus cache lama biar data baru (kali_dimensi dkk) langsung terbaca
     try { await redis.del(cacheKey); } catch(e) {}
 
     let cachedDetail = null;

@@ -112,7 +112,7 @@ export default function FileUpload({ variant = "box", onChange }: FileUploadProp
           <div className="mt-3 bg-base-200/50 border border-base-300 p-3 rounded-2xl text-center flex flex-col items-center gap-1">
              <Mail size={16} className="text-primary opacity-50" />
              <p className="text-[9px] font-bold uppercase opacity-60">Kirim file pesanan ke email:</p>
-             <p className="text-xs font-black text-primary select-all">cs@bikincetak.com</p>
+             <p className="text-xs font-black text-primary select-all">order@bikincetak.co.id</p>
           </div>
         )}
       </div>

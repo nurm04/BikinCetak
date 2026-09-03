@@ -322,13 +322,18 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return isNaN(val) || val < 1 ? 1 : val; 
   }, [sku?.tipe_kalkulasi, selectedOptions.jumlah_halaman]);
 
+  // 👇 PERBAIKAN: Gunakan harga_tambahan_dimensi dari Sku Master (Database)
+  const hargaPerHalaman = useMemo(() => {
+      return Number(sku?.harga_tambahan_dimensi) || 0;
+  }, [sku?.harga_tambahan_dimensi]);
+
   const biayaHalamanPerBuku = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
       const halamanDicharge = Math.max(0, jumlahHalaman - 1);
-      return halamanDicharge * sisiCetakMultiplier * 1500;
+      return halamanDicharge * sisiCetakMultiplier * hargaPerHalaman; // 👈 MENGGUNAKAN HARGA DINAMIS
     }
     return 0;
-  }, [sku?.tipe_kalkulasi, jumlahHalaman, sisiCetakMultiplier]);
+  }, [sku?.tipe_kalkulasi, jumlahHalaman, sisiCetakMultiplier, hargaPerHalaman]);
 
   const hargaSatuProdukFull = useMemo(() => {
     let net = hargaSatuanNet + biayaHalamanPerBuku;
@@ -365,6 +370,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             }
         }
         
+        // KUNCI: Override HANYA JIKA tier harganya benar-benar BUKAN 0
         if (activeTier && Number(activeTier.nilai) !== 0) {
             activeHarga = Number(activeTier.nilai);
             activeTipe = activeTier.tipe as "nominal" | "persen";
@@ -373,7 +379,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return { harga: activeHarga, tipe: activeTipe };
   };
   
-  // 👇 PERBAIKAN LOGIKA FINISHING METERAN DI UI 👇
+  // 👇 PERBAIKAN LOGIKA FINISHING METERAN / BUKU (KALI DIMENSI) DI UI 👇
   const totalFinishing = useMemo(() => {
     let total = 0;
     Object.values(selectedFinishing).forEach((fin) => {
@@ -387,13 +393,22 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         biaya = hargaSatuProdukFull * (harga / 100);
       } else {
         biaya = harga || 0;
-        // Jika produk adalah cetak meteran dan finishing ini mengikuti QTY pesanan, 
-        // kita harus mengkalikannya dengan luas (m2) per 1 Pcs-nya.
-        if (fin.kali_jumlah_pesan && sku?.tipe_kalkulasi === 'cetak_meteran') {
-          const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
-          if (!isNaN(luas) && luas > 0) {
-            biaya = biaya * luas;
-          }
+
+        // ==== LOGIKA KALI DIMENSI ====
+        const isKaliDimensi = fin.kali_dimensi === true || String(fin.kali_dimensi) === '1';
+
+        if (isKaliDimensi) {
+            if (sku?.tipe_kalkulasi === 'cetak_meteran') {
+                const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+                if (!isNaN(luas) && luas > 0) {
+                    biaya = biaya * luas;
+                }
+            } else if (sku?.tipe_kalkulasi === 'cetak_buku') {
+                const hal = parseInt(selectedOptions['jumlah_halaman'], 10);
+                if (!isNaN(hal) && hal > 0) {
+                    biaya = biaya * hal;
+                }
+            }
         }
       }
 
@@ -568,19 +583,28 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
           if (!isNaN(luas) && luas > 0) finalEffectiveCartQty *= luas;
       }
 
-      // 👇 PERBAIKAN LOGIKA BACKEND SNAPSHOT 👇
+      // 👇 PERBAIKAN LOGIKA BACKEND SNAPSHOT (KIRIM DATA KE CART API) 👇
       const finishings = Object.values(selectedFinishing)
         .filter((fin): fin is OpsiFinishing => fin !== null)
         .map((fin) => {
           let { harga, tipe } = getActiveFinishingPrice(fin, finalEffectiveCartQty);
+          
+          const isKaliDimensi = fin.kali_dimensi === true || String(fin.kali_dimensi) === '1';
 
-          // Jika ini cetak meteran, & opsi finishing ini dikali qty pemesanan, 
-          // maka snapshot harga yang dikirim ke database harus dikali luas meteran terlebih dahulu
-          if (sku.tipe_kalkulasi === 'cetak_meteran' && fin.kali_jumlah_pesan && tipe === 'nominal') {
-             const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
-             if (!isNaN(luas) && luas > 0) {
-                 harga = harga * luas;
-             }
+          // Jika ini cetak meteran/buku & tipe = nominal, kita KALIKAN DIMENSI DI SINI 
+          // Supaya snapshot harga yang dikirim ke database sudah mengandung harga x dimensi
+          if (isKaliDimensi && tipe === 'nominal') {
+              if (sku.tipe_kalkulasi === 'cetak_meteran') {
+                 const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+                 if (!isNaN(luas) && luas > 0) {
+                     harga = harga * luas;
+                 }
+              } else if (sku.tipe_kalkulasi === 'cetak_buku') {
+                 const hal = parseInt(selectedOptions['jumlah_halaman'], 10);
+                 if (!isNaN(hal) && hal > 0) {
+                     harga = harga * hal;
+                 }
+              }
           }
 
           return {
@@ -652,7 +676,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   };
 
   return (
-    <main className="relative px-4 py-6 min-h-screen bg-base-200 md:px-8">
+    <main className="min-h-screen px-4 py-6 relative bg-base-200 md:px-8">
       <AlertPopup 
         isOpen={popup.isOpen} type={popup.type} title={popup.title} message={popup.message}
         autoClose={popup.type === "success" ? 3000 : undefined} 
@@ -756,6 +780,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                       kelipatanQty={kelipatanOrder}
                       tipeKalkulasi={sku?.tipe_kalkulasi || "standard"} 
                       sisiCetakMultiplier={sisiCetakMultiplier}
+                      hargaTambahanDimensi={Number(sku?.harga_tambahan_dimensi) || 0}
                     />
                   </div>
                 </div>

@@ -30,6 +30,7 @@ interface FormPesanProps {
   kelipatanQty?: number; 
   tipeKalkulasi?: string;
   sisiCetakMultiplier?: number;
+  hargaTambahanDimensi?: number; // 👈 TAMBAHAN PROPS BARU
 }
 
 export default function FormPesan({ 
@@ -43,7 +44,8 @@ export default function FormPesan({
   minimumQty = 1, 
   kelipatanQty = 1,
   tipeKalkulasi = "standard", 
-  sisiCetakMultiplier = 1 
+  sisiCetakMultiplier = 1,
+  hargaTambahanDimensi = 0 // 👈 DESTRUCTURING DEFAULT VALUE
 }: FormPesanProps) {
   
   useEffect(() => {
@@ -162,7 +164,8 @@ export default function FormPesan({
              const inputHal = parseInt(values?.jumlah_halaman || "1", 10);
              const halValid = isNaN(inputHal) || inputHal < 1 ? 1 : inputHal;
              const tambahanHalaman = Math.max(0, halValid - 1);
-             const biayaHalaman = tambahanHalaman * sisiCetakMultiplier * 1500;
+             // 👇 PERBAIKAN: MENGGUNAKAN HARGA DINAMIS DARI DATABASE 👇
+             const biayaHalaman = tambahanHalaman * sisiCetakMultiplier * hargaTambahanDimensi; 
              if (biayaHalaman > 0) {
                  return (
                     <div className="mt-2 text-[10px] font-bold text-info px-1">
