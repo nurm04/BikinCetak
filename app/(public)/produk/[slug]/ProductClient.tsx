@@ -323,17 +323,14 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   }, [sku?.tipe_kalkulasi, selectedOptions.jumlah_halaman]);
 
   // 👇 PERBAIKAN: Gunakan harga_tambahan_dimensi dari Sku Master (Database)
-  const hargaPerHalaman = useMemo(() => {
-      return Number(sku?.harga_tambahan_dimensi) || 0;
-  }, [sku?.harga_tambahan_dimensi]);
-
   const biayaHalamanPerBuku = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
       const halamanDicharge = Math.max(0, jumlahHalaman - 1);
-      return halamanDicharge * sisiCetakMultiplier * hargaPerHalaman; // 👈 MENGGUNAKAN HARGA DINAMIS
+      // Harga tambahan lembar sama persis dengan harga dasar grosir (currentTierPrice)
+      return halamanDicharge * currentTierPrice; 
     }
     return 0;
-  }, [sku?.tipe_kalkulasi, jumlahHalaman, sisiCetakMultiplier, hargaPerHalaman]);
+  }, [sku?.tipe_kalkulasi, jumlahHalaman, currentTierPrice]);
 
   const hargaSatuProdukFull = useMemo(() => {
     let net = hargaSatuanNet + biayaHalamanPerBuku;
@@ -778,9 +775,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                       onValueChange={handleAttributeChange} 
                       minimumQty={minimumQty}
                       kelipatanQty={kelipatanOrder}
-                      tipeKalkulasi={sku?.tipe_kalkulasi || "standard"} 
-                      sisiCetakMultiplier={sisiCetakMultiplier}
-                      hargaTambahanDimensi={Number(sku?.harga_tambahan_dimensi) || 0}
+                      tipeKalkulasi={sku?.tipe_kalkulasi || "standard"}
+                      hargaTambahanDimensi={currentTierPrice}
                     />
                   </div>
                 </div>

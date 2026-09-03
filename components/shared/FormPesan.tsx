@@ -43,8 +43,7 @@ export default function FormPesan({
   groupedAddons, 
   minimumQty = 1, 
   kelipatanQty = 1,
-  tipeKalkulasi = "standard", 
-  sisiCetakMultiplier = 1,
+  tipeKalkulasi = "standard",
   hargaTambahanDimensi = 0 // 👈 DESTRUCTURING DEFAULT VALUE
 }: FormPesanProps) {
   
@@ -164,12 +163,14 @@ export default function FormPesan({
              const inputHal = parseInt(values?.jumlah_halaman || "1", 10);
              const halValid = isNaN(inputHal) || inputHal < 1 ? 1 : inputHal;
              const tambahanHalaman = Math.max(0, halValid - 1);
-             // 👇 PERBAIKAN: MENGGUNAKAN HARGA DINAMIS DARI DATABASE 👇
-             const biayaHalaman = tambahanHalaman * sisiCetakMultiplier * hargaTambahanDimensi; 
+
+             // 👇 HAPUS Sisi Cetak Multiplier. Langsung kalikan jumlah halaman dengan harga dasar (hargaTambahanDimensi)
+             const biayaHalaman = tambahanHalaman * hargaTambahanDimensi; 
+             
              if (biayaHalaman > 0) {
                  return (
                     <div className="mt-2 text-[10px] font-bold text-info px-1">
-                        * Kalkulasi: Tambahan {tambahanHalaman} Halaman ({sisiCetakMultiplier} Sisi) = + Rp {biayaHalaman.toLocaleString('id-ID')} / pcs
+                        * Kalkulasi: Tambahan {tambahanHalaman} Lembar = + Rp {biayaHalaman.toLocaleString('id-ID')} / pcs
                     </div>
                  );
              }
