@@ -1,3 +1,4 @@
+// @/services/voucherService.ts
 "use server";
 
 import { cookies } from "next/headers";
@@ -43,8 +44,16 @@ export interface Voucher {
   id_voucher: number;
   kode_voucher: string;
   nama_promo: string;
-  tipe_target: "semua_pesanan" | "produk_tertentu";
+  // 👇 UPDATE: Kolom filter role customer
+  role_customer_targets?: string[] | null; 
+  
+  // 👇 UPDATE: Penambahan target sku_tertentu
+  tipe_target: "semua_pesanan" | "produk_tertentu" | "sku_tertentu"; 
+  
+  // 👇 UPDATE: Kolom target produk spesifik
+  id_produk_target?: string | null; 
   id_sku_target?: string | null;
+  
   persentase_diskon: number;
   maksimal_potongan_rupiah?: number | null;
   minimal_transaksi_rupiah: number;

@@ -1,16 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, MapPin, ShoppingBag, Loader2, ArrowLeft, Home, Truck, Ticket } from "lucide-react";
+import { CreditCard, MapPin, ShoppingBag, Loader2, ArrowLeft, Home, Truck, Ticket, ChevronRight, X, Search } from "lucide-react";
 import { getAlamat, Alamat } from "@/services/alamatService";
 import Link from "next/link";
 import CartProductItem from "@/components/shared/CardProductItem";
 import AlertPopup from "@/components/ui/AlertPopup";
 import UbahAlamat from "./UbahAlamat";
 import { checkoutCart, CheckoutPayload, getShippingCost, RincianDiskonAPI, CustomAttributeValue } from "@/services/cartService";
-import { cekVoucher } from "@/services/voucherService";
+import { cekVoucher, getVouchers, Voucher } from "@/services/voucherService";
 
 interface CheckoutItem {
   id: number;
@@ -101,7 +101,11 @@ interface PopupState {
   type: "success" | "error" | "warning" | "info";
 }
 
-export default function PesanClient() {
+interface PesanClientProps {
+  activeRoleId?: string | number | null;
+}
+
+export default function PesanClient({ activeRoleId }: PesanClientProps = {}) {
   const router = useRouter();
   const [items, setItems] = useState<CheckoutItem[]>([]);
   const [alamatUtama, setAlamatUtama] = useState<Alamat | null>(null);
@@ -121,8 +125,12 @@ export default function PesanClient() {
     etd: string;
   } | null>(null);
 
-  const [inputVoucher, setInputVoucher] = useState("");
-  const [isVerifyingVoucher, setIsVerifyingVoucher] = useState(false);
+  // VOUCHER STATES (Shopee Style)
+  const [availableVouchers, setAvailableVouchers] = useState<Voucher[]>([]);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [manualVoucherCode, setManualVoucherCode] = useState("");
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+  
   const [appliedVoucher, setAppliedVoucher] = useState<{
     kode_voucher: string;
     nominal_diskon: number;
@@ -155,9 +163,7 @@ export default function PesanClient() {
       if (result.success && Array.isArray(result.data)) {
         const data = result.data as Alamat[];
         setAlamatList(data);
-        
         const alamatDefault = data.find((item) => item.is_default) || data[0] || null;
-
         if (alamatDefault) {
           setAlamatUtama(alamatDefault);
           return;
@@ -171,11 +177,24 @@ export default function PesanClient() {
     }
   }, []);
 
+  const loadVouchersList = useCallback(async () => {
+    try {
+      const res = await getVouchers();
+      if (res.success && res.data) {
+        setAvailableVouchers(res.data);
+      }
+    } catch (err) {
+      console.error("Gagal load voucher", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadInitialData();
     loadAlamatUtama();
-  }, [loadInitialData, loadAlamatUtama]);
+    loadVouchersList();
+  }, [loadInitialData, loadAlamatUtama, loadVouchersList]);
 
+  // ONGKIR LOGIC...
   useEffect(() => {
     if (!alamatUtama) return;
 
@@ -185,28 +204,16 @@ export default function PesanClient() {
       setOngkirError(null);
       setCouriers([]);
 
-      // OPSI 1: AMBIL DI TOKO
       const manualPickup: CourierOption = {
         code: "toko",
         name: "Ambil di Toko",
-        costs: [{
-          service: "Ambil Sendiri",
-          description: "Ambil pesanan langsung di toko kami",
-          cost: 0,
-          etd: "0"
-        }]
+        costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
       };
 
-      // OPSI 2: REQUEST CARGO / EKSPEDISI CUSTOM
       const requestCargo: CourierOption = {
         code: "cargo",
         name: "Request Expedisi Cargo",
-        costs: [{
-          service: "Cargo / Custom",
-          description: "Pembayaran ongkir bisa tujuan / transfer belakangan (sesuai kesepakatan)",
-          cost: 0,
-          etd: "Menyesuaikan"
-        }]
+        costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
       };
 
       let normalizedCouriers: CourierOption[] = [manualPickup, requestCargo];
@@ -214,48 +221,28 @@ export default function PesanClient() {
       try {
         const result = await getShippingCost(alamatUtama.id_alamat);
         
-        if (result.error) {
-          setOngkirError(result.error);
+        if (result.error || (result.data as OngkirAPIResponse)?.meta?.status === 'error') {
+          setOngkirError(result.error || (result.data as OngkirAPIResponse)?.meta?.message || "Gagal mendapatkan ongkos kirim.");
           setCouriers(normalizedCouriers);
           return;
         }
 
         const rawData = result.data as OngkirAPIResponse;
-
-        if (rawData?.meta?.status === 'error') {
-          setOngkirError(rawData.meta.message || "Gagal mendapatkan ongkos kirim.");
-          return;
-        }
-        if (rawData?.rajaongkir?.status?.code && rawData.rajaongkir.status.code >= 400) {
-          setOngkirError(rawData.rajaongkir.status.description || "Gagal mendapatkan ongkos kirim.");
-          return;
-        }
-
         if (rawData?.meta && Array.isArray(rawData?.data)) {
           const couriersMap: Record<string, CourierOption> = {};
-          
           rawData.data.forEach((item: KomerceCostItem) => {
-            if (!couriersMap[item.code]) {
-              couriersMap[item.code] = { code: item.code, name: item.name, costs: [] };
-            }
+            if (!couriersMap[item.code]) couriersMap[item.code] = { code: item.code, name: item.name, costs: [] };
             couriersMap[item.code].costs.push({
-              service: item.service,
-              description: item.description || item.service,
-              cost: item.cost,
-              etd: item.etd || item.estimation || "-"
+              service: item.service, description: item.description || item.service, cost: item.cost, etd: item.etd || item.estimation || "-"
             });
           });
           normalizedCouriers = [...normalizedCouriers, ...Object.values(couriersMap)];
         } 
         else if (rawData?.rajaongkir?.results && Array.isArray(rawData.rajaongkir.results)) {
           const apiCouriers = rawData.rajaongkir.results.map((c: RajaOngkirResult) => ({
-            code: c.code,
-            name: c.name,
+            code: c.code, name: c.name,
             costs: c.costs.map((srv: RajaOngkirServiceCost) => ({
-              service: srv.service,
-              description: srv.description,
-              cost: srv.cost[0]?.value || 0,
-              etd: srv.cost[0]?.etd || "-"
+              service: srv.service, description: srv.description, cost: srv.cost[0]?.value || 0, etd: srv.cost[0]?.etd || "-"
             }))
           }));
           normalizedCouriers = [...normalizedCouriers, ...apiCouriers];
@@ -264,9 +251,7 @@ export default function PesanClient() {
         if (normalizedCouriers.length === 2) {
             setOngkirError("Tidak ada layanan pengiriman otomatis ke alamat ini. Anda masih bisa menggunakan opsi manual.");
         } 
-        
         setCouriers(normalizedCouriers);
-        
       } catch (error) {
         setOngkirError("Terjadi kesalahan sistem saat mengambil tarif logistik.");
         setCouriers(normalizedCouriers);
@@ -274,21 +259,15 @@ export default function PesanClient() {
         setLoadingOngkir(false);
       }
     };
-
     fetchOngkir();
   }, [alamatUtama]);
 
   const hitungRowTotal = (item: CheckoutItem) => {
     let hargaDasar = item.harga_satuan || 0;
-    
     let atribut: Record<string, CustomAttributeValue> = {};
     if (item.atribut_custom_snapshot) {
       if (typeof item.atribut_custom_snapshot === "string") {
-        try {
-          atribut = JSON.parse(item.atribut_custom_snapshot) as Record<string, CustomAttributeValue>;
-        } catch (error) {
-          console.error("Gagal parse atribut_custom_snapshot", error);
-        }
+        try { atribut = JSON.parse(item.atribut_custom_snapshot) as Record<string, CustomAttributeValue>; } catch (e) {}
       } else {
         atribut = item.atribut_custom_snapshot;
       }
@@ -297,21 +276,15 @@ export default function PesanClient() {
     let sisi = 1;
     item.finishing.forEach((fin) => {
       const label = fin.nama_finishing.toLowerCase();
-      if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) {
-        sisi = 2;
-      }
+      if (label.includes("2 sisi") || label.includes("dua sisi") || label.includes("bolak")) sisi = 2;
     });
 
     let jumlahHalaman = 1;
     if (atribut["Jumlah Halaman"]) {
       const val = parseInt(String(atribut["Jumlah Halaman"]), 10);
-      if (!isNaN(val) && val > 0) {
-        jumlahHalaman = val;
-      }
+      if (!isNaN(val) && val > 0) jumlahHalaman = val;
     }
-    if (jumlahHalaman > 1) {
-      hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
-    }
+    if (jumlahHalaman > 1) hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
 
     let multiplierLuas = 1;
     if (atribut["Luas Dihargai (m2)"] !== undefined) {
@@ -327,78 +300,118 @@ export default function PesanClient() {
       subtotalItem += isKaliQty ? (val * item.jumlah) : val;
     });
 
-    const biayaPengerjaan = item.harga_pengerjaan_snapshot || 0;
-    
-    return subtotalItem + biayaPengerjaan;
+    return subtotalItem + (item.harga_pengerjaan_snapshot || 0);
   };
 
   const subTotal = items.reduce((acc, item) => acc + hitungRowTotal(item), 0);
 
-  const handleApplyVoucher = async () => {
-    if (!inputVoucher.trim()) return;
-    
-    setIsVerifyingVoucher(true);
-    try {
-        const response = await cekVoucher(inputVoucher.trim());
-        
-        if (!response.success || !response.data) {
-            setPopup({ isOpen: true, title: "Voucher Ditolak", message: response.error || response.message || "Voucher tidak valid.", type: "error" });
-            setAppliedVoucher(null);
-            return;
+  // LOGIKA KELAYAKAN VOUCHER (SHOOPEE STYLE)
+  const getVoucherEligibility = useCallback((v: Voucher) => {
+    // 1. Role Filter
+    const currentRoleId = activeRoleId ? String(activeRoleId) : "";
+    if (v.role_customer_targets && v.role_customer_targets.length > 0) {
+        if (!currentRoleId || !v.role_customer_targets.includes(currentRoleId)) {
+            return { eligible: false, reason: "Tidak berlaku untuk level Anda", subtotalTarget: 0 };
         }
-
-        const voucher = response.data;
-
-        if (subTotal < Number(voucher.minimal_transaksi_rupiah)) {
-            setPopup({ isOpen: true, title: "Belum Memenuhi Syarat", message: `Voucher ini membutuhkan minimal belanja Rp ${Number(voucher.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, type: "warning" });
-            setAppliedVoucher(null);
-            return;
-        }
-
-        let kalkulasiDiskon = 0;
-        const persen = Number(voucher.persentase_diskon);
-
-        if (voucher.tipe_target === 'semua_pesanan') {
-            kalkulasiDiskon = (subTotal * persen) / 100;
-        } else if (voucher.tipe_target === 'produk_tertentu') {
-            const totalProdukTarget = items
-                .filter(item => item.id_sku === voucher.id_sku_target)
-                .reduce((sum, item) => sum + hitungRowTotal(item), 0);
-            
-            if(totalProdukTarget === 0){
-                setPopup({ isOpen: true, title: "Produk Tidak Sesuai", message: "Voucher ini tidak berlaku untuk produk di keranjang Anda.", type: "warning" });
-                setAppliedVoucher(null);
-                return;
-            }
-            kalkulasiDiskon = (totalProdukTarget * persen) / 100;
-        }
-
-        const maksPotongan = Number(voucher.maksimal_potongan_rupiah);
-        if (maksPotongan > 0 && kalkulasiDiskon > maksPotongan) {
-            kalkulasiDiskon = maksPotongan;
-        }
-
-        setAppliedVoucher({
-            kode_voucher: voucher.kode_voucher,
-            nama_promo: voucher.nama_promo,
-            nominal_diskon: Math.round(kalkulasiDiskon)
-        });
-
-        setPopup({ isOpen: true, title: "Voucher Berhasil", message: `Hore! Diskon senilai Rp ${Math.round(kalkulasiDiskon).toLocaleString("id-ID")} berhasil diterapkan.`, type: "success" });
-
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Voucher tidak valid atau terjadi kesalahan.";
-        
-        setPopup({ isOpen: true, title: "Voucher Ditolak", message: errorMessage, type: "error" });
-        setAppliedVoucher(null);
-    } finally {
-        setIsVerifyingVoucher(false);
     }
+
+    // 2. Target Barang Filter
+    let subtotalTarget = 0;
+    let isTargetFound = false;
+
+    if (v.tipe_target === 'semua_pesanan') {
+        subtotalTarget = subTotal;
+        isTargetFound = items.length > 0;
+    } else if (v.tipe_target === 'produk_tertentu') {
+        const itemsTarget = items.filter(i => (i.id_sku ? i.id_sku.split('-SKU-')[0] : "") === v.id_produk_target);
+        subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
+        isTargetFound = itemsTarget.length > 0;
+    } else if (v.tipe_target === 'sku_tertentu') {
+        const itemsTarget = items.filter(i => i.id_sku === v.id_sku_target);
+        subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
+        isTargetFound = itemsTarget.length > 0;
+    }
+
+    if (!isTargetFound || subtotalTarget === 0) {
+        return { eligible: false, reason: "Produk tidak sesuai", subtotalTarget: 0 };
+    }
+
+    // 3. Syarat Nominal Filter
+    if (subtotalTarget < Number(v.minimal_transaksi_rupiah)) {
+        return { eligible: false, reason: `Min. belanja Rp ${Number(v.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, subtotalTarget };
+    }
+
+    return { eligible: true, reason: "", subtotalTarget };
+  }, [activeRoleId, items, subTotal]);
+
+  const vouchersWithStatus = useMemo(() => {
+    return availableVouchers.map(v => ({
+       ...v,
+       ...getVoucherEligibility(v)
+    }));
+  }, [availableVouchers, getVoucherEligibility]);
+
+  const eligibleVouchers = vouchersWithStatus.filter(v => v.eligible);
+  const ineligibleVouchers = vouchersWithStatus.filter(v => !v.eligible);
+
+  const applySelectedVoucher = (v: Voucher & ReturnType<typeof getVoucherEligibility>) => {
+      if (!v.eligible) return;
+
+      const persen = Number(v.persentase_diskon);
+      let kalkulasiDiskon = (v.subtotalTarget * persen) / 100;
+      
+      const maksPotongan = Number(v.maksimal_potongan_rupiah);
+      if (maksPotongan > 0 && kalkulasiDiskon > maksPotongan) {
+          kalkulasiDiskon = maksPotongan;
+      }
+
+      setAppliedVoucher({
+          kode_voucher: v.kode_voucher,
+          nama_promo: v.nama_promo,
+          nominal_diskon: Math.round(kalkulasiDiskon)
+      });
+      setShowVoucherModal(false);
+      setManualVoucherCode("");
+      setPopup({ isOpen: true, title: "Voucher Terpasang", message: `Voucher ${v.kode_voucher} berhasil digunakan.`, type: "success" });
   };
 
-  const hapusVoucher = () => {
-      setAppliedVoucher(null);
-      setInputVoucher("");
+  const handleManualInputVoucher = async () => {
+      if (!manualVoucherCode.trim()) return;
+      setIsApplyingVoucher(true);
+
+      try {
+          // Cari di list lokal dulu
+          const localMatch = vouchersWithStatus.find(v => v.kode_voucher.toLowerCase() === manualVoucherCode.toLowerCase());
+          
+          if (localMatch) {
+              if (localMatch.eligible) {
+                  applySelectedVoucher(localMatch);
+              } else {
+                  setPopup({ isOpen: true, title: "Tidak Memenuhi Syarat", message: localMatch.reason, type: "warning" });
+              }
+              return;
+          }
+
+          // Jika tidak ada di lokal, tembak API (misal voucher khusus/tersembunyi)
+          const response = await cekVoucher(manualVoucherCode.trim());
+          if (!response.success || !response.data) {
+              setPopup({ isOpen: true, title: "Kode Salah", message: "Voucher tidak ditemukan atau sudah tidak aktif.", type: "error" });
+              return;
+          }
+
+          const apiVoucher = response.data;
+          const status = getVoucherEligibility(apiVoucher);
+          
+          if (status.eligible) {
+              applySelectedVoucher({ ...apiVoucher, ...status });
+          } else {
+              setPopup({ isOpen: true, title: "Tidak Memenuhi Syarat", message: status.reason, type: "warning" });
+          }
+      } catch (err) {
+          setPopup({ isOpen: true, title: "Error", message: "Gagal memvalidasi kode voucher.", type: "error" });
+      } finally {
+          setIsApplyingVoucher(false);
+      }
   };
 
   const diskonNominal = appliedVoucher?.nominal_diskon || 0;
@@ -427,16 +440,13 @@ export default function PesanClient() {
       const result = await checkoutCart(payload as CheckoutPayload);
 
       if (!result.success && !result.data) {
-        setPopup({
-          isOpen: true, title: "Checkout Gagal", message: result.error || result.message || "Terjadi kesalahan.", type: "error",
-        });
+        setPopup({ isOpen: true, title: "Checkout Gagal", message: result.error || result.message || "Terjadi kesalahan.", type: "error" });
         return;
       }
 
       const kodeTransaksi = (result.data as {kode_transaksi: string})?.kode_transaksi;
       localStorage.removeItem("checkout_items");
       localStorage.removeItem("checkout_item_ids");
-
       router.push(`/pesan/status/${kodeTransaksi}`);
 
     } catch {
@@ -462,8 +472,8 @@ export default function PesanClient() {
           if (popup.title === "Alamat Kosong") router.push("/profil/edit");
         }}
       />
+
       <div className="max-w-7xl mx-auto">
-        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="breadcrumbs text-[10px] uppercase font-black opacity-40 tracking-widest">
             <ul>
@@ -478,7 +488,6 @@ export default function PesanClient() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
           <div className="lg:col-span-8 space-y-6">
             
             {/* LOKASI PENGIRIMAN */}
@@ -498,13 +507,8 @@ export default function PesanClient() {
                     </p>
                     <p className="text-[10px] font-bold opacity-60 mt-1 leading-tight">
                       {alamatUtama ? (
-                        <>
-                          {alamatUtama.nama_penerima} {" ("}{alamatUtama.no_hp}{") • "}
-                          {alamatUtama.alamat_lengkap}, {alamatUtama.kecamatan}, {alamatUtama.kota}, {alamatUtama.provinsi} {alamatUtama.kode_pos}
-                        </>
-                      ) : (
-                        "Silakan atur alamat di profil."
-                      )}
+                        <>{alamatUtama.nama_penerima} {" ("}{alamatUtama.no_hp}{") • "} {alamatUtama.alamat_lengkap}, {alamatUtama.kecamatan}, {alamatUtama.kota}, {alamatUtama.provinsi} {alamatUtama.kode_pos}</>
+                      ) : ("Silakan atur alamat di profil.")}
                     </p>
                   </div>
                 </div>
@@ -520,7 +524,6 @@ export default function PesanClient() {
                 <ShoppingBag className="text-primary" size={20} />
                 <h2 className="text-xl font-black uppercase tracking-tight">Ringkasan Produk ({items.length})</h2>
               </div>
-              
               <div className="divide-y divide-base-content/5">
                 {items.map((item) => (
                   <CartProductItem key={item.id} {...item} isReadOnly={true} />
@@ -542,7 +545,6 @@ export default function PesanClient() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  
                   {ongkirError && (
                     <div className="py-4 px-4 text-center text-xs font-bold text-warning uppercase tracking-wider bg-warning/10 rounded-xl border border-dashed border-warning/30">
                       {ongkirError}
@@ -551,51 +553,28 @@ export default function PesanClient() {
 
                   {couriers.length === 0 ? (
                     <div className="py-6 text-center text-xs font-bold text-base-content/50 uppercase tracking-wider bg-base-200/50 rounded-xl border border-dashed border-base-300">
-                      {alamatUtama 
-                        ? "Tidak ada opsi pengiriman tersedia. Pastikan alamat valid atau coba lagi nanti." 
-                        : "Pilih alamat terlebih dahulu untuk melihat opsi."}
+                      {alamatUtama ? "Tidak ada opsi pengiriman tersedia." : "Pilih alamat terlebih dahulu."}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-4">
                       {couriers.map((courier) => (
                         courier.costs.map((srv, idx) => {
                           const isSelected = selectedShipping?.courier_code === courier.code && selectedShipping?.service === srv.service;
-                          const isManualPickupOrCargo = courier.code === "toko" || courier.code === "cargo";
-                          
                           return (
                             <div 
                               key={`${courier.code}-${idx}`}
-                              onClick={() => setSelectedShipping({
-                                courier_code: courier.code,
-                                courier_name: courier.name,
-                                service: srv.service,
-                                cost: srv.cost,
-                                etd: srv.etd
-                              })}
-                              className={`cursor-pointer transition-all p-4 rounded-xl border-2 flex items-center justify-between ${
-                                isSelected ? 'border-primary bg-primary/5' : 'border-base-200 hover:border-primary/30'
-                              }`}
+                              onClick={() => setSelectedShipping({ courier_code: courier.code, courier_name: courier.name, service: srv.service, cost: srv.cost, etd: srv.etd })}
+                              className={`cursor-pointer transition-all p-4 rounded-xl border-2 flex items-center justify-between ${isSelected ? 'border-primary bg-primary/5' : 'border-base-200 hover:border-primary/30'}`}
                             >
                               <div className="flex items-center gap-4">
-                                <div className="radio-input">
-                                  <input type="radio" name="shipping" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
-                                </div>
+                                <input type="radio" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
                                 <div>
-                                  <p className="font-black text-sm uppercase tracking-tight">
-                                    {courier.name} - {srv.service}
-                                  </p>
-                                  <p className="text-[10px] font-bold opacity-60 mt-1">
-                                    {isManualPickupOrCargo ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}
-                                  </p>
+                                  <p className="font-black text-sm uppercase tracking-tight">{courier.name} - {srv.service}</p>
+                                  <p className="text-[10px] font-bold opacity-60 mt-1">{(courier.code === "toko" || courier.code === "cargo") ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}</p>
                                 </div>
                               </div>
                               <div className="text-right font-black text-primary text-xs sm:text-sm">
-                                {courier.code === "cargo" 
-                                  ? "BAYAR TUJUAN" 
-                                  : srv.cost === 0 
-                                    ? "GRATIS" 
-                                    : `Rp ${srv.cost.toLocaleString("id-ID")}`
-                                }
+                                {courier.code === "cargo" ? "BAYAR TUJUAN" : srv.cost === 0 ? "GRATIS" : `Rp ${srv.cost.toLocaleString("id-ID")}`}
                               </div>
                             </div>
                           );
@@ -612,56 +591,27 @@ export default function PesanClient() {
           <div className="lg:col-span-4">
             
             <div className="fixed bottom-16 left-0 right-0 z-40 bg-base-100 border-t border-base-content/10 px-4 py-3 shadow-[0_-10px_20px_rgba(0,0,0,0.08)] lg:static lg:bg-transparent lg:border-none lg:p-0 lg:shadow-none lg:z-auto">
-              
               <div className="lg:sticky lg:top-24 flex flex-col gap-0 lg:gap-6">
                 
-                {/* CARD VOUCHER */}
-                <div className="pb-3 border-b border-base-content/5 mb-3 lg:mb-0 lg:p-6 lg:bg-base-100 lg:border-2 lg:border-base-content/10 lg:rounded-2xl">
-                  
-                  {/* Judul Desktop */}
-                  <h3 className="hidden lg:flex text-[10px] font-black uppercase tracking-[0.2em] opacity-40 mb-4 items-center gap-2">
-                    <Ticket size={14} /> Voucher & Promo
-                  </h3>
-
-                  {/* Judul Mobile Kecil */}
-                  <div className="flex items-center gap-2 mb-2 lg:hidden">
-                    <Ticket size={14} className="text-primary"/>
-                    <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Makin Hemat Pakai Voucher</span>
-                  </div>
-
-                  {appliedVoucher ? (
-                    <div className="bg-success/10 border border-success/30 p-2.5 lg:p-4 rounded-xl flex justify-between items-center">
-                      <div>
-                        <p className="text-success font-black text-[11px] lg:text-xs uppercase tracking-wider">{appliedVoucher.kode_voucher}</p>
-                        <p className="text-[9px] lg:text-[10px] font-bold opacity-70 mt-0.5">{appliedVoucher.nama_promo}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right hidden sm:block lg:hidden">
-                          <span className="text-[9px] uppercase font-bold opacity-50 block">Potongan</span>
-                          <span className="text-error font-black text-xs">- Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")}</span>
+                {/* TOMBOL PILIH VOUCHER (SHOPEE STYLE) */}
+                <div 
+                    onClick={() => setShowVoucherModal(true)}
+                    className="flex justify-between items-center p-3.5 lg:p-5 border-2 lg:rounded-2xl border-primary/20 bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors mb-3 lg:mb-0"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="bg-primary/20 p-1.5 rounded-lg text-primary"><Ticket size={18}/></div>
+                        <div>
+                            {appliedVoucher ? (
+                                <>
+                                    <p className="text-xs font-black text-primary uppercase tracking-wider">{appliedVoucher.kode_voucher}</p>
+                                    <p className="text-[9px] font-bold text-success mt-0.5">Berhasil dipasang (-Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")})</p>
+                                </>
+                            ) : (
+                                <p className="text-xs font-bold text-base-content/80">Makin hemat pakai <span className="font-black text-primary">Voucher</span></p>
+                            )}
                         </div>
-                        <button onClick={hapusVoucher} className="btn btn-ghost btn-xs text-error">Hapus</button>
-                      </div>
                     </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="Masukkan Kode..." 
-                        className="input input-bordered input-sm lg:input-md w-full uppercase"
-                        value={inputVoucher}
-                        onChange={(e) => setInputVoucher(e.target.value.toUpperCase())}
-                        disabled={isVerifyingVoucher}
-                      />
-                      <button 
-                        onClick={handleApplyVoucher} 
-                        disabled={!inputVoucher.trim() || isVerifyingVoucher}
-                        className="btn btn-primary btn-sm lg:btn-md uppercase font-black"
-                      >
-                        {isVerifyingVoucher ? <Loader2 size={16} className="animate-spin" /> : 'Pakai'}
-                      </button>
-                    </div>
-                  )}
+                    <ChevronRight size={18} className="text-base-content/40" />
                 </div>
 
                 {/* CARD DETAIL PEMBAYARAN */}
@@ -670,7 +620,6 @@ export default function PesanClient() {
                     <CreditCard size={14} /> Detail Pembayaran
                   </h3>
                   
-                  {/* Rincian Desktop (Hidden di Mobile biar compact) */}
                   <div className="hidden lg:block space-y-4 mb-8">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[10px] font-bold uppercase opacity-60">Total Pesanan</span>
@@ -680,29 +629,20 @@ export default function PesanClient() {
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[10px] font-bold uppercase opacity-60">Ongkos Kirim</span>
                       <span className="font-bold text-success">
-                        {selectedShipping 
-                          ? selectedShipping.courier_code === "cargo" 
-                            ? "Bayar Tujuan"
-                            : selectedShipping.cost === 0 
-                              ? "Gratis" 
-                              : `+ Rp ${selectedShipping.cost.toLocaleString("id-ID")}`
-                          : "-"}
+                        {selectedShipping ? (selectedShipping.courier_code === "cargo" ? "Bayar Tujuan" : selectedShipping.cost === 0 ? "Gratis" : `+ Rp ${selectedShipping.cost.toLocaleString("id-ID")}`) : "-"}
                       </span>
                     </div>
 
                     {appliedVoucher && (
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-[10px] font-bold uppercase opacity-60">Potongan Diskon</span>
-                        <span className="font-black text-error">
-                          - Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")}
-                        </span>
+                        <span className="text-[10px] font-bold uppercase opacity-60">Voucher BikinCetak</span>
+                        <span className="font-black text-error">- Rp {appliedVoucher.nominal_diskon.toLocaleString("id-ID")}</span>
                       </div>
                     )}
 
                     <div className="divider opacity-10 my-0"></div>
                   </div>
 
-                  {/* Bagian Bawah: Total & Tombol */}
                   <div className="flex flex-row justify-between items-center lg:flex-col lg:items-stretch gap-4">
                     <div className="flex flex-col gap-0 lg:gap-1 lg:pt-2">
                       <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Total Tagihan</span>
@@ -716,15 +656,9 @@ export default function PesanClient() {
                       disabled={loading || items.length === 0 || !selectedShipping} 
                       className="btn btn-primary lg:btn-block rounded-xl lg:rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/20 h-11 lg:h-16 text-[10px] lg:text-xs w-[55%] lg:w-full"
                     >
-                      {loading ? (<Loader2 className="animate-spin" />) : (
-                        <>Konfirmasi <span className="hidden lg:inline">Pesanan</span></>
-                      )}
+                      {loading ? (<Loader2 className="animate-spin" />) : (<>Konfirmasi <span className="hidden lg:inline">Pesanan</span></>)}
                     </button>
                   </div>
-
-                  <p className="hidden lg:block text-[9px] text-center mt-6 opacity-60 font-bold uppercase tracking-tighter leading-relaxed">
-                    Silakan lakukan pembayaran <span className="text-primary font-black">Transfer Manual</span> sesuai instruksi pada halaman selanjutnya.
-                  </p>
                 </div>
 
               </div>
@@ -739,11 +673,119 @@ export default function PesanClient() {
         alamatList={alamatList}
         selectedAlamatId={alamatUtama?.id_alamat}
         onClose={() => setShowAlamatModal(false)}
-        onSelect={(alamat) => {
-          setAlamatUtama(alamat);
-          setShowAlamatModal(false);
-        }}
+        onSelect={(alamat) => { setAlamatUtama(alamat); setShowAlamatModal(false); }}
       />
+
+      {/* MODAL LIST VOUCHER (SHOPEE STYLE) */}
+      {showVoucherModal && (
+        <div className="fixed inset-0 z-100 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 transition-opacity">
+            <div className="bg-base-200 w-full sm:w-120 h-[85vh] sm:h-162.5 sm:rounded-3xl rounded-t-3xl flex flex-col overflow-hidden animate-slide-up shadow-2xl">
+                
+                {/* Header Modal */}
+                <div className="bg-base-100 p-4 border-b flex justify-between items-center sticky top-0 z-10">
+                    <h3 className="font-black uppercase tracking-wider text-base-content/80 ml-2">Pilih Voucher BikinCetak</h3>
+                    <button onClick={() => setShowVoucherModal(false)} className="btn btn-circle btn-ghost btn-sm"><X size={18}/></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    
+                    {/* Input Manual Kode */}
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <Search size={16} className="absolute left-3 top-3 text-base-content/40" />
+                            <input 
+                                type="text" 
+                                placeholder="Masukkan Kode Voucher" 
+                                className="input input-bordered w-full pl-9 uppercase focus:outline-primary font-bold text-sm"
+                                value={manualVoucherCode}
+                                onChange={(e) => setManualVoucherCode(e.target.value.toUpperCase())}
+                            />
+                        </div>
+                        <button 
+                            disabled={!manualVoucherCode.trim() || isApplyingVoucher} 
+                            onClick={handleManualInputVoucher}
+                            className="btn btn-primary px-6"
+                        >
+                            {isApplyingVoucher ? <Loader2 size={16} className="animate-spin"/> : 'Terapkan'}
+                        </button>
+                    </div>
+
+                    {/* Jika Tidak Ada Voucher Sama Sekali */}
+                    {availableVouchers.length === 0 && (
+                        <div className="py-12 flex flex-col items-center justify-center opacity-40">
+                            <Ticket size={48} className="mb-4" />
+                            <p className="font-bold text-xs uppercase tracking-widest">Belum ada promo aktif</p>
+                        </div>
+                    )}
+
+                    {/* List Voucher Bisa Dipakai */}
+                    {eligibleVouchers.length > 0 && (
+                        <div className="space-y-3">
+                            <p className="text-[10px] font-black tracking-widest uppercase opacity-40 pl-1">Bisa Digunakan</p>
+                            {eligibleVouchers.map(v => (
+                                <div key={v.kode_voucher} className="flex bg-base-100 rounded-2xl shadow-sm border border-primary/20 overflow-hidden relative group">
+                                    <div className="w-1/3 bg-primary text-primary-content flex flex-col items-center justify-center p-4 border-r-2 border-dashed border-base-100">
+                                        <span className="text-3xl font-black">{v.persentase_diskon}%</span>
+                                        <span className="text-[9px] font-bold tracking-widest uppercase mt-1">Diskon</span>
+                                    </div>
+                                    <div className="w-2/3 p-4 flex flex-col justify-between">
+                                        <div>
+                                            <p className="font-bold text-sm leading-tight mb-1">{v.nama_promo}</p>
+                                            <p className="text-[10px] opacity-60 leading-tight">Min. Belanja Rp {v.minimal_transaksi_rupiah.toLocaleString("id-ID")}</p>
+                                            <p className="text-[10px] opacity-60 leading-tight">Maks. Potongan Rp {v.maksimal_potongan_rupiah ? v.maksimal_potongan_rupiah.toLocaleString("id-ID") : "Tanpa Batas"}</p>
+                                        </div>
+                                        <div className="flex justify-between items-end mt-4">
+                                            <p className="text-[9px] font-bold text-error">Berakhir {new Date(v.berlaku_sampai).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                            <button onClick={() => applySelectedVoucher(v)} className="btn btn-primary btn-sm px-5 h-8 min-h-0 text-xs rounded-xl shadow-md shadow-primary/20">Pilih</button>
+                                        </div>
+                                    </div>
+                                    {appliedVoucher?.kode_voucher === v.kode_voucher && (
+                                        <div className="absolute inset-0 border-2 border-primary rounded-2xl pointer-events-none"></div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* List Voucher Tidak Memenuhi Syarat */}
+                    {ineligibleVouchers.length > 0 && (
+                        <div className="space-y-3 pt-2">
+                            <p className="text-[10px] font-black tracking-widest uppercase opacity-40 pl-1">Tidak Memenuhi Syarat</p>
+                            {ineligibleVouchers.map(v => (
+                                <div key={v.kode_voucher} className="flex bg-base-100/50 rounded-2xl border border-base-300 overflow-hidden opacity-60 grayscale relative">
+                                    <div className="w-1/3 bg-base-300 text-base-content flex flex-col items-center justify-center p-4 border-r-2 border-dashed border-base-100">
+                                        <span className="text-3xl font-black">{v.persentase_diskon}%</span>
+                                        <span className="text-[9px] font-bold tracking-widest uppercase mt-1">Diskon</span>
+                                    </div>
+                                    <div className="w-2/3 p-4 flex flex-col justify-between">
+                                        <div>
+                                            <p className="font-bold text-sm leading-tight mb-1">{v.nama_promo}</p>
+                                            <p className="text-[10px] leading-tight">Min. Belanja Rp {v.minimal_transaksi_rupiah.toLocaleString("id-ID")}</p>
+                                        </div>
+                                        <div className="flex justify-between items-end mt-4">
+                                            <p className="text-[9px] font-black text-error bg-error/10 px-2 py-1 rounded">{v.reason}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Modal */}
+                {appliedVoucher && (
+                    <div className="bg-base-100 p-4 border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] flex justify-between items-center">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase opacity-50">Voucher Terpakai</p>
+                            <p className="font-black text-primary text-sm">{appliedVoucher.kode_voucher}</p>
+                        </div>
+                        <button onClick={() => { setAppliedVoucher(null); setShowVoucherModal(false); }} className="btn btn-outline btn-error btn-sm rounded-xl">Lepas Voucher</button>
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
+
     </main>
   );
 }
