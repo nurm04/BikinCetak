@@ -301,6 +301,7 @@ export default function PesanClient() {
 
   const subTotal = items.reduce((acc, item) => acc + hitungRowTotal(item), 0);
 
+  // LOGIKA KELAYAKAN VOUCHER
   const getVoucherEligibility = useCallback((v: Voucher) => {
     let subtotalTarget = 0;
     let isTargetFound = false;
@@ -309,16 +310,22 @@ export default function PesanClient() {
         subtotalTarget = subTotal;
         isTargetFound = items.length > 0;
     } else if (v.tipe_target === 'produk_tertentu') {
-        // 👇 EKSTRAKSI PASTI: Pecah 'PRD-1004-SKU-005' jadi 'PRD-1004'
+        // 👇 SOLUSI PALING SAKTI: Ekstrak "PRD-XXXX" dari nama_sku kalau id_sku kosong
         const itemsTarget = items.filter(i => {
-            if (!i.id_sku) return false;
-            const idProduk = i.id_sku.split('-SKU-')[0]; 
+            const textSumber = i.id_sku || i.nama_sku || "";
+            const match = textSumber.match(/PRD-\d+/); // Cari pola PRD-Angka
+            const idProduk = match ? match[0] : "";
+            
             return idProduk === v.id_produk_target;
         });
         subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
         isTargetFound = itemsTarget.length > 0;
     } else if (v.tipe_target === 'sku_tertentu') {
-        const itemsTarget = items.filter(i => i.id_sku === v.id_sku_target);
+        // Fallback pencarian SKU spesifik
+        const itemsTarget = items.filter(i => {
+             const textSumber = i.id_sku || i.nama_sku || "";
+             return textSumber.includes(v.id_sku_target || "XXX");
+        });
         subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
         isTargetFound = itemsTarget.length > 0;
     }
