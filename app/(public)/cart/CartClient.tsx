@@ -22,6 +22,7 @@ import CartProductItem from "@/components/shared/CardProductItem";
 interface ExtendedCartItemAPI {
   id: number;
   id_pesan: string;
+  id_sku?: string;
   jumlah: number;
   nama_sku: string;
   harga_satuan: number;
@@ -124,6 +125,7 @@ export default function CartClient() {
                 return {
                   id: item.id,
                   id_pesan: item.id_pesan || "",
+                  id_sku: item.id_sku,
                   jumlah: item.jumlah,
                   nama_sku: item.nama_produk_snapshot,
                   harga_satuan: item.harga_satuan_snapshot, 
