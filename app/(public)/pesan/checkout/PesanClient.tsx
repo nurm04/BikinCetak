@@ -303,9 +303,6 @@ export default function PesanClient() {
 
   // LOGIKA KELAYAKAN VOUCHER
   const getVoucherEligibility = useCallback((v: Voucher) => {
-    // Note: Pengecekan Role Customer dihapus dari frontend karena API Backend 
-    // otomatis hanya mengirim/meloloskan voucher yang sesuai dengan role user.
-
     let subtotalTarget = 0;
     let isTargetFound = false;
 
@@ -313,7 +310,10 @@ export default function PesanClient() {
         subtotalTarget = subTotal;
         isTargetFound = items.length > 0;
     } else if (v.tipe_target === 'produk_tertentu') {
-        const itemsTarget = items.filter(i => (i.id_sku ? i.id_sku.split('-SKU-')[0] : "") === v.id_produk_target);
+        // 👇 PERBAIKAN: Gunakan startsWith agar lebih aman & akurat menangkap ID Produk dari ID SKU
+        const itemsTarget = items.filter(i => 
+            i.id_sku && v.id_produk_target && i.id_sku.startsWith(v.id_produk_target)
+        );
         subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
         isTargetFound = itemsTarget.length > 0;
     } else if (v.tipe_target === 'sku_tertentu') {
@@ -322,16 +322,17 @@ export default function PesanClient() {
         isTargetFound = itemsTarget.length > 0;
     }
 
+    // 👇 PERBAIKAN: Tambahkan flag "hide: true" agar disembunyikan total jika produk beda
     if (!isTargetFound || subtotalTarget === 0) {
-        return { eligible: false, reason: "Produk tidak sesuai", subtotalTarget: 0 };
+        return { eligible: false, reason: "Produk tidak sesuai", subtotalTarget: 0, hide: true };
     }
 
-    // Cek Minimal Transaksi
+    // Cek Minimal Transaksi (Akan tetap tampil di UI tapi abu-abu)
     if (subtotalTarget < Number(v.minimal_transaksi_rupiah)) {
-        return { eligible: false, reason: `Min. belanja Rp ${Number(v.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, subtotalTarget };
+        return { eligible: false, reason: `Min. belanja Rp ${Number(v.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, subtotalTarget, hide: false };
     }
 
-    return { eligible: true, reason: "", subtotalTarget };
+    return { eligible: true, reason: "", subtotalTarget, hide: false };
   }, [items, subTotal]);
 
   const vouchersWithStatus = useMemo(() => {
@@ -341,8 +342,9 @@ export default function PesanClient() {
     }));
   }, [availableVouchers, getVoucherEligibility]);
 
-  const eligibleVouchers = vouchersWithStatus.filter(v => v.eligible);
-  const ineligibleVouchers = vouchersWithStatus.filter(v => !v.eligible);
+  // 👇 PERBAIKAN: Filter agar yang "hide: true" benar-benar ghaib dari UI
+  const eligibleVouchers = vouchersWithStatus.filter(v => v.eligible && !v.hide);
+  const ineligibleVouchers = vouchersWithStatus.filter(v => !v.eligible && !v.hide);
 
   const applySelectedVoucher = (v: Voucher & ReturnType<typeof getVoucherEligibility>) => {
       if (!v.eligible) return;
