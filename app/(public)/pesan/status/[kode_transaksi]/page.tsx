@@ -284,26 +284,25 @@ export default function StatusPesananPage({ params }: Props) {
           </div>
         </div>
 
-        {/* 👇 BLOK PEMBAYARAN QRIS 👇 */}
-        {/* Tampilkan box ini JIKA status masih belum lunas ATAU masih dibayar_sebagian (ada sisa tagihan) */}
+        {/* 👇 BLOK PEMBAYARAN QRIS & TRANSFER MANUAL 👇 */}
         {(pesanan.status_pembayaran === "belum_lunas" || pesanan.status_pembayaran === "dibayar_sebagian") && (
           <div className="bg-base-100 rounded-3xl p-6 md:p-10 border-2 border-primary/30 shadow-xl mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            
             <div className="text-center mb-8">
               <h3 className="text-2xl font-black uppercase text-primary tracking-tighter">
-                Bayar dengan QRIS {pesanan.sumber_pesanan}
+                PEMBAYARAN (QRIS / TRANSFER BANK)
               </h3>
-              <p className="text-sm opacity-70 mt-2 max-w-md mx-auto">
-                Scan QR Code di bawah ini menggunakan aplikasi M-Banking atau E-Wallet Anda (Gopay, OVO, Dana, ShopeePay, BCA Mobile, dll).
+              <p className="text-sm opacity-70 mt-2 max-w-2xl mx-auto leading-relaxed">
+                Scan QR Code menggunakan aplikasi M-Banking atau E-Wallet (Gopay, OVO, Dana, dll), <strong>ATAU</strong> lakukan transfer manual ke rekening bank di bawah ini.
               </p>
               
-              {/* Notif jika statusnya DP */}
               {pesanan.status_pembayaran === 'dibayar_sebagian' && (
                 <div className="badge badge-warning mt-4 font-bold p-3">Sisa Tagihan: Rp {sisaTagihan.toLocaleString("id-ID")}</div>
               )}
             </div>
 
-            {/* LOGIKA JIKA SUMBER PESANAN DARI KASIR & QR BELUM DIGENERATE */}
-            {pesanan.sumber_pesanan === 'pos_kasir' && !qrisData && !loadingQris && (
+            {/* LOGIKA JIKA SUMBER PESANAN DARI KASIR & OPSI BELUM DIPILIH */}
+            {pesanan.sumber_pesanan === 'pos_kasir' && !qrisData && !loadingQris && !errorDp && (
               <div className="max-w-sm mx-auto mb-8 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <button 
@@ -315,7 +314,6 @@ export default function StatusPesananPage({ params }: Props) {
                   </button>
                   <button 
                     onClick={() => { setOpsiBayar('dp'); setErrorDp(""); }}
-                    // Disable opsi DP kalau statusnya emang udah DP (dibayar_sebagian) biar gak dobel DP
                     disabled={pesanan.status_pembayaran === 'dibayar_sebagian'}
                     className={`btn h-auto py-4 flex flex-col items-center gap-2 ${opsiBayar === 'dp' ? 'btn-primary' : 'btn-outline'}`}
                   >
@@ -326,7 +324,7 @@ export default function StatusPesananPage({ params }: Props) {
 
                 {opsiBayar === 'lunas' && (
                   <button onClick={() => handleGenerateQris(sisaTagihan)} className="btn btn-primary btn-block mt-4">
-                    Tampilkan QRIS Lunas (Rp {sisaTagihan.toLocaleString("id-ID")})
+                    Tampilkan Nominal (Rp {sisaTagihan.toLocaleString("id-ID")})
                   </button>
                 )}
 
@@ -344,74 +342,96 @@ export default function StatusPesananPage({ params }: Props) {
                       {errorDp && <span className="label-text-alt text-error font-semibold mt-2 block">{errorDp}</span>}
                     </div>
                     <button onClick={handleBayarDp} className="btn btn-primary btn-block">
-                      Tampilkan QRIS DP
+                      Tampilkan Nominal DP
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* AREA RENDER QRIS BILA SUDAH DIGENERATE ATAU SEDANG LOADING ATAU ERROR */}
-            {(qrisData || loadingQris || errorDp) && ( // 👈 TAMBAHKAN errorDp DI SINI
-              <div className="flex flex-col items-center justify-center bg-base-200/50 p-8 rounded-3xl border border-base-content/5 mb-8 max-w-sm mx-auto relative">
+            {/* AREA RENDER QRIS & BCA */}
+            {(qrisData || loadingQris || errorDp || pesanan.sumber_pesanan !== 'pos_kasir') && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
                 
-                {/* Tombol Batal/Ubah Opsi (Khusus Kasir) */}
-                {pesanan.sumber_pesanan === 'pos_kasir' && !loadingQris && (
-                  <button 
-                    onClick={() => { setQrisData(null); setOpsiBayar(null); setNominalDp(""); setErrorDp(""); }}
-                    className="absolute top-4 right-4 btn btn-xs btn-ghost text-error"
-                  >
-                    Ubah Nominal
-                  </button>
-                )}
-
-                {loadingQris ? (
-                  <div className="w-48 h-48 flex flex-col items-center justify-center gap-4">
-                    <span className="loading loading-spinner loading-lg text-primary"></span>
-                    <span className="text-xs font-bold opacity-50 uppercase tracking-widest">Menyiapkan QRIS...</span>
-                  </div>
-                ) : qrisData?.qr_string ? (
-                  <div className="bg-white p-4 rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300 cursor-pointer">
-                    <QRCodeSVG value={qrisData.qr_string} size={220} />
-                  </div>
-                ) : qrisData?.qr_url ? (
-                  <div className="bg-white p-4 rounded-2xl shadow-sm hover:scale-105 transition-transform duration-300 cursor-pointer">
-                    <img src={qrisData.qr_url} alt="QRIS" className="w-55 h-55 object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-48 h-48 flex flex-col items-center justify-center text-center">
-                    <XCircle size={32} className="text-error mb-2" />
-                    <p className="text-xs font-bold text-error">{errorDp || "Gagal memuat QRIS"}</p>
-                    <button onClick={() => handleGenerateQris()} className="btn btn-xs btn-outline mt-2">Coba Lagi</button>
-                  </div>
-                )}
-
-                <div className="mt-8 text-center w-full">
-                  <span className="text-[10px] font-black uppercase opacity-50 tracking-widest">
-                    {pesanan.sumber_pesanan === 'kasir' && opsiBayar === 'dp' ? 'Nominal DP' : 'Tagihan Pembayaran'}
-                  </span>
-                  <div className="flex items-center justify-center gap-2 mt-1">
-                    <p className="text-4xl font-black text-primary">
-                      Rp {(qrisData?.amount || sisaTagihan).toLocaleString("id-ID")}
-                    </p>
+                {/* KOTAK KIRI: QRIS */}
+                <div className="flex flex-col items-center justify-center bg-base-200/50 p-6 md:p-8 rounded-3xl border border-base-content/5 relative">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-4">Bayar via QRIS Otomatis</span>
+                  
+                  {pesanan.sumber_pesanan === 'pos_kasir' && !loadingQris && (
                     <button 
-                      onClick={() => handleCopyNominal(qrisData?.amount || sisaTagihan)} 
-                      className="btn btn-ghost btn-sm btn-circle text-primary tooltip tooltip-top" 
-                      data-tip={copiedNominal ? "Tersalin!" : "Salin Nominal"}
+                      onClick={() => { setQrisData(null); setOpsiBayar(null); setNominalDp(""); setErrorDp(""); }}
+                      className="absolute top-4 right-4 btn btn-xs btn-ghost text-error"
                     >
-                      <Copy size={16} className={copiedNominal ? "text-success" : ""} />
+                      Ubah Nominal
                     </button>
-                  </div>
-                  <p className="text-[10px] font-bold opacity-50 mt-3 text-warning">
-                    *Batas Pembayaran: {batasWaktuTransfer}
-                  </p>
+                  )}
+
+                  {loadingQris ? (
+                    <div className="h-[200px] flex flex-col items-center justify-center gap-4">
+                      <span className="loading loading-spinner loading-lg text-primary"></span>
+                      <span className="text-[10px] font-bold opacity-50 uppercase tracking-widest">Menyiapkan QRIS...</span>
+                    </div>
+                  ) : qrisData?.qr_string ? (
+                    <div className="bg-white p-3 rounded-2xl shadow-sm">
+                      <QRCodeSVG value={qrisData.qr_string} size={200} />
+                    </div>
+                  ) : qrisData?.qr_url ? (
+                    <div className="bg-white p-3 rounded-2xl shadow-sm">
+                      <img src={qrisData.qr_url} alt="QRIS" className="w-50 h-50 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="h-50 flex flex-col items-center justify-center text-center">
+                      <XCircle size={32} className="text-error mb-2" />
+                      <p className="text-xs font-bold text-error px-4">{errorDp || "Gagal memuat QRIS dari server."}</p>
+                      <p className="text-[10px] opacity-60 mt-1 px-4">Gunakan metode transfer bank di samping, atau coba muat ulang.</p>
+                      <button onClick={() => handleGenerateQris(qrisData?.amount || sisaTagihan)} className="btn btn-xs btn-outline mt-4">Coba Lagi QRIS</button>
+                    </div>
+                  )}
                 </div>
+
+                {/* KOTAK KANAN: TRANSFER BCA */}
+                <div className="flex flex-col items-center justify-center bg-base-200/50 p-6 md:p-8 rounded-3xl border border-base-content/5 text-center">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-4">Transfer Bank Manual</span>
+                  
+                  <div className="bg-blue-700 text-white px-5 py-1.5 rounded-lg font-black italic tracking-widest text-lg mb-4">
+                    {process.env.NEXT_PUBLIC_BANK_NAME || "BCA"}
+                  </div>
+                  <p className="text-2xl md:text-3xl font-black tracking-widest text-primary mb-1 select-all">
+                    {process.env.NEXT_PUBLIC_BANK_NUMBER || "1930566086"}
+                  </p>
+                  <p className="text-xs font-bold opacity-70 uppercase mb-6">
+                    A.N. {process.env.NEXT_PUBLIC_BANK_OWNER || "Mohammad Chairul Anam"}
+                  </p>
+
+                  <div className="w-full pt-6 border-t border-base-content/10">
+                    <span className="text-[10px] font-black uppercase opacity-50 tracking-widest block mb-1">
+                      {pesanan.sumber_pesanan === 'kasir' && opsiBayar === 'dp' ? 'Nominal Transfer DP' : 'Nominal Transfer (Harus Sesuai)'}
+                    </span>
+                    <div className="flex items-center justify-center gap-2">
+                      <p className="text-2xl md:text-3xl font-black text-primary">
+                        Rp {(qrisData?.amount || sisaTagihan).toLocaleString("id-ID")}
+                      </p>
+                      <button 
+                        onClick={() => handleCopyNominal(qrisData?.amount || sisaTagihan)} 
+                        className="btn btn-ghost btn-sm btn-circle text-primary tooltip tooltip-top" 
+                        data-tip={copiedNominal ? "Tersalin!" : "Salin Nominal"}
+                      >
+                        <Copy size={18} className={copiedNominal ? "text-success" : ""} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
 
-            <div className="bg-primary/10 text-primary p-5 rounded-2xl text-center border border-primary/20">
+            <p className="text-[10px] font-bold opacity-50 mt-8 text-warning text-center">
+              *Batas Waktu Pembayaran: {batasWaktuTransfer}
+            </p>
+
+            <div className="bg-primary/10 text-primary p-5 rounded-2xl text-center border border-primary/20 mt-4">
               <p className="text-xs font-bold leading-relaxed">
-                ✅ Pembayaran Anda akan diverifikasi secara <strong>Otomatis</strong> oleh sistem dalam hitungan detik setelah Anda berhasil scan dan bayar. Tidak perlu mengirimkan bukti transfer!
+                ✅ Jika menggunakan QRIS, pembayaran akan diverifikasi <strong>Otomatis</strong>. <br className="hidden md:block"/>Jika menggunakan Transfer Bank Manual, harap simpan bukti transfer Anda dan hubungi admin kami.
               </p>
             </div>
           </div>
