@@ -301,7 +301,6 @@ export default function PesanClient() {
 
   const subTotal = items.reduce((acc, item) => acc + hitungRowTotal(item), 0);
 
-  // LOGIKA KELAYAKAN VOUCHER
   const getVoucherEligibility = useCallback((v: Voucher) => {
     let subtotalTarget = 0;
     let isTargetFound = false;
@@ -310,10 +309,12 @@ export default function PesanClient() {
         subtotalTarget = subTotal;
         isTargetFound = items.length > 0;
     } else if (v.tipe_target === 'produk_tertentu') {
-        // 👇 PERBAIKAN: Gunakan startsWith agar lebih aman & akurat menangkap ID Produk dari ID SKU
-        const itemsTarget = items.filter(i => 
-            i.id_sku && v.id_produk_target && i.id_sku.startsWith(v.id_produk_target)
-        );
+        // 👇 EKSTRAKSI PASTI: Pecah 'PRD-1004-SKU-005' jadi 'PRD-1004'
+        const itemsTarget = items.filter(i => {
+            if (!i.id_sku) return false;
+            const idProduk = i.id_sku.split('-SKU-')[0]; 
+            return idProduk === v.id_produk_target;
+        });
         subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
         isTargetFound = itemsTarget.length > 0;
     } else if (v.tipe_target === 'sku_tertentu') {
@@ -322,12 +323,12 @@ export default function PesanClient() {
         isTargetFound = itemsTarget.length > 0;
     }
 
-    // 👇 PERBAIKAN: Tambahkan flag "hide: true" agar disembunyikan total jika produk beda
+    // Jika produk target TIDAK ADA di keranjang, hide: true (dighaibkan)
     if (!isTargetFound || subtotalTarget === 0) {
         return { eligible: false, reason: "Produk tidak sesuai", subtotalTarget: 0, hide: true };
     }
 
-    // Cek Minimal Transaksi (Akan tetap tampil di UI tapi abu-abu)
+    // Jika produk ADA, tapi minimal belanja belum mencapai target (tampil abu-abu)
     if (subtotalTarget < Number(v.minimal_transaksi_rupiah)) {
         return { eligible: false, reason: `Min. belanja Rp ${Number(v.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, subtotalTarget, hide: false };
     }
