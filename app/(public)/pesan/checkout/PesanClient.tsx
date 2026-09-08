@@ -101,11 +101,7 @@ interface PopupState {
   type: "success" | "error" | "warning" | "info";
 }
 
-interface PesanClientProps {
-  activeRoleId?: string | number | null;
-}
-
-export default function PesanClient({ activeRoleId }: PesanClientProps = {}) {
+export default function PesanClient() {
   const router = useRouter();
   const [items, setItems] = useState<CheckoutItem[]>([]);
   const [alamatUtama, setAlamatUtama] = useState<Alamat | null>(null);
@@ -305,17 +301,11 @@ export default function PesanClient({ activeRoleId }: PesanClientProps = {}) {
 
   const subTotal = items.reduce((acc, item) => acc + hitungRowTotal(item), 0);
 
-  // LOGIKA KELAYAKAN VOUCHER (SHOOPEE STYLE)
+  // LOGIKA KELAYAKAN VOUCHER
   const getVoucherEligibility = useCallback((v: Voucher) => {
-    // 1. Role Filter
-    const currentRoleId = activeRoleId ? String(activeRoleId) : "";
-    if (v.role_customer_targets && v.role_customer_targets.length > 0) {
-        if (!currentRoleId || !v.role_customer_targets.includes(currentRoleId)) {
-            return { eligible: false, reason: "Tidak berlaku untuk level Anda", subtotalTarget: 0 };
-        }
-    }
+    // Note: Pengecekan Role Customer dihapus dari frontend karena API Backend 
+    // otomatis hanya mengirim/meloloskan voucher yang sesuai dengan role user.
 
-    // 2. Target Barang Filter
     let subtotalTarget = 0;
     let isTargetFound = false;
 
@@ -336,13 +326,13 @@ export default function PesanClient({ activeRoleId }: PesanClientProps = {}) {
         return { eligible: false, reason: "Produk tidak sesuai", subtotalTarget: 0 };
     }
 
-    // 3. Syarat Nominal Filter
+    // Cek Minimal Transaksi
     if (subtotalTarget < Number(v.minimal_transaksi_rupiah)) {
         return { eligible: false, reason: `Min. belanja Rp ${Number(v.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, subtotalTarget };
     }
 
     return { eligible: true, reason: "", subtotalTarget };
-  }, [activeRoleId, items, subTotal]);
+  }, [items, subTotal]);
 
   const vouchersWithStatus = useMemo(() => {
     return availableVouchers.map(v => ({
@@ -392,10 +382,11 @@ export default function PesanClient({ activeRoleId }: PesanClientProps = {}) {
               return;
           }
 
-          // Jika tidak ada di lokal, tembak API (misal voucher khusus/tersembunyi)
+          // Jika tidak ada di lokal, tembak API
           const response = await cekVoucher(manualVoucherCode.trim());
           if (!response.success || !response.data) {
-              setPopup({ isOpen: true, title: "Kode Salah", message: "Voucher tidak ditemukan atau sudah tidak aktif.", type: "error" });
+              // Menampilkan error langsung dari backend (termasuk jika role ditolak)
+              setPopup({ isOpen: true, title: "Kode Salah", message: response.error || response.message || "Voucher tidak ditemukan.", type: "error" });
               return;
           }
 
