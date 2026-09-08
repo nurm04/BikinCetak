@@ -290,10 +290,10 @@ export default function StatusPesananPage({ params }: Props) {
             
             <div className="text-center mb-8">
               <h3 className="text-2xl font-black uppercase text-primary tracking-tighter">
-                PEMBAYARAN (QRIS / TRANSFER BANK)
+                PEMBAYARAN (QRIS / TRANSFER BCA)
               </h3>
               <p className="text-sm opacity-70 mt-2 max-w-2xl mx-auto leading-relaxed">
-                Scan QR Code menggunakan aplikasi M-Banking atau E-Wallet (Gopay, OVO, Dana, dll), <strong>ATAU</strong> lakukan transfer manual ke rekening bank di bawah ini.
+                Scan QR Code menggunakan aplikasi M-Banking atau E-Wallet (Gopay, OVO, Dana, dll), <strong>ATAU</strong> lakukan transfer manual ke rekening BCA di bawah ini.
               </p>
               
               {pesanan.status_pembayaran === 'dibayar_sebagian' && (
@@ -367,7 +367,7 @@ export default function StatusPesananPage({ params }: Props) {
                   )}
 
                   {loadingQris ? (
-                    <div className="h-[200px] flex flex-col items-center justify-center gap-4">
+                    <div className="h-50 flex flex-col items-center justify-center gap-4">
                       <span className="loading loading-spinner loading-lg text-primary"></span>
                       <span className="text-[10px] font-bold opacity-50 uppercase tracking-widest">Menyiapkan QRIS...</span>
                     </div>
@@ -382,8 +382,11 @@ export default function StatusPesananPage({ params }: Props) {
                   ) : (
                     <div className="h-50 flex flex-col items-center justify-center text-center">
                       <XCircle size={32} className="text-error mb-2" />
-                      <p className="text-xs font-bold text-error px-4">{errorDp || "Gagal memuat QRIS dari server."}</p>
-                      <p className="text-[10px] opacity-60 mt-1 px-4">Gunakan metode transfer bank di samping, atau coba muat ulang.</p>
+                      {/* 👇 Penyesuaian Pesan Error Jika Server Gagal 👇 */}
+                      <p className="text-xs font-bold text-error px-4">
+                        {errorDp?.includes("internal server") ? "Gagal memuat QRIS (Saldo API habis/gangguan)." : errorDp || "Gagal memuat QRIS dari server."}
+                      </p>
+                      <p className="text-[10px] opacity-60 mt-1 px-4">Silakan gunakan metode transfer BCA di samping.</p>
                       <button onClick={() => handleGenerateQris(qrisData?.amount || sisaTagihan)} className="btn btn-xs btn-outline mt-4">Coba Lagi QRIS</button>
                     </div>
                   )}
@@ -393,7 +396,7 @@ export default function StatusPesananPage({ params }: Props) {
                 <div className="flex flex-col items-center justify-center bg-base-200/50 p-6 md:p-8 rounded-3xl border border-base-content/5 text-center">
                   <span className="text-[10px] font-black uppercase tracking-widest opacity-50 block mb-4">Transfer Bank Manual</span>
                   
-                  <div className="bg-blue-700 text-white px-5 py-1.5 rounded-lg font-black italic tracking-widest text-lg mb-4">
+                  <div className="bg-blue-700 text-white px-5 py-1.5 rounded-lg font-black italic tracking-widest text-lg mb-4 shadow-md">
                     {process.env.NEXT_PUBLIC_BANK_NAME || "BCA"}
                   </div>
                   <p className="text-2xl md:text-3xl font-black tracking-widest text-primary mb-1 select-all">
