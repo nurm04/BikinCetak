@@ -65,16 +65,22 @@ export interface Voucher {
   updated_at?: string;
 }
 
+// @/services/voucherService.ts
+
 export async function getVouchers(): Promise<ApiResponse<Voucher[]>> {
   try {
-    const headers = {
+    // 👇 UPDATE: Gunakan getAuthHeader() agar token dikirim ke backend
+    const headers = await getAuthHeader(); 
+
+    // Jika butuh fallback untuk user yang belum login (opsional)
+    const requestHeaders = headers || {
         Accept: "application/json",
         "Content-Type": "application/json",
     };
 
     const response = await fetch(`${API_URL}/api/vouchers`, {
       method: "GET",
-      headers,
+      headers: requestHeaders, // 👈 Masukkan headers di sini
       cache: "no-store",
     });
 
