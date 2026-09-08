@@ -27,6 +27,7 @@ export default function StatusPesananPage({ params }: Props) {
 
   const [qrisData, setQrisData] = useState<QrisData | null>(null);
   const [loadingQris, setLoadingQris] = useState(false);
+  const [hasAttemptedQris, setHasAttemptedQris] = useState(false);
 
   // State untuk Kasir (Opsi Pembayaran)
   const [opsiBayar, setOpsiBayar] = useState<"lunas" | "dp" | null>(null);
@@ -137,18 +138,17 @@ export default function StatusPesananPage({ params }: Props) {
     });
   };
 
-  // 👇 INI USE-EFFECT YANG BENAR (SUDAH DI-MERGE) 👇
   useEffect(() => {
-    // Kalau pesanan butuh dibayar DAN QRIS belum digenerate
-    if (pesanan?.id_pesan && (pesanan.status_pembayaran === "belum_lunas" || pesanan.status_pembayaran === "dibayar_sebagian") && !qrisData && !loadingQris) {
+    // Kalau pesanan butuh dibayar DAN QRIS belum digenerate DAN belum pernah dicoba
+    if (pesanan?.id_pesan && (pesanan.status_pembayaran === "belum_lunas" || pesanan.status_pembayaran === "dibayar_sebagian") && !qrisData && !loadingQris && !hasAttemptedQris) {
       
       // Jika pesanan dari e-commerce (bukan kasir), langsung generate QRIS otomatis!
       if (pesanan.sumber_pesanan !== 'pos_kasir') {
+        setHasAttemptedQris(true); // 👈 KUNCI PENTING: Tandai agar tidak spam API tiap 5 detik
         handleGenerateQris();
       }
-      // Jika dari kasir, kita biarkan saja (jangan generate dulu) supaya opsi tampil.
     }
-  }, [pesanan, qrisData]);
+  }, [pesanan?.id_pesan, pesanan?.status_pembayaran, pesanan?.sumber_pesanan, qrisData, loadingQris, hasAttemptedQris]);
 
   // Handler untuk Submit Nominal DP dari Kasir
   // Handler untuk Submit Nominal DP dari Kasir
@@ -351,14 +351,14 @@ export default function StatusPesananPage({ params }: Props) {
               </div>
             )}
 
-            {/* AREA RENDER QRIS BILA SUDAH DIGENERATE ATAU SEDANG LOADING */}
-            {(qrisData || loadingQris) && (
+            {/* AREA RENDER QRIS BILA SUDAH DIGENERATE ATAU SEDANG LOADING ATAU ERROR */}
+            {(qrisData || loadingQris || errorDp) && ( // 👈 TAMBAHKAN errorDp DI SINI
               <div className="flex flex-col items-center justify-center bg-base-200/50 p-8 rounded-3xl border border-base-content/5 mb-8 max-w-sm mx-auto relative">
                 
                 {/* Tombol Batal/Ubah Opsi (Khusus Kasir) */}
                 {pesanan.sumber_pesanan === 'pos_kasir' && !loadingQris && (
                   <button 
-                    onClick={() => { setQrisData(null); setOpsiBayar(null); setNominalDp(""); }}
+                    onClick={() => { setQrisData(null); setOpsiBayar(null); setNominalDp(""); setErrorDp(""); }}
                     className="absolute top-4 right-4 btn btn-xs btn-ghost text-error"
                   >
                     Ubah Nominal
@@ -382,7 +382,7 @@ export default function StatusPesananPage({ params }: Props) {
                   <div className="w-48 h-48 flex flex-col items-center justify-center text-center">
                     <XCircle size={32} className="text-error mb-2" />
                     <p className="text-xs font-bold text-error">{errorDp || "Gagal memuat QRIS"}</p>
-                    <button onClick={() => window.location.reload()} className="btn btn-xs btn-outline mt-2">Muat Ulang Halaman</button>
+                    <button onClick={() => handleGenerateQris()} className="btn btn-xs btn-outline mt-2">Coba Lagi</button>
                   </div>
                 )}
 
