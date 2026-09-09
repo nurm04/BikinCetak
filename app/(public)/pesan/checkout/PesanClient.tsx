@@ -9,7 +9,8 @@ import Link from "next/link";
 import CartProductItem from "@/components/shared/CardProductItem";
 import AlertPopup from "@/components/ui/AlertPopup";
 import UbahAlamat from "./UbahAlamat";
-import { checkoutCart, CheckoutPayload, getShippingCost, RincianDiskonAPI, CustomAttributeValue } from "@/services/cartService";
+// 👇 IMPORT CourierOption DARI cartService
+import { checkoutCart, CheckoutPayload, getShippingCost, RincianDiskonAPI, CustomAttributeValue, CourierOption } from "@/services/cartService";
 import { cekVoucher, getVouchers, Voucher } from "@/services/voucherService";
 
 interface CheckoutItem {
@@ -36,62 +37,6 @@ interface CheckoutItem {
     harga_tambahan: number;
     kali_jumlah_pesan?: number | boolean;
   }[];
-}
-
-interface ShippingService {
-  service: string;
-  description: string;
-  cost: number;
-  etd: string;
-}
-
-interface CourierOption {
-  code: string;
-  name: string;
-  costs: ShippingService[];
-}
-
-interface KomerceCostItem {
-  code: string;
-  name: string;
-  service: string;
-  description?: string;
-  cost: number;
-  etd?: string;
-  estimation?: string;
-}
-
-interface RajaOngkirCostDetail {
-  value: number;
-  etd: string;
-}
-
-interface RajaOngkirServiceCost {
-  service: string;
-  description: string;
-  cost: RajaOngkirCostDetail[];
-}
-
-interface RajaOngkirResult {
-  code: string;
-  name: string;
-  costs: RajaOngkirServiceCost[];
-}
-
-interface OngkirAPIResponse {
-  meta?: {
-    status: string;
-    message?: string;
-  };
-  data?: KomerceCostItem[];
-
-  rajaongkir?: {
-    status?: {
-      code: number;
-      description: string;
-    };
-    results?: RajaOngkirResult[];
-  };
 }
 
 interface PopupState {
@@ -203,54 +148,37 @@ export default function PesanClient() {
       const manualPickup: CourierOption = {
         code: "toko",
         name: "Ambil di Toko",
+        logo_url: "/images/kurir/toko.png", // 👈 Fallback Logo Toko
         costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
       };
 
       const requestCargo: CourierOption = {
         code: "cargo",
         name: "Request Expedisi Cargo",
+        logo_url: "/images/kurir/cargo.png", // 👈 Fallback Logo Cargo
         costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
       };
-
-      let normalizedCouriers: CourierOption[] = [manualPickup, requestCargo];
       
       try {
         const result = await getShippingCost(alamatUtama.id_alamat);
         
-        if (result.error || (result.data as OngkirAPIResponse)?.meta?.status === 'error') {
-          setOngkirError(result.error || (result.data as OngkirAPIResponse)?.meta?.message || "Gagal mendapatkan ongkos kirim.");
-          setCouriers(normalizedCouriers);
+        if (result.error) {
+          setOngkirError(result.error);
+          setCouriers([manualPickup, requestCargo]);
           return;
         }
 
-        const rawData = result.data as OngkirAPIResponse;
-        if (rawData?.meta && Array.isArray(rawData?.data)) {
-          const couriersMap: Record<string, CourierOption> = {};
-          rawData.data.forEach((item: KomerceCostItem) => {
-            if (!couriersMap[item.code]) couriersMap[item.code] = { code: item.code, name: item.name, costs: [] };
-            couriersMap[item.code].costs.push({
-              service: item.service, description: item.description || item.service, cost: item.cost, etd: item.etd || item.estimation || "-"
-            });
-          });
-          normalizedCouriers = [...normalizedCouriers, ...Object.values(couriersMap)];
-        } 
-        else if (rawData?.rajaongkir?.results && Array.isArray(rawData.rajaongkir.results)) {
-          const apiCouriers = rawData.rajaongkir.results.map((c: RajaOngkirResult) => ({
-            code: c.code, name: c.name,
-            costs: c.costs.map((srv: RajaOngkirServiceCost) => ({
-              service: srv.service, description: srv.description, cost: srv.cost[0]?.value || 0, etd: srv.cost[0]?.etd || "-"
-            }))
-          }));
-          normalizedCouriers = [...normalizedCouriers, ...apiCouriers];
-        }
+        // Karena hasil udah dirapikan sama cartService.ts, kita tinggal pake data-nya
+        const apiCouriers = (result.data as CourierOption[]) || [];
+        const finalCouriers = [manualPickup, requestCargo, ...apiCouriers];
 
-        if (normalizedCouriers.length === 2) {
+        if (finalCouriers.length === 2) {
             setOngkirError("Tidak ada layanan pengiriman otomatis ke alamat ini. Anda masih bisa menggunakan opsi manual.");
         } 
-        setCouriers(normalizedCouriers);
+        setCouriers(finalCouriers);
       } catch (error) {
         setOngkirError("Terjadi kesalahan sistem saat mengambil tarif logistik.");
-        setCouriers(normalizedCouriers);
+        setCouriers([manualPickup, requestCargo]);
       } finally {
         setLoadingOngkir(false);
       }
@@ -310,10 +238,9 @@ export default function PesanClient() {
         subtotalTarget = subTotal;
         isTargetFound = items.length > 0;
     } else if (v.tipe_target === 'produk_tertentu') {
-        // 👇 SOLUSI PALING SAKTI: Ekstrak "PRD-XXXX" dari nama_sku kalau id_sku kosong
         const itemsTarget = items.filter(i => {
             const textSumber = i.id_sku || i.nama_sku || "";
-            const match = textSumber.match(/PRD-\d+/); // Cari pola PRD-Angka
+            const match = textSumber.match(/PRD-\d+/);
             const idProduk = match ? match[0] : "";
             
             return idProduk === v.id_produk_target;
@@ -321,7 +248,6 @@ export default function PesanClient() {
         subtotalTarget = itemsTarget.reduce((total, item) => total + hitungRowTotal(item), 0);
         isTargetFound = itemsTarget.length > 0;
     } else if (v.tipe_target === 'sku_tertentu') {
-        // Fallback pencarian SKU spesifik
         const itemsTarget = items.filter(i => {
              const textSumber = i.id_sku || i.nama_sku || "";
              return textSumber.includes(v.id_sku_target || "XXX");
@@ -330,12 +256,10 @@ export default function PesanClient() {
         isTargetFound = itemsTarget.length > 0;
     }
 
-    // Jika produk target TIDAK ADA di keranjang, hide: true (dighaibkan)
     if (!isTargetFound || subtotalTarget === 0) {
         return { eligible: false, reason: "Produk tidak sesuai", subtotalTarget: 0, hide: true };
     }
 
-    // Jika produk ADA, tapi minimal belanja belum mencapai target (tampil abu-abu)
     if (subtotalTarget < Number(v.minimal_transaksi_rupiah)) {
         return { eligible: false, reason: `Min. belanja Rp ${Number(v.minimal_transaksi_rupiah).toLocaleString("id-ID")}`, subtotalTarget, hide: false };
     }
@@ -350,7 +274,6 @@ export default function PesanClient() {
     }));
   }, [availableVouchers, getVoucherEligibility]);
 
-  // 👇 PERBAIKAN: Filter agar yang "hide: true" benar-benar ghaib dari UI
   const eligibleVouchers = vouchersWithStatus.filter(v => v.eligible && !v.hide);
   const ineligibleVouchers = vouchersWithStatus.filter(v => !v.eligible && !v.hide);
 
@@ -380,7 +303,6 @@ export default function PesanClient() {
       setIsApplyingVoucher(true);
 
       try {
-          // Cari di list lokal dulu
           const localMatch = vouchersWithStatus.find(v => v.kode_voucher.toLowerCase() === manualVoucherCode.toLowerCase());
           
           if (localMatch) {
@@ -392,10 +314,8 @@ export default function PesanClient() {
               return;
           }
 
-          // Jika tidak ada di lokal, tembak API
           const response = await cekVoucher(manualVoucherCode.trim());
           if (!response.success || !response.data) {
-              // Menampilkan error langsung dari backend (termasuk jika role ditolak)
               setPopup({ isOpen: true, title: "Kode Salah", message: response.error || response.message || "Voucher tidak ditemukan.", type: "error" });
               return;
           }
@@ -569,6 +489,17 @@ export default function PesanClient() {
                             >
                               <div className="flex items-center gap-4">
                                 <input type="radio" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
+                                
+                                {/* 👇 UI RENDER LOGO EKSPEDISI 👇 */}
+                                <div className="w-12 h-10 bg-white rounded-lg border border-base-content/10 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                                  {courier.logo_url ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={courier.logo_url} alt={courier.name} className="w-full h-full object-contain" />
+                                  ) : (
+                                    <Truck className="text-base-content/30" size={20} /> 
+                                  )}
+                                </div>
+
                                 <div>
                                   <p className="font-black text-sm uppercase tracking-tight">{courier.name} - {srv.service}</p>
                                   <p className="text-[10px] font-bold opacity-60 mt-1">{(courier.code === "toko" || courier.code === "cargo") ? srv.description : `Estimasi sampai: ${srv.etd} Hari`}</p>

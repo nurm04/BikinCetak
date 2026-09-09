@@ -352,7 +352,88 @@ export async function checkoutCart(payload: CheckoutPayload): Promise<CartServic
   }
 }
 
-export async function getShippingCost(id_alamat: string): Promise<CartServiceResponse<unknown>> {
+// ==============================================================
+// 👇 1. INTERFACE STRICT UNTUK ONGKIR (TANPA ANY) 👇
+// ==============================================================
+
+export interface ShippingServiceOption {
+  service: string;
+  description: string;
+  cost: number;
+  etd: string;
+}
+
+export interface CourierOption {
+  code: string;
+  name: string;
+  logo_url: string; 
+  costs: ShippingServiceOption[];
+}
+
+// Interface Komerce V2
+interface KomerceCostItem {
+  code: string;
+  name: string;
+  service: string;
+  description?: string;
+  cost: number;
+  etd?: string;
+  estimation?: string;
+}
+
+// Interface RajaOngkir Asli
+interface RajaOngkirCostDetail {
+  value: number;
+  etd: string;
+}
+
+interface RajaOngkirServiceCost {
+  service: string;
+  description: string;
+  cost: RajaOngkirCostDetail[];
+}
+
+interface RajaOngkirResult {
+  code: string;
+  name: string;
+  costs: RajaOngkirServiceCost[];
+}
+
+// Interface Respon Gabungan
+interface OngkirAPIResponse {
+  meta?: {
+    status: string;
+    message?: string;
+  };
+  data?: KomerceCostItem[];
+  rajaongkir?: {
+    status?: {
+      code: number;
+      description: string;
+    };
+    results?: RajaOngkirResult[];
+  };
+  message?: string;
+}
+
+// ==============================================================
+// 👇 2. FUNGSI LOGO DAN PENGAMBILAN DATA ONGKIR 👇
+// ==============================================================
+
+export function getCourierLogo(code: string): string {
+  const cleanCode = code.toLowerCase();
+  const availableLogos = [
+      'jne', 'pos', 'tiki', 'sicepat', 'jnt', 'ninja', 'anteraja', 
+      'lion', 'wahana', 'ide', 'sentral'
+  ];
+  
+  if (availableLogos.includes(cleanCode)) {
+      return `/images/kurir/${cleanCode}.png`;
+  }
+  return ""; 
+}
+
+export async function getShippingCost(id_alamat: string): Promise<CartServiceResponse<CourierOption[]>> {
   try {
     const headers = await getAuthHeader();
 
@@ -366,13 +447,51 @@ export async function getShippingCost(id_alamat: string): Promise<CartServiceRes
       body: JSON.stringify({ id_alamat }),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as OngkirAPIResponse;
 
     if (!response.ok) {
-      return { error: result.message || "Gagal menghitung ongkos kirim." };
+      return { error: result.meta?.message || result.message || "Gagal menghitung ongkos kirim." };
     }
 
-    return { success: true, data: result }; 
+    let normalizedCouriers: CourierOption[] = [];
+
+    // Mapping Jika Format API = Komerce V2
+    if (result.meta && Array.isArray(result.data)) {
+        const couriersMap: Record<string, CourierOption> = {};
+        
+        result.data.forEach((item: KomerceCostItem) => {
+            if (!couriersMap[item.code]) {
+                couriersMap[item.code] = { 
+                    code: item.code, 
+                    name: item.name, 
+                    logo_url: getCourierLogo(item.code),
+                    costs: [] 
+                };
+            }
+            couriersMap[item.code].costs.push({
+                service: item.service, 
+                description: item.description || item.service, 
+                cost: item.cost, 
+                etd: item.etd || item.estimation || "-"
+            });
+        });
+        normalizedCouriers = Object.values(couriersMap);
+    } else if (result.rajaongkir?.results && Array.isArray(result.rajaongkir.results)) {
+        normalizedCouriers = result.rajaongkir.results.map((c: RajaOngkirResult) => ({
+            code: c.code, 
+            name: c.name,
+            logo_url: getCourierLogo(c.code),
+            costs: c.costs.map((srv: RajaOngkirServiceCost) => ({
+                service: srv.service, 
+                description: srv.description, 
+                cost: srv.cost[0]?.value || 0, 
+                etd: srv.cost[0]?.etd || "-"
+            }))
+        }));
+    }
+
+    return { success: true, data: normalizedCouriers }; 
+
   } catch (error) {
     return { error: "Terjadi kesalahan sistem saat mengambil ongkos kirim." };
   }
