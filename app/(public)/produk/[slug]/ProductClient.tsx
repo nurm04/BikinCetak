@@ -476,17 +476,60 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
   }, [itemDetail, getLabelBersih]);
 
   const fieldsTambahan = useMemo(() => {
-    if (itemDetail?.varians && itemDetail.varians.length > 0) {
-      return itemDetail.varians
-        .filter(v => v.jenis_varian === 'tambahan')
-        .map(v => ({
-          name: v.id_varian,
-          label: v.nama_varian,
-          options: v.pilihan_varian.map(pv => ({ label: pv.nama_pilihan, value: pv.id_pilihan }))
-        }));
+    if (!itemDetail?.varians || itemDetail.varians.length === 0) return [];
+    
+    const varianTambahan = itemDetail.varians.filter(v => v.jenis_varian === 'tambahan');
+    if (varianTambahan.length === 0) return [];
+
+    // 1. Ambil spesifikasi dasar yang sedang dipilih user saat ini
+    const selectedUtama = selectedOptions["kombinasi_utama"];
+    
+    // 2. Filter SKU yang cocok dengan spesifikasi dasar tersebut
+    const validSkus = itemDetail.skus.filter(s => getLabelBersih(s.nama_sku) === selectedUtama);
+
+    // 3. Ekstrak string varian tambahan dari nama_sku (mengambil array paling belakang setelah split '-')
+    const validVarianNames = new Set(
+      validSkus.map(s => {
+        const parts = s.nama_sku.split('-');
+        return parts[parts.length - 1]?.trim() || ""; // Contoh hasil: "4 Lembar"
+      })
+    );
+
+    return varianTambahan.map(v => {
+      // 4. Filter options select berdasarkan nama yang berhasil di ekstrak
+      const filteredOptions = v.pilihan_varian.filter(pv => 
+        validVarianNames.has(pv.nama_pilihan.trim())
+      );
+
+      // Fallback jika filter kosong, tampilkan semua (jaga-jaga jika format nama_sku ada yang salah ketik)
+      const finalOptions = filteredOptions.length > 0 ? filteredOptions : v.pilihan_varian;
+
+      return {
+        name: v.id_varian,
+        label: v.nama_varian,
+        options: finalOptions.map(pv => ({ label: pv.nama_pilihan, value: pv.id_pilihan }))
+      };
+    });
+  }, [itemDetail, selectedOptions["kombinasi_utama"], getLabelBersih]);
+
+  useEffect(() => {
+    let changed = false;
+    const newOptions = { ...selectedOptions };
+
+    fieldsTambahan.forEach(field => {
+      const currentSelected = newOptions[field.name];
+      const isStillValid = field.options.some(opt => opt.value === currentSelected);
+      
+      if (!isStillValid && field.options.length > 0) {
+         newOptions[field.name] = field.options[0].value;
+         changed = true;
+      }
+    });
+
+    if (changed) {
+      setSelectedOptions(newOptions);
     }
-    return [];
-  }, [itemDetail]);
+  }, [fieldsTambahan]);
 
   const handleAttributeChange = (name: string, value: string) => {
     if (groupedAddons[name]) {
