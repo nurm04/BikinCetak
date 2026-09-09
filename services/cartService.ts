@@ -420,7 +420,7 @@ interface OngkirAPIResponse {
 // 👇 2. FUNGSI LOGO DAN PENGAMBILAN DATA ONGKIR 👇
 // ==============================================================
 
-export function getCourierLogo(code: string): string {
+function getCourierLogo(code: string): string {
   const cleanCode = code.toLowerCase();
   const availableLogos = [
       'jne', 'pos', 'tiki', 'sicepat', 'jnt', 'ninja', 'anteraja', 
