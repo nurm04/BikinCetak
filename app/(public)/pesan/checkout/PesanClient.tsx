@@ -148,14 +148,14 @@ export default function PesanClient() {
       const manualPickup: CourierOption = {
         code: "toko",
         name: "Ambil di Toko",
-        logo_url: "/images/kurir/toko.png", // 👈 Fallback Logo Toko
+        logo_url: "",
         costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
       };
 
       const requestCargo: CourierOption = {
         code: "cargo",
         name: "Request Expedisi Cargo",
-        logo_url: "/images/kurir/cargo.png", // 👈 Fallback Logo Cargo
+        logo_url: "",
         costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
       };
       
@@ -490,9 +490,12 @@ export default function PesanClient() {
                               <div className="flex items-center gap-4">
                                 <input type="radio" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
                                 
-                                {/* 👇 UI RENDER LOGO EKSPEDISI 👇 */}
                                 <div className="w-12 h-10 bg-white rounded-lg border border-base-content/10 flex items-center justify-center p-1 shrink-0 overflow-hidden">
-                                  {courier.logo_url ? (
+                                  {courier.code === "toko" ? (
+                                    <Home className="text-primary" size={24} />
+                                  ) : courier.code === "cargo" ? (
+                                    <Truck className="text-primary" size={24} />
+                                  ) : courier.logo_url ? (
                                     /* eslint-disable-next-line @next/next/no-img-element */
                                     <img src={courier.logo_url} alt={courier.name} className="w-full h-full object-contain" />
                                   ) : (
