@@ -172,6 +172,7 @@ export default async function DetailPesananPage({ params }: {
                         isReadOnly={true}
                         id={item.id}
                         nama_sku={item.nama_produk_snapshot}
+                        gambar_url={item.gambar_url}
                         harga_satuan={Number(item.harga_satuan_snapshot) || 0}
                         jumlah={Number(item.jumlah) || 1}
                         finishing={item.pesanan_item_finishing?.map(f => ({

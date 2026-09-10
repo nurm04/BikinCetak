@@ -23,6 +23,7 @@ interface ExtendedCartItemAPI {
   id: number;
   id_pesan: string;
   id_sku?: string;
+  gambar_url?: string | null;
   jumlah: number;
   nama_sku: string;
   harga_satuan: number;
@@ -126,6 +127,7 @@ export default function CartClient() {
                   id: item.id,
                   id_pesan: item.id_pesan || "",
                   id_sku: item.id_sku,
+                  gambar_url: item.gambar_url,
                   jumlah: item.jumlah,
                   nama_sku: item.nama_produk_snapshot,
                   harga_satuan: item.harga_satuan_snapshot, 
@@ -367,6 +369,7 @@ export default function CartClient() {
                       key={item.id}
                       id={item.id}
                       nama_sku={item.nama_sku || "Produk Cetak"}
+                      gambar_url={item.gambar_url}
                       harga_satuan={item.harga_satuan || 0}
                       jumlah={item.jumlah}
                       finishing={item.finishing || []} 

@@ -53,6 +53,8 @@ export interface PesananItem {
 
   nama_produk_snapshot: string;
 
+  gambar_url?: string | null;
+
   jumlah: number;
 
   harga_satuan_snapshot: number;

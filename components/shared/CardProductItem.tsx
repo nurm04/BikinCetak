@@ -17,6 +17,7 @@ interface FinishingItem {
 interface CartProductItemProps {
   id: number;
   nama_sku: string;
+  gambar_url?: string | null;
   harga_satuan: number;
   jumlah: number;
   finishing?: FinishingItem[];
@@ -43,6 +44,7 @@ interface CartProductItemProps {
 export default function CartProductItem({
   id,
   nama_sku,
+  gambar_url,
   harga_satuan,
   jumlah,
   finishing = [],
@@ -198,7 +200,7 @@ export default function CartProductItem({
 
         <div className="relative w-17 h-17 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-base-200 border border-base-content/10 shrink-0">
           <Image 
-            src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"
+            src={gambar_url || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"}
             alt={productName} 
             fill 
             unoptimized
