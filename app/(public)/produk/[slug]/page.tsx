@@ -112,8 +112,15 @@ export default async function Produk({ params }: PageProps) {
       initialSku = matchedSku || itemDetail.skus[0];
     }
 
+    // 👇 PERBAIKAN LOGIKA FILTER REKOMENDASI 👇
     const recommendations = items
-      .filter((item) => item.kategori === foundItemData.kategori && item.id_produk !== foundItemData.id_produk)
+      .filter((item) => {
+        // Bandingkan ID Kategorinya langsung biar akurat
+        const isSameKategori = item.kategori?.id_kategori === foundItemData.kategori?.id_kategori;
+        const isDifferentProduct = item.id_produk !== foundItemData.id_produk;
+        
+        return isSameKategori && isDifferentProduct;
+      })
       .slice(0, 4)
       .map((item) => ({
         id: item.id_produk,

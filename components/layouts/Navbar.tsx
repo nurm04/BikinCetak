@@ -15,12 +15,18 @@ interface NavbarProps {
   items: ItemData[];
 }
 
+interface CategoryGroup {
+  id: string;
+  label: string;
+  urutan: number;
+  icon: string | null;
+  submenu: Array<{ name: string }>;
+}
+
 const Navbar = ({ items = [] }: NavbarProps) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>("Pelanggan");
   const [mounted, setMounted] = useState(false);
-  
-  // State untuk pencarian
   const [searchQuery, setSearchQuery] = useState(""); 
   
   const pathname = usePathname();
@@ -28,17 +34,14 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   const handleLogout = useCallback(async () => {
     await logoutAction();
-
     setIsLoggedIn(false);
     setUserName("Pelanggan");
-    
     router.push("/login");
     router.refresh();
   }, [router]);
 
   const checkAuth = useCallback(async () => {
     const res = await getUserProfile();
-    
     if (res.data) {
       setIsLoggedIn(true);
       setUserName(res.data.name || res.data.email || "User");
@@ -53,20 +56,15 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     checkAuth();
   }, [checkAuth]);
 
-  // Fungsi untuk eksekusi pencarian
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // Hilangkan fokus dari input agar keyboard di HP turun
       const elem = document.activeElement as HTMLElement;
       if (elem) elem.blur();
-      
-      // Lempar ke halaman katalog dengan query parameter
       router.push(`/katalog?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
-  // Fungsi menutup dropdown profile saat diklik
   const closeDropdown = () => {
     const elem = document.activeElement as HTMLElement;
     if (elem) elem.blur();
@@ -76,25 +74,33 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   const isHome = pathname === '/';
 
-  const groupedItems: Record<string, Array<{ name: string }>> = {};
+  // ==========================================
+  // LOGIC GROUPING KATEGORI 
+  // ==========================================
+  const groupedCategories: Record<string, CategoryGroup> = {};
+  
   items.forEach((item) => {
-    if (item.is_active === 0) return;
-    if (item.id_produk === "PRD-0001") return;
-    const categoryName = item.kategori || "Lainnya";
+    if (item.is_active === 0 || item.id_produk === "PRD-0001") return;
+    
+    const catId = item.kategori?.id_kategori || "lainnya";
+    const catName = item.kategori?.nama_kategori || "Lainnya";
+    const catUrutan = item.kategori?.urutan ?? 999;
+    const catIcon = item.kategori?.icon || null;
 
-    if (!groupedItems[categoryName]) {
-      groupedItems[categoryName] = [];
+    if (!groupedCategories[catId]) {
+      groupedCategories[catId] = {
+        id: catId,
+        label: catName,
+        urutan: catUrutan,
+        icon: catIcon,
+        submenu: []
+      };
     }
-    groupedItems[categoryName].push({ name: item.nama_produk });
+    groupedCategories[catId].submenu.push({ name: item.nama_produk });
   });
 
-  const dynamicCategories = Object.keys(groupedItems)
-    .map((categoryKey) => ({
-      key: slugify(categoryKey),
-      label: categoryKey,
-      submenu: groupedItems[categoryKey],
-    }))
-    .sort((a, b) => (a.label === "Jasa" ? 1 : b.label === "Jasa" ? -1 : 0));
+  const dynamicCategories = Object.values(groupedCategories)
+    .sort((a, b) => a.urutan - b.urutan);
 
   return (
     <>
@@ -112,7 +118,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: SEARCH BAR (Responsive Mobile & Desktop) */}
+        {/* TENGAH: SEARCH BAR */}
         <div className="navbar-center flex-1 px-2 md:px-8">
           <form onSubmit={handleSearch} className="w-full max-w-2xl relative mx-auto">
             <input
@@ -182,24 +188,26 @@ const Navbar = ({ items = [] }: NavbarProps) => {
         </div>
       </div>
 
-      {/* MENU KATEGORI DESKTOP (Hanya muncul di Layar Besar & Halaman Home) */}
+      {/* MENU KATEGORI DESKTOP (Render Dinamis dengan Icon) */}
       {isHome && (
         <div className="navbar bg-base-100 hidden lg:flex justify-center border-t border-base-200 px-4 md:px-12 lg:px-20">
           <ul className="menu menu-horizontal p-0 scrollbar-hide">
-            {dynamicCategories.map((menu) => (
-              <li key={menu.key} className="dropdown dropdown-hover dropdown-center">
-                <div role="button" className="text-[11px] font-semibold uppercase hover:text-primary transition-colors py-3 px-4">
-                  {menu.label}
-                </div>
-                <ul className="dropdown-content menu bg-base-100 rounded-box z-50 w-56 p-2 shadow-2xl border-t-4 border-primary mt-0">
-                  {menu.submenu.map((item, i) => (
-                    <li key={i}>
-                      <Link href={`/produk/${slugify(item.name)}`}>{item.name}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+            {dynamicCategories.map((menu) => {
+              return (
+                <li key={menu.id} className="dropdown dropdown-hover dropdown-center">
+                  <div role="button" className="text-[11px] font-semibold uppercase hover:text-primary transition-colors py-3 px-4 flex items-center gap-2">
+                    {menu.label}
+                  </div>
+                  <ul className="dropdown-content menu bg-base-100 rounded-box z-50 w-56 p-2 shadow-2xl border-t-4 border-primary mt-0">
+                    {menu.submenu.map((item, i) => (
+                      <li key={i}>
+                        <Link href={`/produk/${slugify(item.name)}`}>{item.name}</Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

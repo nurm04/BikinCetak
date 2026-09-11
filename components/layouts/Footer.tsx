@@ -11,30 +11,53 @@ interface FooterProps {
   items: ItemData[];
 }
 
+// 👇 TAMBAHAN: Interface supaya terhindar dari tipe 'any'
+interface CategoryGroup {
+  id: string;
+  label: string;
+  urutan: number;
+  submenu: Array<{ name: string }>;
+}
+
 const Footer = ({ items = [] }: FooterProps) => {
 
-  const groupedItems: Record<string, Array<{ name: string }>> = {};
+  // ==========================================
+  // LOGIC GROUPING KATEGORI (Tanpa Icon)
+  // ==========================================
+  const groupedCategories: Record<string, CategoryGroup> = {};
 
   items.forEach((item) => {
     if (item.is_active === 0) return;
 
-    const categoryName = item.kategori || "Lainnya";
-    const lowerCat = categoryName.toLowerCase();
+    // Menarik metadata kategori dari DB, fallback ke "Lainnya"
+    const catId = item.kategori?.id_kategori || "lainnya";
+    const catName = item.kategori?.nama_kategori || "Lainnya";
+    const catUrutan = item.kategori?.urutan ?? 999;
+    const lowerCat = catName.toLowerCase();
 
+    // Sembunyikan kategori jasa di footer
     if (lowerCat === "services" || lowerCat === "jasa") return;
 
-    if (!groupedItems[categoryName]) {
-      groupedItems[categoryName] = [];
+    if (!groupedCategories[catId]) {
+      groupedCategories[catId] = {
+        id: catId,
+        label: catName,
+        urutan: catUrutan,
+        submenu: []
+      };
     }
 
-    groupedItems[categoryName].push({ name: item.nama_produk });
+    groupedCategories[catId].submenu.push({ name: item.nama_produk });
   });
 
-  const dynamicCategories = Object.keys(groupedItems).map((categoryKey) => ({
-    key: slugify(categoryKey),
-    label: categoryKey,
-    submenu: groupedItems[categoryKey],
-  }));
+  // Convert object ke array, lalu urutkan sesuai angka "urutan" dari Admin
+  const dynamicCategories = Object.values(groupedCategories)
+    .sort((a, b) => a.urutan - b.urutan)
+    .map((category) => ({
+      key: slugify(category.label),
+      label: category.label,
+      submenu: category.submenu,
+    }));
 
   const router = useRouter();
   const [kodeTransaksi, setKodeTransaksi] = useState("");
@@ -98,17 +121,15 @@ const Footer = ({ items = [] }: FooterProps) => {
                <a className="btn btn-circle btn-sm btn-ghost bg-white/10 hover:bg-white/20"></a>
             </div>
 
-            {/* 👇 METODE PEMBAYARAN (FIX PADDING) 👇 */}
+            {/* METODE PEMBAYARAN */}
             <div className="mt-8 pt-6 border-t border-white/20 max-w-2xl">
               <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Metode Pembayaran</h6>
               <div className="flex items-center gap-3">
                 
-                {/* Logo BCA - Box tetep h-10 w-16, hapus p-1 di div, sisain p-1 di Image */}
                 <div className="bg-white rounded-lg h-10 w-16 relative shadow-sm overflow-hidden">
                   <Image src="/bca.png" alt="BCA" fill className="object-contain p-1" />
                 </div>
                 
-                {/* Logo QRIS - Box tetep h-10 w-20, hapus p-1 di div, sisain p-1 di Image */}
                 <div className="bg-white rounded-lg h-10 w-20 relative shadow-sm overflow-hidden">
                   <Image src="/qris.png" alt="QRIS" fill className="object-contain p-1" />
                 </div>

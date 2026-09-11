@@ -4,10 +4,18 @@
 
 import redis from "@/lib/redis";
 
+export interface KategoriData {
+  id_kategori: string;
+  nama_kategori: string;
+  urutan: number;
+  is_active: boolean;
+  icon: string | null;
+}
+
 export interface ItemData {
   id_produk: string;
   nama_produk: string;
-  kategori: string;
+  kategori: KategoriData | null;
   is_active: number;
   gambar_urls: string[];
   harga_mulai_dari?: number;

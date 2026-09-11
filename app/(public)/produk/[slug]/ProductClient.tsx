@@ -322,11 +322,9 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return isNaN(val) || val < 1 ? 1 : val; 
   }, [sku?.tipe_kalkulasi, selectedOptions.jumlah_halaman]);
 
-  // 👇 PERBAIKAN: Gunakan harga_tambahan_dimensi dari Sku Master (Database)
   const biayaHalamanPerBuku = useMemo(() => {
     if (sku?.tipe_kalkulasi === 'cetak_buku') {
       const halamanDicharge = Math.max(0, jumlahHalaman - 1);
-      // Harga tambahan lembar sama persis dengan harga dasar grosir (currentTierPrice)
       return halamanDicharge * currentTierPrice; 
     }
     return 0;
@@ -367,7 +365,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             }
         }
         
-        // KUNCI: Override HANYA JIKA tier harganya benar-benar BUKAN 0
         if (activeTier && Number(activeTier.nilai) !== 0) {
             activeHarga = Number(activeTier.nilai);
             activeTipe = activeTier.tipe as "nominal" | "persen";
@@ -376,7 +373,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     return { harga: activeHarga, tipe: activeTipe };
   };
   
-  // 👇 PERBAIKAN LOGIKA FINISHING METERAN / BUKU (KALI DIMENSI) DI UI 👇
   const totalFinishing = useMemo(() => {
     let total = 0;
     Object.values(selectedFinishing).forEach((fin) => {
@@ -385,13 +381,10 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       const { harga, tipe } = getActiveFinishingPrice(fin, effectiveQtyForTier);
 
       if (tipe === 'persen') {
-        // Karena hargaSatuProdukFull sudah mengandung (Harga Dasar x Luas) untuk tipe meteran,
-        // kita tidak perlu mengkalikannya dengan luas lagi.
         biaya = hargaSatuProdukFull * (harga / 100);
       } else {
         biaya = harga || 0;
 
-        // ==== LOGIKA KALI DIMENSI ====
         const isKaliDimensi = fin.kali_dimensi === true || String(fin.kali_dimensi) === '1';
 
         if (isKaliDimensi) {
@@ -409,7 +402,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         }
       }
 
-      // Terakhir, kita kalikan dengan jumlah qty pesanan yang dimasukkan user
       if (fin.kali_jumlah_pesan) {
         biaya = biaya * currentQty;
       }
@@ -481,27 +473,21 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     const varianTambahan = itemDetail.varians.filter(v => v.jenis_varian === 'tambahan');
     if (varianTambahan.length === 0) return [];
 
-    // 1. Ambil spesifikasi dasar yang sedang dipilih user saat ini
     const selectedUtama = selectedOptions["kombinasi_utama"];
-    
-    // 2. Filter SKU yang cocok dengan spesifikasi dasar tersebut
     const validSkus = itemDetail.skus.filter(s => getLabelBersih(s.nama_sku) === selectedUtama);
 
-    // 3. Ekstrak string varian tambahan dari nama_sku (mengambil array paling belakang setelah split '-')
     const validVarianNames = new Set(
       validSkus.map(s => {
         const parts = s.nama_sku.split('-');
-        return parts[parts.length - 1]?.trim() || ""; // Contoh hasil: "4 Lembar"
+        return parts[parts.length - 1]?.trim() || "";
       })
     );
 
     return varianTambahan.map(v => {
-      // 4. Filter options select berdasarkan nama yang berhasil di ekstrak
       const filteredOptions = v.pilihan_varian.filter(pv => 
         validVarianNames.has(pv.nama_pilihan.trim())
       );
 
-      // Fallback jika filter kosong, tampilkan semua (jaga-jaga jika format nama_sku ada yang salah ketik)
       const finalOptions = filteredOptions.length > 0 ? filteredOptions : v.pilihan_varian;
 
       return {
@@ -623,7 +609,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
           if (!isNaN(luas) && luas > 0) finalEffectiveCartQty *= luas;
       }
 
-      // 👇 PERBAIKAN LOGIKA BACKEND SNAPSHOT (KIRIM DATA KE CART API) 👇
       const finishings = Object.values(selectedFinishing)
         .filter((fin): fin is OpsiFinishing => fin !== null)
         .map((fin) => {
@@ -631,8 +616,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
           
           const isKaliDimensi = fin.kali_dimensi === true || String(fin.kali_dimensi) === '1';
 
-          // Jika ini cetak meteran/buku & tipe = nominal, kita KALIKAN DIMENSI DI SINI 
-          // Supaya snapshot harga yang dikirim ke database sudah mengandung harga x dimensi
           if (isKaliDimensi && tipe === 'nominal') {
               if (sku.tipe_kalkulasi === 'cetak_meteran') {
                  const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
@@ -742,7 +725,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                   <div className="p-4 space-y-3 text-xs leading-relaxed border bg-base-200/50 rounded-xl border-base-content/5">
                     <div>
-                      <span className="opacity-60">Kategori:</span> <span className="font-bold text-base-content">{itemDetail?.kategori || "Digital Printing"}</span> <br/>
+                      {/* 👇 PERBAIKAN: Baca object kategori.nama_kategori 👇 */}
+                      <span className="opacity-60">Kategori:</span> <span className="font-bold text-base-content">{itemDetail?.kategori?.nama_kategori || "Lainnya"}</span> <br/>
                     </div>
                     <div className="pt-2 border-t border-base-content/10">
                       <p className="font-black uppercase text-[10px] tracking-tight opacity-50 mb-1">Deskripsi Cetak:</p>

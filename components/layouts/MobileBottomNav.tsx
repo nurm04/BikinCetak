@@ -9,39 +9,32 @@ import {
   ScrollText, 
   MessageCircle, 
   X,
-  StickyNote,
-  Printer,
-  Book,
-  Shirt,
-  Box,
-  MonitorPlay,
-  Camera,
-  Image as ImageIcon,
   Phone,
-  Mail
+  Mail,
+  // 👇 Import koleksi icon khusus CMS dari lucide-react 👇
+  Printer, Book, BookOpen, FileText, Image as ImageIcon, Monitor, 
+  Shirt, ShoppingBag, Package, Box, PenTool, Scissors, Camera, 
+  Layers, Grid, Tag, Gift, Briefcase, Calendar, Megaphone, Sticker, Palette, Folder,
+  LucideIcon 
 } from 'lucide-react';
 
-const getCategoryIcon = (categoryName: string) => {
-  const name = categoryName.toLowerCase();
-  if (name.includes('sticker') || name.includes('stiker')) return <StickyNote size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('print') || name.includes('cetak')) return <Printer size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('buku')) return <Book size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('kaos') || name.includes('jersey') || name.includes('garment')) return <Shirt size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('kemasan') || name.includes('box')) return <Box size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('media') || name.includes('promosi')) return <MonitorPlay size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('foto') || name.includes('dekorasi')) return <ImageIcon size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  if (name.includes('undangan')) return <Camera size={28} className="text-primary mb-2" strokeWidth={1.5} />;
-  
-  return <LayoutGrid size={28} className="text-primary mb-2" strokeWidth={1.5} />;
+// 👇 Mapping Icon biar bundle size Next.js tetap kecil & kencang 👇
+const IconMap: Record<string, LucideIcon> = {
+  Printer, Book, BookOpen, FileText, Image: ImageIcon, Monitor,
+  Shirt, ShoppingBag, Package, Box, PenTool, Scissors, Camera,
+  Layers, Grid, Tag, Gift, Briefcase, Calendar, Megaphone, Sticker, Palette, Folder
 };
 
 type SubmenuItem = {
   name: string;
 };
 
+// 👇 UBAH: Sesuaikan dengan data yang dikirim dari ConditionalLayout
 type CategoryItem = {
   key: string;
   label: string;
+  urutan: number;
+  icon: string | null;
   submenu: SubmenuItem[];
 };
 
@@ -117,21 +110,29 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto scrollbar-hide">
           <div className="grid grid-cols-3 gap-y-6 gap-x-2">
-            {categories.map((cat) => (
-              <Link 
-                href={`/katalog?kategori=${cat.key}`} 
-                key={cat.key}
-                onClick={() => setIsCatOpen(false)}
-                className="flex flex-col items-center text-center group"
-              >
-                <div className="w-16 h-16 rounded-2xl bg-base-200/50 flex flex-col items-center justify-center group-hover:bg-primary/10 transition-colors">
-                  {getCategoryIcon(cat.label)}
-                </div>
-                <span className="text-[10px] font-medium mt-2 leading-tight text-base-content/80 group-hover:text-primary px-1">
-                  {cat.label}
-                </span>
-              </Link>
-            ))}
+            
+            {/* 👇 RENDER KATEGORI SECARA DINAMIS DENGAN ICON DARI DATABASE 👇 */}
+            {categories.map((cat) => {
+              // Pilih Icon dari Map (default ke LayoutGrid kalau Admin belum milih/kosong)
+              const IconComponent = cat.icon ? IconMap[cat.icon] : LayoutGrid;
+
+              return (
+                <Link 
+                  href={`/katalog?kategori=${cat.key}`} 
+                  key={cat.key}
+                  onClick={() => setIsCatOpen(false)}
+                  className="flex flex-col items-center text-center group"
+                >
+                  <div className="w-16 h-16 rounded-2xl bg-base-200/50 flex flex-col items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <IconComponent size={28} className="text-primary mb-2" strokeWidth={1.5} />
+                  </div>
+                  <span className="text-[10px] font-medium mt-2 leading-tight text-base-content/80 group-hover:text-primary px-1">
+                    {cat.label}
+                  </span>
+                </Link>
+              );
+            })}
+            
           </div>
         </div>
       </div>
@@ -149,15 +150,6 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto pb-8">
           <div className="flex flex-col gap-3">
-            <a href="https://wa.me/6281213139490" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-600">
-                <Phone size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-base-content">WhatsApp CS 1</h4>
-                <p className="text-xs text-base-content/60">Fast response (08.00 - 17.00)</p>
-              </div>
-            </a>
             <a href="mailto:bikinkancetak@gmail.com" className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600">
                 <Mail size={24} />
@@ -165,6 +157,15 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
               <div>
                 <h4 className="font-bold text-sm text-base-content">Email Support</h4>
                 <p className="text-xs text-base-content/60">bikincetak@gmail.com</p>
+              </div>
+            </a>
+            <a href="https://wa.me/6281213139490" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
+              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-600">
+                <Phone size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-base-content">WhatsApp CS 2</h4>
+                <p className="text-xs text-base-content/60">Fast response (08.00 - 17.00)</p>
               </div>
             </a>
           </div>
@@ -182,7 +183,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
             ? (item.href 
                 ? pathname === item.href 
                 : (item.name === 'Kategori' ? isCatOpen : (item.name === 'Chat' ? isChatOpen : false)))
-            : false; // Paksa jadi false (default render) saat pertama kali load dari Server
+            : false;
             
           const Icon = item.icon;
 

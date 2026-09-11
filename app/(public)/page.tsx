@@ -9,47 +9,63 @@ export const metadata: Metadata = {
   description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
 };
 
+// 👇 TAMBAHAN: Interface untuk Grup Kategori biar rapi
+interface CategoryGroup {
+  id: string;
+  label: string;
+  urutan: number;
+  submenu: Array<{
+    id: string;
+    name: string;
+    image: string[];
+    harga_mulai_dari?: number;
+    diskon_roles?: Record<string, number>;
+  }>;
+}
+
 export default async function Home() {
   const items = await getItems();
   const { data: userProfile } = await getUserProfile();
   const activeRoleId = userProfile?.customer?.id_role_customer || null;
 
-  const groupedItems: Record<
-    string,
-    Array<{
-      id: string;
-      name: string;
-      image: string[];
-      harga_mulai_dari?: number;
-      diskon_roles?: Record<string, number>;
-    }>
-  > = {};
+  // ==========================================
+  // LOGIC GROUPING KATEGORI BARU
+  // Menggunakan Object Kategori dari DB
+  // ==========================================
+  const groupedCategories: Record<string, CategoryGroup> = {};
 
   items.forEach((item) => {
     if (item.is_active === 0) return;
     if (item.id_produk === "PRD-0001") return;
-    const categoryName = item.kategori || "Lainnya";
 
-    if (!groupedItems[categoryName]) {
-      groupedItems[categoryName] = [];
+    // Tarik metadata kategori, fallback ke "Lainnya" jika kosong
+    const catId = item.kategori?.id_kategori || "lainnya";
+    const catName = item.kategori?.nama_kategori || "Lainnya";
+    const catUrutan = item.kategori?.urutan ?? 999;
+
+    if (!groupedCategories[catId]) {
+      groupedCategories[catId] = {
+        id: catId,
+        label: catName,
+        urutan: catUrutan,
+        submenu: [],
+      };
     }
 
-    groupedItems[categoryName].push({
+    // Pastikan default image berupa Array of String
+    const defaultImage = ["https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico"];
+
+    groupedCategories[catId].submenu.push({
       id: item.id_produk,
       name: item.nama_produk,
-      image: item.gambar_urls || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico",
+      image: (item.gambar_urls && item.gambar_urls.length > 0) ? item.gambar_urls : defaultImage,
       harga_mulai_dari: item.harga_mulai_dari,
       diskon_roles: item.diskon_roles,
     });
   });
 
-  const dynamicCategories = Object.keys(groupedItems)
-    .map((categoryKey) => ({
-      key: categoryKey,
-      label: categoryKey,
-      submenu: groupedItems[categoryKey],
-    }))
-    .sort((a, b) => (a.label === "Jasa" ? 1 : b.label === "Jasa" ? -1 : 0));
+  // Convert map ke Array lalu urutkan sesuai settingan 'urutan' dari Admin
+  const dynamicCategories = Object.values(groupedCategories).sort((a, b) => a.urutan - b.urutan);
 
   return (
     <main className="min-h-screen bg-base-200">
@@ -60,7 +76,7 @@ export default async function Home() {
       <div className="container mx-auto px-4 md:px-12 pb-20">
         {dynamicCategories.map((category) => (
           <ProductRow 
-            key={category.key} 
+            key={category.id} 
             title={category.label} 
             data={category.submenu} 
             activeRoleId={activeRoleId}

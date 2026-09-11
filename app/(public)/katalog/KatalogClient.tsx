@@ -14,6 +14,12 @@ interface SidebarProduct {
   slug: string;
 }
 
+interface CategoryGroup {
+  categoryName: string;
+  urutan: number;
+  products: SidebarProduct[];
+}
+
 interface SkuGridItem {
   id_sku: string;
   nama_sku_bersih: string;
@@ -23,13 +29,12 @@ interface SkuGridItem {
   harga: number;
   image: string;
   diskon_roles: Record<string, number>;
-  // Tambahan untuk membantu parsing jika ada nama asli SKU
   nama_sku_asli?: string; 
   nama_produk?: string;
 }
 
 interface KatalogClientProps {
-  sidebarData: Record<string, SidebarProduct[]>;
+  sidebarData: CategoryGroup[]; // UBAH KE ARRAY
   skuItems: SkuGridItem[];
   activeRoleId: string | null;
 }
@@ -49,7 +54,6 @@ const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
     let labelBersih = skuName;
     
     // 1. Buang Prefix (Kode Produk & Nama Produk)
-    // Coba buang PRD-XXX-NamaProduk-
     const prefix1Match = labelBersih.match(/^[A-Z0-9]+-\d+-/i);
     if (prefix1Match) {
       labelBersih = labelBersih.replace(prefix1Match[0], '');
@@ -62,12 +66,8 @@ const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
     }
 
     // 2. Potong Varian Tambahan (Asumsi: Selalu setelah strip terakhir JIKA nama sangat panjang)
-    // Karena di Katalog kita tidak punya relasi 'varians', kita buat tebakan aman:
-    // Jika string masih mengandung '-' dan panjang, kemungkinan itu varian tambahan.
     if (labelBersih.includes('-')) {
         const lastDashIndex = labelBersih.lastIndexOf('-');
-        // Kita hanya memotong jika bagian setelah '-' cukup pendek (misal: "1 Sisi", "2 Lembar")
-        // Ini menghindari pemotongan nama varian utama yang kebetulan ada strip-nya.
         labelBersih = labelBersih.substring(0, lastDashIndex).trim();
     }
 
@@ -88,10 +88,10 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
 
   useEffect(() => {
     if (productParam) {
-      const foundCat = Object.keys(sidebarData).find(cat => 
-        sidebarData[cat].some(p => p.slug === productParam)
+      const foundCatObj = sidebarData.find(cat => 
+        cat.products.some(p => p.slug === productParam)
       );
-      if (foundCat) setExpandedCats({ [slugify(foundCat)]: true });
+      if (foundCatObj) setExpandedCats({ [slugify(foundCatObj.categoryName)]: true });
     } else if (categoryParam) {
       setExpandedCats({ [categoryParam]: true });
     } else {
@@ -104,29 +104,23 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
 
     if (queryParam) {
       const q = queryParam.toLowerCase();
-      // Pencarian tetap menggunakan nama asli/kotor agar lebih akurat jika user mengetik "1 sisi"
       result = result.filter(item => 
           (item.nama_sku_asli || item.nama_sku_bersih).toLowerCase().includes(q)
       );
     }
 
-    // Filter by Kategori atau by Produk (dari klik Sidebar)
     if (productParam) {
       result = result.filter(item => item.parent_slug === productParam);
     } else if (categoryParam) {
       result = result.filter(item => slugify(item.kategori) === categoryParam);
     }
 
-    // Filter Duplikat Label Bersih
-    // Karena satu produk bisa punya banyak varian tambahan, kita hanya perlu nampilin 1 card
-    // per Kombinasi Utama.
     const uniqueItems = new Map<string, SkuGridItem>();
     
     result.forEach(item => {
-        // Generate label bersih saat on-the-fly
+        // Asumsi item.id_sku adalah nama asli dari backend
         const displayLabel = getCleanKatalogLabel(item.nama_sku_asli || item.nama_sku_bersih, item.nama_produk);
         
-        // Simpan hanya jika belum ada label tersebut, ATAU jika yang baru harganya lebih murah
         if (!uniqueItems.has(displayLabel)) {
             uniqueItems.set(displayLabel, { ...item, nama_sku_bersih: displayLabel });
         } else {
@@ -169,18 +163,17 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
     }
   };
 
-  // Dinamis label breadcrumbs
   const getBreadcrumbLabel = () => {
     if (queryParam) return `Pencarian: "${queryParam}"`;
     if (productParam) {
-      for (const cat in sidebarData) {
-        const p = sidebarData[cat].find(x => x.slug === productParam);
+      for (const cat of sidebarData) {
+        const p = cat.products.find(x => x.slug === productParam);
         if (p) return p.name;
       }
     }
     if (categoryParam) {
-      const catName = Object.keys(sidebarData).find(k => slugify(k) === categoryParam);
-      if (catName) return catName;
+      const catObj = sidebarData.find(k => slugify(k.categoryName) === categoryParam);
+      if (catObj) return catObj.categoryName;
     }
     return "Semua Produk";
   };
@@ -200,7 +193,9 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
             <h3 className="font-bold text-xs uppercase opacity-75 mb-3 tracking-wider">Berdasarkan Kategori</h3>
             
             <div className="flex flex-col gap-1">
-              {Object.entries(sidebarData).map(([catName, products]) => {
+              {sidebarData.map((catGroup) => {
+                const catName = catGroup.categoryName;
+                const products = catGroup.products;
                 const catKey = slugify(catName);
                 const isActiveCat = categoryParam === catKey && !productParam;
                 const isExpanded = expandedCats[catKey];
@@ -276,7 +271,7 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
                 return (
                   <Link
                     key={item.id_sku}
-                    href={`/produk/${item.slug}`}
+                    href={`/produk/${item.parent_slug}`} 
                     className="card bg-base-100 shadow-sm border border-base-300 group overflow-hidden transition-all duration-300 hover:shadow-md hover:border-primary/50 relative cursor-pointer flex flex-col h-full rounded-2xl"
                   >
                     {/* Badge Diskon */}
