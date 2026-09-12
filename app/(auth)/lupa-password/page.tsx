@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
           <div className="flex flex-col items-center mb-8">
             <div className="relative w-16 h-16 mb-2">
               <Image 
-                src="/favicon.ico" 
+                src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico" 
                 alt="Logo" 
                 fill 
                 className="object-contain"
