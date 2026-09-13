@@ -155,10 +155,17 @@ export default function StatusPesananPage({ params }: Props) {
   const handleBayarDp = () => {
     const inputNominal = parseInt(nominalDp.replace(/\D/g, ""), 10);
 
-    // Hapus aturan 50%, ganti dengan syarat minimal QRIS (Rp 1.000)
     if (isNaN(inputNominal) || inputNominal < 1000) {
       setErrorDp(`Minimal pembayaran QRIS adalah Rp 1.000`);
       return;
+    }
+
+    if (pesanan?.sumber_pesanan === 'pos_kasir') {
+      const minimumDp = Math.ceil(total_tagihan_akurat * 0.5);
+      if (inputNominal < minimumDp) {
+        setErrorDp(`Minimal DP untuk pesanan Kasir adalah 50% (Rp ${minimumDp.toLocaleString("id-ID")})`);
+        return;
+      }
     }
     
     if (inputNominal > sisaTagihan) {
@@ -435,6 +442,9 @@ export default function StatusPesananPage({ params }: Props) {
             <div className="bg-primary/10 text-primary p-5 rounded-2xl text-center border border-primary/20 mt-4">
               <p className="text-xs font-bold leading-relaxed">
                 ✅ Jika menggunakan QRIS, pembayaran akan diverifikasi <strong>Otomatis</strong>. <br className="hidden md:block"/>Jika menggunakan Transfer Bank Manual, harap simpan bukti transfer Anda dan hubungi admin kami.
+              </p>
+              <p className="text-xs font-semibold text-error/80 mt-3 pt-3 border-t border-primary/20">
+                ⚠️ Jika saldo Anda sudah terpotong via QRIS namun status pesanan tidak berubah dalam 5 menit, harap segera konfirmasi bukti transfer ke Customer Service kami untuk diproses.
               </p>
             </div>
           </div>
