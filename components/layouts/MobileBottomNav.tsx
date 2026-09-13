@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
 import { 
   Home, 
   LayoutGrid, 
@@ -11,14 +12,12 @@ import {
   X,
   Phone,
   Mail,
-  // 👇 Import koleksi icon khusus CMS dari lucide-react 👇
   Printer, Book, BookOpen, FileText, Image as ImageIcon, Monitor, 
   Shirt, ShoppingBag, Package, Box, PenTool, Scissors, Camera, 
   Layers, Grid, Tag, Gift, Briefcase, Calendar, Megaphone, Sticker, Palette, Folder,
   LucideIcon 
 } from 'lucide-react';
 
-// 👇 Mapping Icon biar bundle size Next.js tetap kecil & kencang 👇
 const IconMap: Record<string, LucideIcon> = {
   Printer, Book, BookOpen, FileText, Image: ImageIcon, Monitor,
   Shirt, ShoppingBag, Package, Box, PenTool, Scissors, Camera,
@@ -29,7 +28,6 @@ type SubmenuItem = {
   name: string;
 };
 
-// 👇 UBAH: Sesuaikan dengan data yang dikirim dari ConditionalLayout
 type CategoryItem = {
   key: string;
   label: string;
@@ -46,12 +44,18 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isCatOpen, setIsCatOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+
   const pathname = usePathname();
   
-  const [isMounted, setIsMounted] = useState(false);
-
   useEffect(() => {
     setIsMounted(true);
+    
+    // 👇 FECTH DATA PENGATURAN SECARA ASINKRON 👇
+    getPengaturan().then((res) => {
+      if (res) setPengaturan(res);
+    });
     
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
@@ -89,6 +93,21 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
     { name: 'Chat', action: () => { setIsChatOpen(true); setIsCatOpen(false); }, icon: MessageCircle },
   ];
 
+  // Ekstrak list WhatsApp dan Email
+  const daftarWhatsapp = pengaturan?.daftar_whatsapp || [];
+  const emailPerusahaan = pengaturan?.informasi_lokasi?.email || "info@bikincetak.co.id";
+
+  // Fungsi helper buat bikin Link WA
+  const makeWaLink = (nomor: string, pesan: string = "") => {
+    // Bersihkan karakter non-angka
+    let cleanNum = nomor.replace(/\D/g, '');
+    // Ganti 0 awalan dengan 62
+    if (cleanNum.startsWith('0')) cleanNum = '62' + cleanNum.substring(1);
+    
+    const encodedMessage = pesan ? `?text=${encodeURIComponent(pesan)}` : "";
+    return `https://wa.me/${cleanNum}${encodedMessage}`;
+  };
+
   return (
     <>
       {/* 1. OVERLAY GELAP */}
@@ -102,20 +121,16 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
         <div className="flex items-center justify-between p-5 border-b border-base-200">
           <div className="flex items-center gap-2">
             <LayoutGrid size={20} className="text-base-content/70" />
-            <h3 className="font-bold text-lg">Kategori</h3>
+            <h3 className="text-lg font-bold">Kategori</h3>
           </div>
-          <button onClick={() => setIsCatOpen(false)} className="p-1 bg-base-200 rounded-full text-base-content/60 hover:text-base-content">
+          <button onClick={() => setIsCatOpen(false)} className="p-1 rounded-full bg-base-200 text-base-content/60 hover:text-base-content">
             <X size={20} />
           </button>
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto scrollbar-hide">
-          <div className="grid grid-cols-3 gap-y-6 gap-x-2">
-            
-            {/* 👇 RENDER KATEGORI SECARA DINAMIS DENGAN ICON DARI DATABASE 👇 */}
+          <div className="grid grid-cols-3 gap-x-2 gap-y-6">
             {categories.map((cat) => {
-              // Pilih Icon dari Map (default ke LayoutGrid kalau Admin belum milih/kosong)
               const IconComponent = cat.icon ? IconMap[cat.icon] : LayoutGrid;
-
               return (
                 <Link 
                   href={`/katalog?kategori=${cat.key}`} 
@@ -123,8 +138,8 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
                   onClick={() => setIsCatOpen(false)}
                   className="flex flex-col items-center text-center group"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-base-200/50 flex flex-col items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <IconComponent size={28} className="text-primary mb-2" strokeWidth={1.5} />
+                  <div className="flex flex-col items-center justify-center w-16 h-16 transition-colors rounded-2xl bg-base-200/50 group-hover:bg-primary/10">
+                    <IconComponent size={28} className="mb-2 text-primary" strokeWidth={1.5} />
                   </div>
                   <span className="text-[10px] font-medium mt-2 leading-tight text-base-content/80 group-hover:text-primary px-1">
                     {cat.label}
@@ -132,7 +147,6 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
                 </Link>
               );
             })}
-            
           </div>
         </div>
       </div>
@@ -142,32 +156,50 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
         <div className="flex items-center justify-between p-5 border-b border-base-200">
           <div className="flex items-center gap-2">
             <MessageCircle size={20} className="text-base-content/70" />
-            <h3 className="font-bold text-lg">Hubungi Kami</h3>
+            <h3 className="text-lg font-bold">Hubungi Kami</h3>
           </div>
-          <button onClick={() => setIsChatOpen(false)} className="p-1 bg-base-200 rounded-full text-base-content/60 hover:text-base-content">
+          <button onClick={() => setIsChatOpen(false)} className="p-1 rounded-full bg-base-200 text-base-content/60 hover:text-base-content">
             <X size={20} />
           </button>
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto pb-8">
           <div className="flex flex-col gap-3">
-            <a href="https://wa.me/6281213139490" target="_blank" rel="noreferrer" className="flex items-center gap-4 p-4 rounded-2xl bg-green-500/5 border border-green-500/20 hover:bg-green-500/10 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-600">
-                <Phone size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-base-content">WhatsApp CS 2</h4>
-                <p className="text-xs text-base-content/60">Fast response (08.00 - 17.00)</p>
-              </div>
-            </a>
-            <a href="mailto:bikinkancetak@gmail.com" className="flex items-center gap-4 p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600">
+            
+            {/* RENDER LIST WA DARI DATABASE */}
+            {daftarWhatsapp.map((wa, index) => {
+              // Abaikan jika tidak aktif
+              if (wa.is_active === false) return null;
+              
+              return (
+                <a 
+                  key={wa.id || index}
+                  href={makeWaLink(wa.nomor, wa.pesan_default)} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="flex items-center gap-4 p-4 transition-colors border rounded-2xl bg-green-500/5 border-green-500/20 hover:bg-green-500/10"
+                >
+                  <div className="flex items-center justify-center w-12 h-12 text-green-600 rounded-full bg-green-500/20">
+                    <Phone size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-base-content">{wa.nama}</h4>
+                    <p className="text-xs text-base-content/60">Fast response (08.00 - 17.00)</p>
+                  </div>
+                </a>
+              );
+            })}
+
+            {/* RENDER EMAIL */}
+            <a href={`mailto:${emailPerusahaan}`} className="flex items-center gap-4 p-4 transition-colors border rounded-2xl bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10">
+              <div className="flex items-center justify-center w-12 h-12 text-blue-600 rounded-full bg-blue-500/20">
                 <Mail size={24} />
               </div>
               <div>
-                <h4 className="font-bold text-sm text-base-content">Email Support</h4>
-                <p className="text-xs text-base-content/60">bikincetak@gmail.com</p>
+                <h4 className="text-sm font-bold text-base-content">Email Support</h4>
+                <p className="text-xs text-base-content/60">{emailPerusahaan}</p>
               </div>
             </a>
+
           </div>
         </div>
       </div>
@@ -178,7 +210,6 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
           ${isKeyboardOpen ? "hidden" : "flex"}
       `}>
         {navItems.map((item, index) => {
-          // 3. PAKAI isMounted UNTUK MENCEGAH HYDRATION MISMATCH
           const isActive = isMounted 
             ? (item.href 
                 ? pathname === item.href 
@@ -188,14 +219,14 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
           const Icon = item.icon;
 
           return item.href ? (
-            <Link key={index} href={item.href} className="flex-1 flex flex-col items-center py-2 relative">
+            <Link key={index} href={item.href} className="relative flex flex-col items-center flex-1 py-2">
               <Icon size={22} className={`mb-1 transition-colors ${isActive ? 'text-primary' : 'text-base-content/40'}`} strokeWidth={isActive ? 2.5 : 2} />
               <span className={`text-[10px] font-medium transition-colors ${isActive ? 'text-primary' : 'text-base-content/50'}`}>
                 {item.name}
               </span>
             </Link>
           ) : (
-            <button key={index} onClick={item.action} className="flex-1 flex flex-col items-center py-2 relative">
+            <button key={index} onClick={item.action} className="relative flex flex-col items-center flex-1 py-2">
               <Icon size={22} className={`mb-1 transition-colors ${isActive ? 'text-primary' : 'text-base-content/40'}`} strokeWidth={isActive ? 2.5 : 2} />
               <span className={`text-[10px] font-medium transition-colors ${isActive ? 'text-primary' : 'text-base-content/50'}`}>
                 {item.name}

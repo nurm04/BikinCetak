@@ -9,6 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ItemData } from "@/services/itemService";
 import { getUserProfile } from "@/services/userService";
 import { logoutAction } from "@/services/authService";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
 import { slugify } from "@/lib/utils";
 
 interface NavbarProps {
@@ -28,6 +29,9 @@ const Navbar = ({ items = [] }: NavbarProps) => {
   const [userName, setUserName] = useState<string>("Pelanggan");
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState(""); 
+  
+  // State untuk nyimpen data pengaturan web
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
   
   const pathname = usePathname();
   const router = useRouter();  
@@ -54,6 +58,11 @@ const Navbar = ({ items = [] }: NavbarProps) => {
   useEffect(() => {
     setMounted(true);
     checkAuth();
+    
+    // Tarik data pengaturan secara asinkron pas komponen di-mount
+    getPengaturan().then((res) => {
+      if (res) setPengaturan(res);
+    });
   }, [checkAuth]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -73,6 +82,17 @@ const Navbar = ({ items = [] }: NavbarProps) => {
   if (!mounted) return <div className="h-10 w-20 bg-base-200 animate-pulse rounded-xl"></div>;
 
   const isHome = pathname === '/';
+
+  // ==========================================
+  // DATA DINAMIS IDENTITAS WEB
+  // ==========================================
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
+  
+  // Ambil nama brand saja (Sebelum tanda strip "-") dan ubah jadi huruf besar
+  const namaWebsite = pengaturan?.nama_website 
+    ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() 
+    : "BIKIN CETAK";
 
   // ==========================================
   // LOGIC GROUPING KATEGORI 
@@ -104,29 +124,36 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   return (
     <>
-      <div className="navbar bg-base-100 shadow-sm px-4 md:px-12 lg:px-20 sticky top-0 z-50 gap-2 md:gap-4">
+      <div className="sticky top-0 z-50 gap-2 px-4 shadow-sm navbar bg-base-100 md:px-12 lg:px-20 md:gap-4">
         
         {/* KIRI: LOGO */}
-        <div className="navbar-start w-auto">
-          <Link href="/" className="btn btn-ghost p-0 px-2 flex items-center gap-0.5 hover:bg-transparent">
-            <div className="relative w-4 h-4 md:w-6 md:h-6">
-              <Image src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico" alt="BikinCetak Logo" fill className="object-contain" priority />
+        <div className="w-auto navbar-start">
+          <Link href="/" className="p-0 px-2 flex items-center gap-1.5 btn btn-ghost hover:bg-transparent">
+            <div className="relative w-5 h-5 md:w-6 md:h-6">
+              <Image 
+                src={logoUtama} 
+                alt={`${namaWebsite} Logo`} 
+                fill 
+                unoptimized // 👈 Aman dari peringatan Next.js hostname
+                className="object-contain" 
+                priority 
+              />
             </div>
-            <span className="text-xl font-black text-primary tracking-tighter hidden md:block">
-              <span className="text-base-content">BIKIN CETAK</span>
+            <span className="hidden text-xl font-black tracking-tighter text-primary md:block">
+              <span className="text-base-content">{namaWebsite}</span>
             </span>
           </Link>
         </div>
 
         {/* TENGAH: SEARCH BAR */}
-        <div className="navbar-center flex-1 px-2 md:px-8">
-          <form onSubmit={handleSearch} className="w-full max-w-2xl relative mx-auto">
+        <div className="flex-1 px-2 navbar-center md:px-8">
+          <form onSubmit={handleSearch} className="relative w-full max-w-2xl mx-auto">
             <input
               type="text"
               placeholder="Cari produk..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input input-sm md:input-md input-bordered w-full pr-10 md:pr-12 rounded-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all bg-base-200/50 focus:bg-base-100 text-sm"
+              className="w-full pr-10 text-sm transition-all rounded-full input input-sm md:input-md input-bordered md:pr-12 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100"
             />
             <button 
               type="submit" 
@@ -138,12 +165,12 @@ const Navbar = ({ items = [] }: NavbarProps) => {
         </div>
 
         {/* KANAN: AUTH & PROFILE */}
-        <div className="navbar-end w-auto gap-1 md:gap-3">
+        <div className="w-auto gap-1 navbar-end md:gap-3">
           {!isLoggedIn ? (
             <>
-              <Link href="/login" className="btn btn-ghost btn-sm md:btn-md flex items-center border-none hover:bg-primary/10 group rounded-xl px-2 md:px-4">
-                <LogIn size={18} className="text-primary group-hover:scale-110 transition-transform" />
-                <span className="hidden md:block font-bold text-xs uppercase tracking-widest text-primary ml-2">Sign In</span>
+              <Link href="/login" className="flex items-center px-2 border-none rounded-xl btn btn-ghost btn-sm md:btn-md hover:bg-primary/10 group md:px-4">
+                <LogIn size={18} className="transition-transform text-primary group-hover:scale-110" />
+                <span className="hidden ml-2 text-xs font-bold tracking-widest uppercase md:block text-primary">Sign In</span>
               </Link>
               <div className="hidden md:block">
                 <SwapTheme />
@@ -151,34 +178,34 @@ const Navbar = ({ items = [] }: NavbarProps) => {
             </>
           ) : (
             <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-ghost btn-circle btn-sm md:btn-md avatar bg-primary/10 hover:bg-primary/20 transition-colors">
-                <div className="w-8 md:w-10 rounded-full flex items-center justify-center text-primary">
+              <div tabIndex={0} role="button" className="transition-colors btn btn-ghost btn-circle btn-sm md:btn-md avatar bg-primary/10 hover:bg-primary/20">
+                <div className="flex items-center justify-center rounded-full w-8 md:w-10 text-primary">
                   <User size={18} className="md:w-5 md:h-5" />
                 </div>
               </div>
               
-              <ul tabIndex={0} className="menu menu-sm dropdown-content bg-base-100 rounded-2xl z-50 mt-4 w-64 md:w-72 p-2 shadow-xl border border-base-content/5">
-                <li className="pointer-events-none mb-2 w-full max-w-full overflow-hidden">
-                  <div className="block px-3 py-2 bg-primary/5 rounded-xl w-full max-w-full overflow-hidden box-border">
+              <ul tabIndex={0} className="p-2 mt-4 border shadow-xl menu menu-sm dropdown-content bg-base-100 rounded-2xl z-50 w-64 md:w-72 border-base-content/5">
+                <li className="w-full max-w-full mb-2 overflow-hidden pointer-events-none">
+                  <div className="block w-full max-w-full px-3 py-2 overflow-hidden box-border bg-primary/5 rounded-xl">
                     <span className="font-bold text-[10px] truncate text-primary block w-full uppercase tracking-widest">
                       {userName}
                     </span>
                   </div>
                 </li>
                 
-                <li><Link href="/profil" onClick={closeDropdown} className="py-2 font-bold flex items-center gap-3"><User size={16} className="opacity-70" /> Profil Saya</Link></li>
-                <li><Link href="/pesan" onClick={closeDropdown} className="py-2 font-bold flex items-center gap-3"><Package size={16} className="opacity-70" /> Transaksi</Link></li>
-                <li><Link href="/cart" onClick={closeDropdown} className="py-2 font-bold flex items-center gap-3"><ShoppingBag size={16} className="opacity-70" /> Keranjang</Link></li>
-                <div className="divider my-0 opacity-30"></div>
+                <li><Link href="/profil" onClick={closeDropdown} className="flex items-center gap-3 py-2 font-bold"><User size={16} className="opacity-70" /> Profil Saya</Link></li>
+                <li><Link href="/pesan" onClick={closeDropdown} className="flex items-center gap-3 py-2 font-bold"><Package size={16} className="opacity-70" /> Transaksi</Link></li>
+                <li><Link href="/cart" onClick={closeDropdown} className="flex items-center gap-3 py-2 font-bold"><ShoppingBag size={16} className="opacity-70" /> Keranjang</Link></li>
+                <div className="my-0 divider opacity-30"></div>
                 <li>
-                  <div className="py-1 flex justify-between items-center hover:bg-transparent cursor-default active:bg-transparent">
-                    <span className="font-bold text-xs opacity-70">Ganti Tema</span>
+                  <div className="flex items-center justify-between py-1 cursor-default hover:bg-transparent active:bg-transparent">
+                    <span className="text-xs font-bold opacity-70">Ganti Tema</span>
                     <div className="-mr-2"><SwapTheme /></div>
                   </div>
                 </li>
-                <div className="divider my-0 opacity-30"></div>
+                <div className="my-0 divider opacity-30"></div>
                 <li>
-                  <button onClick={() => { closeDropdown(); handleLogout(); }} className="py-2 text-error font-black flex items-center gap-3 hover:bg-error/10">
+                  <button onClick={() => { closeDropdown(); handleLogout(); }} className="flex items-center gap-3 py-2 font-black text-error hover:bg-error/10">
                     <LogOut size={16} /> Keluar
                   </button>
                 </li>
@@ -188,17 +215,17 @@ const Navbar = ({ items = [] }: NavbarProps) => {
         </div>
       </div>
 
-      {/* MENU KATEGORI DESKTOP (Render Dinamis dengan Icon) */}
+      {/* MENU KATEGORI DESKTOP (Render Dinamis) */}
       {isHome && (
-        <div className="navbar bg-base-100 hidden lg:flex justify-center border-t border-base-200 px-4 md:px-12 lg:px-20">
-          <ul className="menu menu-horizontal p-0 scrollbar-hide">
+        <div className="justify-center hidden px-4 border-t navbar bg-base-100 lg:flex border-base-200 md:px-12 lg:px-20">
+          <ul className="p-0 menu menu-horizontal scrollbar-hide">
             {dynamicCategories.map((menu) => {
               return (
                 <li key={menu.id} className="dropdown dropdown-hover dropdown-center">
                   <div role="button" className="text-[11px] font-semibold uppercase hover:text-primary transition-colors py-3 px-4 flex items-center gap-2">
                     {menu.label}
                   </div>
-                  <ul className="dropdown-content menu bg-base-100 rounded-box z-50 w-56 p-2 shadow-2xl border-t-4 border-primary mt-0">
+                  <ul className="p-2 mt-0 border-t-4 shadow-2xl dropdown-content menu bg-base-100 rounded-box z-50 w-56 border-primary">
                     {menu.submenu.map((item, i) => (
                       <li key={i}>
                         <Link href={`/produk/${slugify(item.name)}`}>{item.name}</Link>

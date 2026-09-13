@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState, MouseEvent } from "react";
+import { useRef, useState, useEffect, MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { slugify } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
 
 interface ProductItem {
   name: string;
@@ -34,6 +35,19 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [hasDragged, setHasDragged] = useState(false);
+
+  // 👇 STATE UNTUK PENGATURAN WEB 👇
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+
+  useEffect(() => {
+    getPengaturan().then((res) => {
+      if (res) setPengaturan(res);
+    });
+  }, []);
+
+  // Siapkan URL fallback / logo utama dari database
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -70,7 +84,7 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
 
   return (
     <div className="mb-10">
-      <p className="text-primary font-bold lg:text-xl border-b-2 border-primary w-fit pt-4 pb-2 mb-4 uppercase tracking-wider">
+      <p className="pt-4 pb-2 mb-4 font-bold tracking-wider uppercase border-b-2 text-primary lg:text-xl border-primary w-fit">
         {title}
       </p>
 
@@ -106,27 +120,27 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
                 key={i}
                 href={`/produk/${slugify(item.name)}`}
                 onClick={(e) => { if (hasDragged) e.preventDefault(); }}
-                className="card block min-w-40 md:min-w-60 bg-base-100 shadow-sm border border-primary/20 group overflow-hidden snap-start transition-all duration-300 hover:shadow-md hover:border-primary/50 relative select-none"
+                className="relative block overflow-hidden transition-all duration-300 border shadow-sm select-none card min-w-40 md:min-w-60 bg-base-100 border-primary/20 group snap-start hover:shadow-md hover:border-primary/50"
               >
                 {maxDiskon > 0 && (
-                  <div className="absolute top-2 right-2 z-10 bg-primary text-primary-content text-[9px] md:text-[10px] font-black px-2 py-1 rounded shadow-sm">
+                  <div className="absolute z-10 px-2 py-1 rounded shadow-sm top-2 right-2 bg-primary text-primary-content text-[9px] md:text-[10px] font-black">
                     Diskon s/d {maxDiskon}%
                   </div>
                 )}
 
-                <figure className="relative h-28 md:h-44 w-full overflow-hidden bg-base-300">
+                <figure className="relative w-full overflow-hidden h-28 md:h-44 bg-base-300">
                   <Image
                     fill
                     unoptimized
                     draggable={false}
                     alt={item.name}
-                    src={item.image?.[0] || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"}
-                    className="object-cover transition-transform duration-500 group-hover:scale-110 pointer-events-none"
+                    src={item.image?.[0] || logoUtama} // 👈 GUNAKAN LOGO DINAMIS DARI DATABASE
+                    className="object-cover transition-transform duration-500 pointer-events-none group-hover:scale-110"
                   />
                 </figure>
 
-                <div className="card-body p-3 md:p-4">
-                  <h2 className="card-title text-sm md:text-base leading-tight h-10 line-clamp-2 transition-colors group-hover:text-primary">
+                <div className="p-3 card-body md:p-4">
+                  <h2 className="transition-colors h-10 text-sm leading-tight md:text-base card-title line-clamp-2 group-hover:text-primary">
                     {item.name}
                   </h2>
 
@@ -134,7 +148,7 @@ const ProductRow = ({ title, data, activeRoleId }: ProductRowProps) => {
                     <span className="text-[9px] md:text-[10px] opacity-60 font-bold uppercase tracking-wider">
                       Mulai dari
                     </span>
-                    <span className="text-sm md:text-base font-black text-primary">
+                    <span className="text-sm font-black md:text-base text-primary">
                       {item.harga_mulai_dari ? formatRupiah(item.harga_mulai_dari) : "Rp 0"}
                     </span>
                   </div>

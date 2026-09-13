@@ -15,8 +15,58 @@ export interface BannerData {
   link_tujuan: string | null;
 }
 
-// Gunakan Record untuk dynamic key-value pengaturan umum
-export type PengaturanData = Record<string, string | number | boolean | object | null>;
+// 👇 TYPE DEFINITION BARU UNTUK PENGATURAN UMUM 👇
+export interface LokasiWeb {
+  email: string;
+  alamat_lengkap: string;
+  link_gmaps: string;
+}
+
+export interface WhatsappCS {
+  id: string | number;
+  nama: string;
+  nomor: string;
+  pesan_default?: string;
+  is_active: boolean;
+}
+
+export interface SosmedItem {
+  platform: string;
+  url: string;
+  icon: string;
+  is_active: boolean;
+}
+
+export interface MetodePembayaran {
+  id: string | number;
+  nama_metode: string;
+  no_rekening: string;
+  atas_nama: string;
+  icon_url: string;
+  is_active: boolean;
+}
+
+export interface PengaturanData {
+  // Identitas & SEO
+  nama_website?: string;
+  deskripsi_singkat?: string;
+  keyword_seo?: string;
+  logo_utama?: string;
+  
+  // Kontak & Sosmed
+  informasi_lokasi?: LokasiWeb;
+  daftar_whatsapp?: WhatsappCS[];
+  daftar_sosmed?: SosmedItem[];
+  
+  // Pembayaran
+  teks_info_pembayaran?: string;
+  metode_pembayaran?: MetodePembayaran[];
+  
+  // Membiarkan sisa key dinamis (Flexible Fallback) jika ke depannya ada penambahan opsi baru di panel Admin
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any; 
+}
+// 👆 ========================================= 👆
 
 export interface HalamanStatisListData {
   id: number;
@@ -56,14 +106,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 // 🌟 SERVICES
 // ==========================================
 
-/**
- * Mengambil daftar Banner Slider yang aktif
- */
 export async function getBanners(): Promise<BannerData[]> {
   const cacheKey = "bikincetak:web:banners";
 
   try {
-    // Coba ambil dari Redis dulu
     let cachedData = null;
     try {
       cachedData = await redis.get(cacheKey);
@@ -73,7 +119,6 @@ export async function getBanners(): Promise<BannerData[]> {
       return JSON.parse(cachedData);
     }
 
-    // Kalau kosong, fetch dari API Laravel
     const response = await fetch(`${API_BASE_URL}/api/web/banners`, {
       method: "GET",
       cache: "no-store", 
@@ -85,7 +130,6 @@ export async function getBanners(): Promise<BannerData[]> {
     
     if (result.success) {
       try {
-        // Simpan ke Redis selama 1 Jam (3600 detik)
         await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
       } catch (setCacheError) {}
       return result.data;
@@ -97,9 +141,6 @@ export async function getBanners(): Promise<BannerData[]> {
   }
 }
 
-/**
- * Mengambil data Pengaturan Umum (General Settings)
- */
 export async function getPengaturan(): Promise<PengaturanData | null> {
   const cacheKey = "bikincetak:web:pengaturan";
 
@@ -135,9 +176,6 @@ export async function getPengaturan(): Promise<PengaturanData | null> {
   }
 }
 
-/**
- * Mengambil daftar Halaman Statis (Hanya Info Dasar)
- */
 export async function getHalamanStatisList(): Promise<HalamanStatisListData[]> {
   const cacheKey = "bikincetak:web:halaman_statis_list";
 
@@ -173,9 +211,6 @@ export async function getHalamanStatisList(): Promise<HalamanStatisListData[]> {
   }
 }
 
-/**
- * Mengambil detail Halaman Statis berdasarkan Slug (Termasuk Konten HTML)
- */
 export async function getHalamanStatisDetail(slug: string): Promise<HalamanStatisDetailData | null> {
   const cacheKey = `bikincetak:web:halaman_statis_detail:${slug}`;
 

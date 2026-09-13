@@ -1,8 +1,14 @@
 import Image from "next/image";
 import ResetPasswordForm from "./ResetPasswordForm";
+import { getPengaturan } from "@/services/pengaturanWebService";
 
 // Tidak perlu lagi menerima params atau searchParams di sini
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage() {
+  const pengaturan = await getPengaturan();
+  
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
+  
   return (
     <main className="flex items-center justify-center min-h-screen px-4 py-10 bg-base-200">
       <div className="card w-full max-w-md bg-base-100 shadow-2xl border border-base-content/5 rounded-[2.5rem] overflow-hidden">
@@ -10,9 +16,10 @@ export default function ResetPasswordPage() {
           <div className="flex flex-col items-center mb-8">
             <div className="relative w-16 h-16 mb-2">
               <Image 
-                src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico" 
+                src={logoUtama}
                 alt="Logo" 
                 fill 
+                unoptimized
                 className="object-contain"
                 priority
               />

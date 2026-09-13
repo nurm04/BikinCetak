@@ -1,3 +1,5 @@
+"use client";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -9,14 +11,27 @@ import {
   Ticket
 } from "lucide-react";
 import { Pesanan, PesananItem, CustomAttributeValue } from "@/services/pesanService";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
 
 interface Props {
   pesanan: Pesanan;
 }
 
 export default function CardPesanan({ pesanan }: Props) {
-  const totalItem = pesanan.pesanan_item?.reduce((sum, item) => sum + (Number(item.jumlah) || 0), 0) ?? 0;
+  // 👇 STATE UNTUK PENGATURAN WEB 👇
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
 
+  useEffect(() => {
+    getPengaturan().then((res) => {
+      if (res) setPengaturan(res);
+    });
+  }, []);
+
+  // Siapkan URL fallback / logo utama dari database
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
+
+  const totalItem = pesanan.pesanan_item?.reduce((sum, item) => sum + (Number(item.jumlah) || 0), 0) ?? 0;
   const ongkir = Number(pesanan.harga_ongkir || 0);
   const diskon = Number(pesanan.diskon_voucher_nominal || 0);
   const kodeUnik = Number(pesanan.kode_unik || 0);
@@ -27,7 +42,6 @@ export default function CardPesanan({ pesanan }: Props) {
   const hitungRowTotal = (item: PesananItem) => {
     let hargaDasar = Number(item.harga_satuan_snapshot) || 0;
 
-    // 1. Ekstrak Jumlah Halaman dengan aman
     let jumlahHalaman = 1;
     let atribut: Record<string, CustomAttributeValue> = {};
 
@@ -50,16 +64,12 @@ export default function CardPesanan({ pesanan }: Props) {
       }
     }
 
-    // ==========================================================
-    // 2. REVISI: Ambil Multiplier Luas Dihargai (Khusus Meteran)
-    // ==========================================================
     let multiplierLuas = 1;
     if (atribut && atribut["Luas Dihargai (m2)"] !== undefined) {
       multiplierLuas = parseFloat(String(atribut["Luas Dihargai (m2)"]));
       if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
     }
 
-    // 3. Deteksi Sisi Cetak
     let sisi = 1;
     item.pesanan_item_finishing?.forEach((fin) => {
       const label = (fin.nama_finishing_snapshot || "").toLowerCase();
@@ -68,12 +78,10 @@ export default function CardPesanan({ pesanan }: Props) {
       }
     });
 
-    // 4. Tambahkan Biaya Kertas Halaman Dalam (halaman 1 gratis)
     if (jumlahHalaman > 1) {
       hargaDasar += (jumlahHalaman - 1) * sisi * 1500;
     }
 
-    // 5. Kalkulasi Total (Harga Dasar * Luas + Finishing) * Qty
     const finishingTotal = item.pesanan_item_finishing?.reduce((sum, fin) => sum + (Number(fin.harga_finishing_snapshot) || 0), 0) ?? 0;
     
     const subtotalItem = ((hargaDasar * multiplierLuas) + finishingTotal) * (Number(item.jumlah) || 1);
@@ -82,7 +90,6 @@ export default function CardPesanan({ pesanan }: Props) {
     return subtotalItem + biayaPengerjaan;
   };
 
-  // 6. Timpa total tagihan dari DB dengan kalkulasi aktual frontend (termasuk kode unik)
   const subtotalProduk = pesanan.pesanan_item?.reduce((sum, item) => sum + hitungRowTotal(item), 0) ?? 0;
   const totalTagihan = subtotalProduk + ongkir - diskon + kodeUnik;
 
@@ -128,9 +135,10 @@ export default function CardPesanan({ pesanan }: Props) {
               
               <div className="relative w-16 h-16 overflow-hidden border shrink-0 bg-base-200 rounded-xl border-base-300">
                 <Image
-                  src={item.gambar_url || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"}
+                  src={item.gambar_url || logoUtama} // 👈 GUNAKAN LOGO DINAMIS DARI DATABASE
                   alt={cleanProductName || "Produk"}
                   fill
+                  unoptimized // 👈 WAJIB PAKAI INI biar Next.js nggak nolak URL admin lokal lu
                   className="object-cover"
                 />
               </div>

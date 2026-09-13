@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
 
 interface ProductCarouselProps {
   images: string[];
@@ -8,7 +9,21 @@ interface ProductCarouselProps {
 }
 
 const ProductCarousel = ({ images, name }: ProductCarouselProps) => {
-  const finalImages = images && images.length > 0 ? images : ["https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"];
+  // 👇 STATE UNTUK PENGATURAN WEB 👇
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+
+  useEffect(() => {
+    getPengaturan().then((res) => {
+      if (res) setPengaturan(res);
+    });
+  }, []);
+
+  // Siapkan URL fallback / logo utama dari database
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
+
+  // 👇 Gunakan logo dinamis dari Admin jika gambar produk kosong 👇
+  const finalImages = images && images.length > 0 ? images : [logoUtama];
   
   // Membuat referensi untuk mengakses elemen DOM secara langsung
   const carouselRef = useRef<HTMLDivElement>(null);

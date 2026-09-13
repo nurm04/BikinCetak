@@ -3,13 +3,19 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import LupaPasswordForm from "./LupaPasswordForm";
 import { Metadata } from "next";
+import { getPengaturan } from "@/services/pengaturanWebService";
 
 export const metadata: Metadata = {
   title: "Lupa Password",
   description: "Bikin Cetak melayani berbagai kebutuhan promosi bisnis Anda mulai dari Sticker, Banner, Merchandise hingga kebutuhan kantor dengan proses cepat dan harga kompetitif.",
 };
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
+  const pengaturan = await getPengaturan();
+  
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
+  
   return (
     <main className="min-h-screen bg-base-200 flex items-center justify-center px-4 py-10">
       <Link 
@@ -24,9 +30,10 @@ export default function ForgotPasswordPage() {
           <div className="flex flex-col items-center mb-8">
             <div className="relative w-16 h-16 mb-2">
               <Image 
-                src="https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico" 
+                src={logoUtama}
                 alt="Logo" 
                 fill 
+                unoptimized
                 className="object-contain"
                 priority
               />

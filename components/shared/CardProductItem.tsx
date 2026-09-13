@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Trash2, Plus, Minus, Clock, Paperclip, Link as LinkIcon, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { RincianDiskonAPI, CustomAttributeValue, FileDesainAPI } from "@/services/cartService";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
 
 interface FinishingItem {
   id?: number;
@@ -11,7 +12,7 @@ interface FinishingItem {
   nama_pilihan?: string;
   nama_finishing?: string;
   harga_tambahan: number;
-  kali_jumlah_pesan?: number | boolean; // Tambahkan ini untuk sinkronisasi harga
+  kali_jumlah_pesan?: number | boolean;
 }
 
 interface CartProductItemProps {
@@ -29,7 +30,6 @@ interface CartProductItemProps {
   harga_pengerjaan_snapshot?: number;
   catatan?: string | null;
   
-  // Ambil tipe langsung dari API agar strict
   file_desain?: FileDesainAPI | string | string[] | null;
   atribut_custom_snapshot?: Record<string, CustomAttributeValue> | string | null;
 
@@ -62,6 +62,19 @@ export default function CartProductItem({
   isLoading = false,
 }: CartProductItemProps) {
 
+  // 👇 STATE UNTUK PENGATURAN WEB 👇
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+
+  useEffect(() => {
+    getPengaturan().then((res) => {
+      if (res) setPengaturan(res);
+    });
+  }, []);
+
+  // Siapkan URL fallback / logo utama dari database
+  const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = pengaturan?.logo_utama || fallbackLogo;
+
   // ==========================================
   // PARSING & FILTERING ATRIBUT CUSTOM
   // ==========================================
@@ -76,7 +89,6 @@ export default function CartProductItem({
     rawAtribut = atribut_custom_snapshot as Record<string, CustomAttributeValue> | null;
   }
 
-  // Buang atribut yang nilainya null, undefined, atau string kosong ""
   let parsedAtribut: Record<string, CustomAttributeValue> | null = null;
   if (rawAtribut && typeof rawAtribut === 'object') {
     const filtered = Object.entries(rawAtribut).filter(
@@ -90,8 +102,6 @@ export default function CartProductItem({
   // ==========================================
   // LOGIKA KALKULASI HARGA (SINKRON DENGAN CART)
   // ==========================================
-  
-  // 1. Cari Sisi Cetak
   let sisi = 1; 
   finishing.forEach(f => {
       const namaFin = (f.nama_finishing || f.nama_pilihan || "").toLowerCase();
@@ -100,7 +110,6 @@ export default function CartProductItem({
       }
   });
 
-  // 2. Hitung Biaya Halaman Kertas (Jika Ada)
   let paperCost = 0;
   if (parsedAtribut && parsedAtribut['Jumlah Halaman'] !== undefined) {
       let hal = parseInt(String(parsedAtribut['Jumlah Halaman']), 10);
@@ -108,7 +117,6 @@ export default function CartProductItem({
       paperCost = (Math.max(0, hal - 1) * sisi * 1500);
   }
 
-  // 3. REVISI: Ambil Multiplier Luas Dihargai
   let multiplierLuas = 1;
   let isMeteran = false;
   if (parsedAtribut && parsedAtribut['Luas Dihargai (m2)'] !== undefined) {
@@ -117,23 +125,17 @@ export default function CartProductItem({
       if (isNaN(multiplierLuas) || multiplierLuas < 1) multiplierLuas = 1;
   }
 
-  // Harga dasar murni per item/meter (Harga SKU awal + Harga Kertas Tambahan)
   const basePrice = harga_satuan + paperCost;
-  
-  // REVISI: Subtotal produk utama sekarang dikali Luas Dihargai (kalau ada)
   let subtotalItem = (basePrice * multiplierLuas) * jumlah;
 
-  // 4. Hitung Biaya Finishing
   finishing.forEach((f) => {
     const isKaliQty = f.kali_jumlah_pesan === true || f.kali_jumlah_pesan === 1;
     const val = f.harga_tambahan || 0;
     subtotalItem += isKaliQty ? (val * jumlah) : val;
   });
 
-  // Total Keseluruhan Baris (Termasuk SLA/Pengerjaan)
   const rowTotal = subtotalItem + harga_pengerjaan_snapshot;
-  // ==========================================
-
+  
   // ==========================================
   // BERSIHKAN NAMA PRODUK DARI KODE SKU
   // ==========================================
@@ -200,7 +202,7 @@ export default function CartProductItem({
 
         <div className="relative w-17 h-17 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-base-200 border border-base-content/10 shrink-0">
           <Image 
-            src={gambar_url || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png"}
+            src={gambar_url || logoUtama} // 👈 GUNAKAN LOGO DINAMIS DARI DATABASE
             alt={productName} 
             fill 
             unoptimized
@@ -233,7 +235,6 @@ export default function CartProductItem({
               ✨ {rincian_diskon_snapshot[0].nama}
             </span>
           )}
-          {/* 👇 PERBAIKAN: Syarat Muncul Badge Berubah */}
           {estimasi_pengerjaan && (
             <span className="text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-warning bg-warning/10 px-1.5 py-0.5 rounded flex items-center gap-1">
               <Clock size={9}/> {estimasi_pengerjaan} 
