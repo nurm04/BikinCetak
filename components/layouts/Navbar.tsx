@@ -1,6 +1,5 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, LogOut, ShoppingBag, LogIn, Package, Search } from 'lucide-react';
 import SwapTheme from '../ui/SwapTheme';
 import Link from 'next/link';
@@ -9,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ItemData } from "@/services/itemService";
 import { getUserProfile } from "@/services/userService";
 import { logoutAction } from "@/services/authService";
-import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService"; // 👈 IMPORT SERVICE
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
 
 interface NavbarProps {
@@ -25,14 +24,11 @@ interface CategoryGroup {
 }
 
 const Navbar = ({ items = [] }: NavbarProps) => {
+  // State User & Pengaturan
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>("Pelanggan");
-  const [mounted, setMounted] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(""); 
-  
-  // State untuk nyimpen data pengaturan web
   const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
-  
+
   const pathname = usePathname();
   const router = useRouter();  
 
@@ -44,42 +40,23 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     router.refresh();
   }, [router]);
 
-  const checkAuth = useCallback(async () => {
-    const res = await getUserProfile();
-    if (res.data) {
-      setIsLoggedIn(true);
-      setUserName(res.data.name || res.data.email || "User");
-    } else {
-      setIsLoggedIn(false);
-      setUserName("Pelanggan");
-    }
-  }, []);
-
+  // 👇 FETCHING PARALEL (Jauh Lebih Cepat dari sebelumnya)
   useEffect(() => {
-    setMounted(true);
-    checkAuth();
-    
-    // Tarik data pengaturan secara asinkron pas komponen di-mount
-    getPengaturan().then((res) => {
-      if (res) setPengaturan(res);
+    Promise.all([getUserProfile(), getPengaturan()]).then(([resUser, resPengaturan]) => {
+      if (resUser?.data) {
+        setIsLoggedIn(true);
+        setUserName(resUser.data.name || resUser.data.email || "User");
+      }
+      if (resPengaturan) {
+        setPengaturan(resPengaturan);
+      }
     });
-  }, [checkAuth]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      const elem = document.activeElement as HTMLElement;
-      if (elem) elem.blur();
-      router.push(`/katalog?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
+  }, []);
 
   const closeDropdown = () => {
     const elem = document.activeElement as HTMLElement;
     if (elem) elem.blur();
   };
-
-  if (!mounted) return <div className="h-10 w-20 bg-base-200 animate-pulse rounded-xl"></div>;
 
   const isHome = pathname === '/';
 
@@ -88,44 +65,43 @@ const Navbar = ({ items = [] }: NavbarProps) => {
   // ==========================================
   const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
   const logoUtama = pengaturan?.logo_utama || fallbackLogo;
-  
-  // Ambil nama brand saja (Sebelum tanda strip "-") dan ubah jadi huruf besar
   const namaWebsite = pengaturan?.nama_website 
     ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() 
-    : "BIKIN CETAK";
+    : "BIKINCETAK";
 
   // ==========================================
-  // LOGIC GROUPING KATEGORI 
+  // LOGIC GROUPING KATEGORI (DI-MEMOIZE BIAR ENTENG)
   // ==========================================
-  const groupedCategories: Record<string, CategoryGroup> = {};
-  
-  items.forEach((item) => {
-    if (item.is_active === 0 || item.id_produk === "PRD-0001") return;
-    
-    const catId = item.kategori?.id_kategori || "lainnya";
-    const catName = item.kategori?.nama_kategori || "Lainnya";
-    const catUrutan = item.kategori?.urutan ?? 999;
-    const catIcon = item.kategori?.icon || null;
+  const dynamicCategories = useMemo(() => {
+    const grouped: Record<string, CategoryGroup> = {};
 
-    if (!groupedCategories[catId]) {
-      groupedCategories[catId] = {
-        id: catId,
-        label: catName,
-        urutan: catUrutan,
-        icon: catIcon,
-        submenu: []
-      };
-    }
-    groupedCategories[catId].submenu.push({ name: item.nama_produk });
-  });
+    items.forEach((item) => {
+      if (item.is_active === 0 || item.id_produk === "PRD-0001") return;
 
-  const dynamicCategories = Object.values(groupedCategories)
-    .sort((a, b) => a.urutan - b.urutan);
+      const catId = item.kategori?.id_kategori || "lainnya";
+      const catName = item.kategori?.nama_kategori || "Lainnya";
+      const catUrutan = item.kategori?.urutan ?? 999;
+      const catIcon = item.kategori?.icon || null;
+
+      if (!grouped[catId]) {
+        grouped[catId] = {
+          id: catId,
+          label: catName,
+          urutan: catUrutan,
+          icon: catIcon,
+          submenu: []
+        };
+      }
+      grouped[catId].submenu.push({ name: item.nama_produk });
+    });
+
+    return Object.values(grouped).sort((a, b) => a.urutan - b.urutan);
+  }, [items]); // Hanya ngitung ulang kalau 'items' berubah
 
   return (
     <>
       <div className="sticky top-0 z-50 gap-2 px-4 shadow-sm navbar bg-base-100 md:px-12 lg:px-20 md:gap-4">
-        
+
         {/* KIRI: LOGO */}
         <div className="w-auto navbar-start">
           <Link href="/" className="p-0 px-2 flex items-center gap-1.5 btn btn-ghost hover:bg-transparent">
@@ -134,7 +110,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
                 src={logoUtama} 
                 alt={`${namaWebsite} Logo`} 
                 fill 
-                unoptimized // 👈 Aman dari peringatan Next.js hostname
+                unoptimized 
                 className="object-contain" 
                 priority 
               />
@@ -145,14 +121,14 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: SEARCH BAR */}
+        {/* TENGAH: SEARCH BAR (Ubah pakai Form Native HTML) */}
         <div className="flex-1 px-2 navbar-center md:px-8">
-          <form onSubmit={handleSearch} className="relative w-full max-w-2xl mx-auto">
+          <form action="/katalog" method="GET" className="relative w-full max-w-2xl mx-auto">
             <input
               type="text"
+              name="q"
               placeholder="Cari produk..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              required
               className="w-full pr-10 text-sm transition-all rounded-full input input-sm md:input-md input-bordered md:pr-12 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100"
             />
             <button 
@@ -183,7 +159,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
                   <User size={18} className="md:w-5 md:h-5" />
                 </div>
               </div>
-              
+
               <ul tabIndex={0} className="p-2 mt-4 border shadow-xl menu menu-sm dropdown-content bg-base-100 rounded-2xl z-50 w-64 md:w-72 border-base-content/5">
                 <li className="w-full max-w-full mb-2 overflow-hidden pointer-events-none">
                   <div className="block w-full max-w-full px-3 py-2 overflow-hidden box-border bg-primary/5 rounded-xl">
@@ -192,7 +168,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
                     </span>
                   </div>
                 </li>
-                
+
                 <li><Link href="/profil" onClick={closeDropdown} className="flex items-center gap-3 py-2 font-bold"><User size={16} className="opacity-70" /> Profil Saya</Link></li>
                 <li><Link href="/pesan" onClick={closeDropdown} className="flex items-center gap-3 py-2 font-bold"><Package size={16} className="opacity-70" /> Transaksi</Link></li>
                 <li><Link href="/cart" onClick={closeDropdown} className="flex items-center gap-3 py-2 font-bold"><ShoppingBag size={16} className="opacity-70" /> Keranjang</Link></li>
@@ -216,7 +192,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
       </div>
 
       {/* MENU KATEGORI DESKTOP (Render Dinamis) */}
-      {isHome && (
+      {isHome && dynamicCategories.length > 0 && (
         <div className="justify-center hidden px-4 border-t navbar bg-base-100 lg:flex border-base-200 md:px-12 lg:px-20">
           <ul className="p-0 menu menu-horizontal scrollbar-hide">
             {dynamicCategories.map((menu) => {
