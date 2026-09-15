@@ -1,15 +1,12 @@
-"use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import Image from 'next/image';
+import { redirect } from "next/navigation";
 import { Mail, Phone, Search, MapPin, Globe } from 'lucide-react';
 import { ItemData } from "@/services/itemService";
-// 👇 IMPORT DITAMBAHKAN getHalamanStatisList dan HalamanStatisListData
-import { getPengaturan, PengaturanData, getHalamanStatisList, HalamanStatisListData } from "@/services/pengaturanWebService";
+import { getPengaturan, getHalamanStatisList } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
 
-// Custom Icon untuk TikTok (Karena Lucide belum ada icon TikTok resmi)
+// Custom Icon untuk TikTok
 const TikTokIcon = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
@@ -54,26 +51,26 @@ interface CategoryGroup {
   submenu: Array<{ name: string }>;
 }
 
-const Footer = ({ items = [] }: FooterProps) => {
-  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+// 👇 DIUBAH JADI SERVER COMPONENT (ASYNC)
+export default async function Footer({ items = [] }: FooterProps) {
   
-  // 👇 STATE BARU UNTUK HALAMAN STATIS
-  const [halamanStatis, setHalamanStatis] = useState<HalamanStatisListData[]>([]);
+  // 👇 Tarik 2 API sekaligus di Server (Tanpa loading state)
+  const [pengaturan, halamanStatis] = await Promise.all([
+    getPengaturan(),
+    getHalamanStatisList()
+  ]);
 
-  // Tarik data dinamis dari Redis/API saat komponen di-load
-  useEffect(() => {
-    getPengaturan().then((res) => {
-      if (res) setPengaturan(res);
-    });
-    
-    // 👇 FETCH DATA HALAMAN STATIS
-    getHalamanStatisList().then((res) => {
-      if (res) setHalamanStatis(res);
-    });
-  }, []);
+  // 👇 FUNGSI PENCARIAN (Next.js Server Action)
+  async function checkOrder(formData: FormData) {
+    "use server";
+    const kode = formData.get("kode_transaksi")?.toString().trim();
+    if (kode) {
+      redirect(`/pesan/status/${encodeURIComponent(kode)}`);
+    }
+  }
 
   // ==========================================
-  // LOGIC GROUPING KATEGORI (Tanpa Icon)
+  // LOGIC GROUPING KATEGORI
   // ==========================================
   const groupedCategories: Record<string, CategoryGroup> = {};
 
@@ -107,35 +104,24 @@ const Footer = ({ items = [] }: FooterProps) => {
       submenu: category.submenu,
     }));
 
-  const router = useRouter();
-  const [kodeTransaksi, setKodeTransaksi] = useState("");
-
-  const handleCheckOrder = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const kode = kodeTransaksi.trim();
-    if (!kode) return;
-    router.push(`/pesan/status/${encodeURIComponent(kode)}`);
-  };
 
   // ==========================================
   // DATA DINAMIS DARI PENGATURAN (Dengan Fallback)
   // ==========================================
   const logoUtama = pengaturan?.logo_utama || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
-  const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKIN CETAK";
+  const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKINCETAK";
   const deskripsi = pengaturan?.deskripsi_singkat || "Percetakan online terpercaya yang melayani berbagai kebutuhan cetak mesin offset, digital offset, indoor, outdoor, sablon hingga merchandise.";
   const alamatLengkap = pengaturan?.informasi_lokasi?.alamat_lengkap || "Layanan Online - Seluruh Indonesia";
   const linkGmaps = pengaturan?.informasi_lokasi?.link_gmaps || "https://maps.app.goo.gl/VwC6C6tzCZ8CwPSK8";
   const emailPerusahaan = pengaturan?.informasi_lokasi?.email || "info@bikincetak.co.id";
   
-  // Ambil WA pertama untuk dicantumkan di kontak Footer
-  const waUtama = pengaturan?.daftar_whatsapp?.find(wa => wa.is_active) || { nomor: "081213139490", nama: "CS" };
+  const waUtama = pengaturan?.daftar_whatsapp?.find(wa => wa.is_active) || { nomor: "6281213139490", nama: "CS" };
   const waUtamaLink = `https://wa.me/${waUtama.nomor.replace(/\D/g, '').startsWith('0') ? '62' + waUtama.nomor.replace(/\D/g, '').substring(1) : waUtama.nomor.replace(/\D/g, '')}`;
 
   const sosmedList = pengaturan?.daftar_sosmed?.filter(s => s.is_active) || [];
   const metodePembayaran = pengaturan?.metode_pembayaran?.filter(m => m.is_active) || [];
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "Menerima pembayaran melalui transfer Bank BCA dan seluruh E-Wallet / M-Banking via QRIS.";
 
-  // Helper untuk merender icon sosmed yang dinamis berdasarkan nama yang diinput Admin
   const renderSosmedIcon = (iconName: string) => {
     const name = iconName.toLowerCase();
     if (name.includes('instagram') || name.includes('ig')) return <InstagramIcon size={18} />;
@@ -214,19 +200,17 @@ const Footer = ({ items = [] }: FooterProps) => {
             <div className="max-w-2xl pt-6 mt-8 border-t border-white/20">
               <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Metode Pembayaran</h6>
               <div className="flex flex-wrap items-center gap-3">
-                
                 {metodePembayaran.map((bank, index) => (
                   <div key={index} className="relative overflow-hidden bg-white rounded-lg shadow-sm h-10 w-16 group" title={`${bank.nama_metode} - ${bank.no_rekening}`}>
                     <Image 
                       src={bank.icon_url} 
                       alt={bank.nama_metode} 
                       fill 
-                      unoptimized // Biar nggak pusing sama next.config.js kalau pakai URL lokal Admin
+                      unoptimized 
                       className="object-contain p-1.5" 
                     />
                   </div>
                 ))}
-                
               </div>
               <p className="text-[10px] mt-3 opacity-70 font-medium max-w-xl">
                 {teksPembayaran}
@@ -239,24 +223,13 @@ const Footer = ({ items = [] }: FooterProps) => {
           <div className="flex flex-col gap-4">
             <h6 className="font-bold text-white footer-title opacity-100">Hubungi Kami</h6>
             <div className="flex flex-col gap-3 text-sm">
-              <a
-                href={waUtamaLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 transition-colors hover:text-black"
-              >
-                <Phone size={16} />
-                <span>{waUtama.nomor}</span>
+              <a href={waUtamaLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 transition-colors hover:text-black">
+                <Phone size={16} /><span>{waUtama.nomor}</span>
               </a>
               <div className="flex items-center gap-3">
                 <Mail size={16} /> <span>{emailPerusahaan}</span>
               </div>
-              <a
-                href={linkGmaps}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 transition-colors hover:text-black group"
-              >
+              <a href={linkGmaps} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 transition-colors hover:text-black group">
                 <MapPin size={16} className="mt-0.5 shrink-0 transition-transform group-hover:scale-110" /> 
                 <span className="leading-snug line-clamp-2">{alamatLengkap}</span>
               </a>
@@ -267,12 +240,13 @@ const Footer = ({ items = [] }: FooterProps) => {
                 Cek Status Pesanan
               </h6>
 
-              <form onSubmit={handleCheckOrder} className="flex gap-2">
+              {/* 👇 FORM DIREVISI PAKAI SERVER ACTION 👇 */}
+              <form action={checkOrder} className="flex gap-2">
                 <input
                   type="text"
+                  name="kode_transaksi"
                   placeholder="Kode Transaksi"
-                  value={kodeTransaksi}
-                  onChange={(e) => setKodeTransaksi(e.target.value)}
+                  required
                   className="w-full input input-bordered input-sm text-base-content"
                 />
                 <button
@@ -297,8 +271,7 @@ const Footer = ({ items = [] }: FooterProps) => {
           <p className="opacity-80">© {new Date().getFullYear()} {namaWebsite} - Layanan Percetakan Online</p>
           <div className="flex flex-wrap justify-center gap-4 md:gap-6">
             
-            {/* 👇 RENDER LINK HALAMAN STATIS SECARA DINAMIS 👇 */}
-            {halamanStatis && halamanStatis.length > 0 ? (
+            {halamanStatis && halamanStatis.length > 0 && (
               halamanStatis.map((halaman) => (
                 <Link 
                   key={halaman.id} 
@@ -308,11 +281,7 @@ const Footer = ({ items = [] }: FooterProps) => {
                   {halaman.judul}
                 </Link>
               ))
-            ) : (
-              // Fallback jika data belum ter-load atau kosong
-              <span className="opacity-50">Memuat info...</span>
             )}
-            {/* 👆 ========================================== 👆 */}
 
           </div>
         </div>
@@ -320,5 +289,3 @@ const Footer = ({ items = [] }: FooterProps) => {
     </footer>
   );
 }
-
-export default Footer;
