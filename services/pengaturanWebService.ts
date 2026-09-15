@@ -212,22 +212,12 @@ export async function getHalamanStatisList(): Promise<HalamanStatisListData[]> {
 }
 
 export async function getHalamanStatisDetail(slug: string): Promise<HalamanStatisDetailData | null> {
-  const cacheKey = `bikincetak:web:halaman_statis_detail:${slug}`;
-
   try {
-    let cachedData = null;
-    try {
-      cachedData = await redis.get(cacheKey);
-    } catch (redisError) {}
-
-    if (cachedData) {
-      return JSON.parse(cachedData);
-    }
-
     const url = `${API_BASE_URL}/api/web/halaman-statis/${encodeURIComponent(slug)}`;
+    
     const response = await fetch(url, { 
       method: "GET", 
-      cache: "no-store" 
+      next: { revalidate: 60 } 
     });
 
     if (!response.ok) return null;
@@ -235,9 +225,6 @@ export async function getHalamanStatisDetail(slug: string): Promise<HalamanStati
     const result: ApiHalamanStatisDetailResponse = await response.json();
     
     if (result.success) {
-      try {
-        await redis.set(cacheKey, JSON.stringify(result.data), "EX", 3600);
-      } catch (setCacheError) {}
       return result.data;
     }
 

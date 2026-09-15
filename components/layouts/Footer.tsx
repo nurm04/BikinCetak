@@ -5,7 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Mail, Phone, Search, MapPin, Globe } from 'lucide-react';
 import { ItemData } from "@/services/itemService";
-import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService";
+// 👇 IMPORT DITAMBAHKAN getHalamanStatisList dan HalamanStatisListData
+import { getPengaturan, PengaturanData, getHalamanStatisList, HalamanStatisListData } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
 
 // Custom Icon untuk TikTok (Karena Lucide belum ada icon TikTok resmi)
@@ -55,11 +56,19 @@ interface CategoryGroup {
 
 const Footer = ({ items = [] }: FooterProps) => {
   const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+  
+  // 👇 STATE BARU UNTUK HALAMAN STATIS
+  const [halamanStatis, setHalamanStatis] = useState<HalamanStatisListData[]>([]);
 
   // Tarik data dinamis dari Redis/API saat komponen di-load
   useEffect(() => {
     getPengaturan().then((res) => {
       if (res) setPengaturan(res);
+    });
+    
+    // 👇 FETCH DATA HALAMAN STATIS
+    getHalamanStatisList().then((res) => {
+      if (res) setHalamanStatis(res);
     });
   }, []);
 
@@ -287,10 +296,24 @@ const Footer = ({ items = [] }: FooterProps) => {
         <div className="container flex flex-col items-center justify-between gap-4 px-4 mx-auto text-[10px] font-bold tracking-wider uppercase md:px-8 md:flex-row">
           <p className="opacity-80">© {new Date().getFullYear()} {namaWebsite} - Layanan Percetakan Online</p>
           <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-            <Link href="/profil" className="transition-colors opacity-80 hover:opacity-100 hover:text-black">Profil</Link>
-            <Link href="/cara-order" className="transition-colors opacity-80 hover:opacity-100 hover:text-black">Cara Order</Link>
-            <Link href="/faq" className="transition-colors opacity-80 hover:opacity-100 hover:text-black">FAQ</Link>
-            <Link href="/syarat-ketentuan" className="transition-colors opacity-80 hover:opacity-100 hover:text-black">Syarat & Ketentuan</Link>
+            
+            {/* 👇 RENDER LINK HALAMAN STATIS SECARA DINAMIS 👇 */}
+            {halamanStatis && halamanStatis.length > 0 ? (
+              halamanStatis.map((halaman) => (
+                <Link 
+                  key={halaman.id} 
+                  href={`/${halaman.slug}`} 
+                  className="transition-colors opacity-80 hover:opacity-100 hover:text-black"
+                >
+                  {halaman.judul}
+                </Link>
+              ))
+            ) : (
+              // Fallback jika data belum ter-load atau kosong
+              <span className="opacity-50">Memuat info...</span>
+            )}
+            {/* 👆 ========================================== 👆 */}
+
           </div>
         </div>
       </div>
