@@ -1,9 +1,12 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import Image from 'next/image';
-import { redirect } from "next/navigation";
 import { Mail, Phone, Search, MapPin, Globe } from 'lucide-react';
 import { ItemData } from "@/services/itemService";
-import { getPengaturan, getHalamanStatisList } from "@/services/pengaturanWebService";
+import { getPengaturan, PengaturanData, getHalamanStatisList, HalamanStatisListData } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
 
 // Custom Icon untuk TikTok
@@ -51,23 +54,26 @@ interface CategoryGroup {
   submenu: Array<{ name: string }>;
 }
 
-// 👇 DIUBAH JADI SERVER COMPONENT (ASYNC)
-export default async function Footer({ items = [] }: FooterProps) {
-  
-  // 👇 Tarik 2 API sekaligus di Server (Tanpa loading state)
-  const [pengaturan, halamanStatis] = await Promise.all([
-    getPengaturan(),
-    getHalamanStatisList()
-  ]);
+export default function Footer({ items = [] }: FooterProps) {
+  const router = useRouter();
+  const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+  const [halamanStatis, setHalamanStatis] = useState<HalamanStatisListData[]>([]);
+  const [kodeTransaksi, setKodeTransaksi] = useState("");
 
-  // 👇 FUNGSI PENCARIAN (Next.js Server Action)
-  async function checkOrder(formData: FormData) {
-    "use server";
-    const kode = formData.get("kode_transaksi")?.toString().trim();
-    if (kode) {
-      redirect(`/pesan/status/${encodeURIComponent(kode)}`);
-    }
-  }
+  // 👇 FETCHING PARALEL (Lebih cepat dari kode versi awal lu)
+  useEffect(() => {
+    Promise.all([getPengaturan(), getHalamanStatisList()]).then(([resPengaturan, resHalaman]) => {
+      if (resPengaturan) setPengaturan(resPengaturan);
+      if (resHalaman) setHalamanStatis(resHalaman);
+    });
+  }, []);
+
+  const handleCheckOrder = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const kode = kodeTransaksi.trim();
+    if (!kode) return;
+    router.push(`/pesan/status/${encodeURIComponent(kode)}`);
+  };
 
   // ==========================================
   // LOGIC GROUPING KATEGORI
@@ -110,7 +116,7 @@ export default async function Footer({ items = [] }: FooterProps) {
   // ==========================================
   const logoUtama = pengaturan?.logo_utama || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
   const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKINCETAK";
-  const deskripsi = pengaturan?.deskripsi_singkat || "Percetakan online terpercaya yang melayani berbagai kebutuhan cetak mesin offset, digital offset, indoor, outdoor, sablon hingga merchandise.";
+  const deskripsi = pengaturan?.deskripsi_singkat || "";
   const alamatLengkap = pengaturan?.informasi_lokasi?.alamat_lengkap || "Layanan Online - Seluruh Indonesia";
   const linkGmaps = pengaturan?.informasi_lokasi?.link_gmaps || "https://maps.app.goo.gl/VwC6C6tzCZ8CwPSK8";
   const emailPerusahaan = pengaturan?.informasi_lokasi?.email || "info@bikincetak.co.id";
@@ -120,7 +126,7 @@ export default async function Footer({ items = [] }: FooterProps) {
 
   const sosmedList = pengaturan?.daftar_sosmed?.filter(s => s.is_active) || [];
   const metodePembayaran = pengaturan?.metode_pembayaran?.filter(m => m.is_active) || [];
-  const teksPembayaran = pengaturan?.teks_info_pembayaran || "Menerima pembayaran melalui transfer Bank BCA dan seluruh E-Wallet / M-Banking via QRIS.";
+  const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
 
   const renderSosmedIcon = (iconName: string) => {
     const name = iconName.toLowerCase();
@@ -240,13 +246,13 @@ export default async function Footer({ items = [] }: FooterProps) {
                 Cek Status Pesanan
               </h6>
 
-              {/* 👇 FORM DIREVISI PAKAI SERVER ACTION 👇 */}
-              <form action={checkOrder} className="flex gap-2">
+              {/* 👇 FORM DIKEMBALIKAN KE VERSI ON-SUBMIT (CLIENT SIDE) 👇 */}
+              <form onSubmit={handleCheckOrder} className="flex gap-2">
                 <input
                   type="text"
-                  name="kode_transaksi"
                   placeholder="Kode Transaksi"
-                  required
+                  value={kodeTransaksi}
+                  onChange={(e) => setKodeTransaksi(e.target.value)}
                   className="w-full input input-bordered input-sm text-base-content"
                 />
                 <button
