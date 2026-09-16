@@ -30,7 +30,7 @@ interface FormPesanProps {
   kelipatanQty?: number; 
   tipeKalkulasi?: string;
   sisiCetakMultiplier?: number;
-  hargaTambahanDimensi?: number; // 👈 TAMBAHAN PROPS BARU
+  hargaTambahanDimensi?: number; 
 }
 
 export default function FormPesan({ 
@@ -44,9 +44,10 @@ export default function FormPesan({
   minimumQty = 1, 
   kelipatanQty = 1,
   tipeKalkulasi = "standard",
-  hargaTambahanDimensi = 0 // 👈 DESTRUCTURING DEFAULT VALUE
+  hargaTambahanDimensi = 0 
 }: FormPesanProps) {
   
+  // ATURAN DEFAULT FINISHING
   useEffect(() => {
     if (!groupedAddons || !onValueChange || !selectedFinishing) return;
 
@@ -56,11 +57,13 @@ export default function FormPesan({
 
       if (currentFinishingObj === undefined) {
         if (hasZero) {
+          // Jika ada yang harganya 0, otomatis pilih itu (Aturan 1 & 2)
           const zeroAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
           if (zeroAddon) {
             onValueChange(groupName, String(zeroAddon.id_sku_finishing));
           }
         } else {
+          // Jika semua bayar, otomatis pilih "Tanpa..." (Aturan 3)
           onValueChange(groupName, "");
         }
       }
@@ -85,14 +88,11 @@ export default function FormPesan({
   }, [minimumQty, kelipatanQty]); 
 
   const availableRolls = useMemo(() => [0.9, 1.2, 1.6, 1.8, 2.0], []);
-  
   const currentRoll = parseFloat(values?.['Lebar Bahan Dihitung'] || "1.20");
   const currentPanjang = parseFloat(values?.Panjang || "1");
   const currentLebar = parseFloat(values?.Lebar || "1");
-  
   const maxDim = Math.max(currentPanjang, currentLebar);
   const qtyInput = parseInt(values?.qty || String(minimumQty), 10);
-
   const renderUtama = fieldsUtama?.length ? fieldsUtama : (fields || []);
 
   return (
@@ -100,7 +100,6 @@ export default function FormPesan({
 
       {renderUtama.map((field, index) => {
         const selectOptions = field.options || [];
-
         return (
           <div key={`utama-${index}`} className="pt-2">
             <FormSelect 
@@ -117,7 +116,7 @@ export default function FormPesan({
       })}
 
       {tipeKalkulasi === "cetak_meteran" && (
-        <div className="space-y-4 pt-4 border-t border-base-content/5">
+        <div className="pt-4 space-y-4 border-t border-base-content/5">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FormInput label="Panjang (Meter)" name="Panjang" type="number" min="0.1" step="0.1" value={values?.Panjang ?? ""} onChange={onValueChange} />
@@ -144,8 +143,8 @@ export default function FormPesan({
               </div>
             </div>
             
-            <div className="bg-base-200/50 border border-base-content/10 p-3 rounded-xl text-xs font-bold text-base-content/70">
-               Perhitungan: {qtyInput} x {currentRoll} x {maxDim} = <span className="text-primary font-black ml-1">{((qtyInput * currentRoll * maxDim)).toFixed(1).replace(/\.0$/, '')} m²</span>
+            <div className="p-3 font-bold border bg-base-200/50 border-base-content/10 rounded-xl text-xs text-base-content/70">
+               Perhitungan: {qtyInput} x {currentRoll} x {maxDim} = <span className="ml-1 font-black text-primary">{((qtyInput * currentRoll * maxDim)).toFixed(1).replace(/\.0$/, '')} m²</span>
                {((qtyInput * currentRoll * maxDim)) < 1 && (
                   <div className="text-[9px] font-bold text-error italic mt-1 block">
                       *Minimal order dihitung 1 m²
@@ -157,14 +156,12 @@ export default function FormPesan({
       )}
 
       {tipeKalkulasi === "cetak_buku" && (
-        <div className="pt-4 border-t border-base-content/5 grid grid-cols-1">
+        <div className="grid grid-cols-1 pt-4 border-t border-base-content/5">
           <FormInput label="Jumlah Halaman" name="jumlah_halaman" type="number" min="1" value={values?.jumlah_halaman ?? ""} onChange={onValueChange} />
           {(() => {
              const inputHal = parseInt(values?.jumlah_halaman || "1", 10);
              const halValid = isNaN(inputHal) || inputHal < 1 ? 1 : inputHal;
              const tambahanHalaman = Math.max(0, halValid - 1);
-
-             // 👇 HAPUS Sisi Cetak Multiplier. Langsung kalikan jumlah halaman dengan harga dasar (hargaTambahanDimensi)
              const biayaHalaman = tambahanHalaman * hargaTambahanDimensi; 
              
              if (biayaHalaman > 0) {
@@ -180,7 +177,7 @@ export default function FormPesan({
       )}
 
       {(fieldsTambahan && fieldsTambahan.length > 0 || (groupedAddons && Object.keys(groupedAddons).length > 0)) && (
-        <div className="pt-4 border-t border-base-content/5 space-y-4">
+        <div className="pt-4 space-y-4 border-t border-base-content/5">
           <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Spesifikasi Tambahan</p>
           
           {fieldsTambahan && fieldsTambahan.map((field, index) => {
@@ -204,21 +201,18 @@ export default function FormPesan({
             const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
             const addonOptions: FormFieldOption[] = [];
 
+            // 👇 MURNI LABEL TANPA HARGA RUPIAH DI DROPDOWN 👇
             if (!hasZero) {
               addonOptions.push({
                 value: "",
-                label: `Tanpa ${groupName} (+ Rp 0)`
+                label: `Tanpa ${groupName}` // <-- "(+ Rp 0)" dihapus
               });
             }
 
             addons.forEach(a => {
-              const labelBiaya = a.tipe === 'persen' 
-                ? `${a.harga_tambahan}%` 
-                : `Rp ${Number(a.harga_tambahan).toLocaleString("id-ID")}`;
-
               addonOptions.push({
                 value: String(a.id_sku_finishing), 
-                label: `${a.nama_pilihan} (+ ${labelBiaya})`
+                label: a.nama_pilihan // <-- Label harga dihapus
               });
             });
 

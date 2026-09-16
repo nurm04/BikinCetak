@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import ProductCarousel from "@/components/shared/ProductCarousel";
 import ProductRow from "@/components/shared/ProductRow";
 import FileUpload, { FileDesainPayload } from "@/components/ui/FileUpload";
-import { ShoppingBag, CreditCard, Award, CheckCircle, Truck, ShieldCheck, Info, Clock } from "lucide-react";
+import { ShoppingBag, CreditCard, Award, CheckCircle, Truck, ShieldCheck, Info, Clock, HelpCircle } from "lucide-react";
 import AlertPopup from "@/components/ui/AlertPopup";
 import { slugify } from "@/lib/utils";
 
@@ -698,6 +698,67 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
   };
 
+  // 👇 FUNGSI RENDER TOOLTIP RINCIAN HARGA 👇
+  const renderTooltipHarga = () => {
+    let totalSatuan = hargaSatuProdukFull;
+
+    return (
+      <div className="ml-1 dropdown dropdown-end dropdown-hover">
+        <div tabIndex={0} role="button" className="min-h-0 w-5 h-5 flex items-center justify-center btn btn-circle btn-ghost btn-xs text-base-content/50 hover:bg-base-200">
+          <HelpCircle size={14} />
+        </div>
+        <div tabIndex={0} className="dropdown-content z-50 p-4 shadow-xl bg-base-100 rounded-xl w-64 border border-base-content/10 text-xs font-normal normal-case mt-1 cursor-default">
+          <div className="font-black text-[10px] uppercase opacity-50 mb-2 border-b border-base-content/10 pb-1">
+            Rincian Harga Satuan
+          </div>
+          
+          <div className="flex justify-between py-1">
+            <span className="opacity-70">Harga Dasar</span>
+            <span className="font-bold">Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
+          </div>
+
+          {Object.values(selectedFinishing).map(fin => {
+            if (!fin) return null;
+            const { harga, tipe } = getActiveFinishingPrice(fin, effectiveQtyForTier);
+            
+            let valRp = 0;
+            // KONVERSI PERSENTASE KE RUPIAH
+            if (tipe === 'persen') {
+              valRp = hargaSatuProdukFull * (harga / 100);
+            } else {
+              valRp = harga;
+              const isKaliDimensi = fin.kali_dimensi === true || String(fin.kali_dimensi) === '1';
+              if (isKaliDimensi) {
+                if (sku?.tipe_kalkulasi === 'cetak_meteran') {
+                  const luas = parseFloat(selectedOptions['Luas Dihargai (m2)']);
+                  if (!isNaN(luas) && luas > 0) valRp *= luas;
+                } else if (sku?.tipe_kalkulasi === 'cetak_buku') {
+                  const hal = parseInt(selectedOptions['jumlah_halaman'], 10);
+                  if (!isNaN(hal) && hal > 0) valRp *= hal;
+                }
+              }
+            }
+
+            totalSatuan += valRp;
+
+            return (
+              <div key={fin.id_sku_finishing} className="flex justify-between py-1">
+                <span className="pr-2 truncate opacity-70 max-w-35">{fin.nama_pilihan}</span>
+                <span className="shrink-0 font-bold">Rp {valRp.toLocaleString("id-ID")}</span>
+              </div>
+            );
+          })}
+
+          <div className="flex justify-between pt-1 mt-1 font-black border-t border-base-content/10 text-primary">
+            <span>Total Satuan</span>
+            <span>Rp {totalSatuan.toLocaleString("id-ID")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  // 👆 END FUNGSI RENDER TOOLTIP 👆
+
   return (
     <main className="min-h-screen px-4 py-6 relative bg-base-200 md:px-8">
       <AlertPopup 
@@ -874,6 +935,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                              <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                            )}
                            <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
+                           
+                           {renderTooltipHarga()}
                         </div>
                       </div>
                       
