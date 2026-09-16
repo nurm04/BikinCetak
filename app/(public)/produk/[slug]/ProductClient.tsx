@@ -133,6 +133,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
   }, [sku?.nama_sku]);
 
+  // 👇 PERBAIKAN: ATURAN DEFAULT FINISHING DI-SET DISINI AGAR SOLID 👇
   useEffect(() => {
     if (!sku) {
       setSelectedFinishing({});
@@ -145,8 +146,17 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         if (!groups[fin.kategori_finishing]) groups[fin.kategori_finishing] = [];
         groups[fin.kategori_finishing].push(fin);
       });
+      
       Object.entries(groups).forEach(([kategori, options]) => {
-        if (options.length > 0) defaultFinishing[kategori] = null;
+        // Aturan 1 & 2: Cari yang harganya 0, jadikan default
+        const zeroAddon = options.find((a) => Number(a.harga_tambahan) === 0);
+        
+        if (zeroAddon) {
+          defaultFinishing[kategori] = zeroAddon; 
+        } else {
+          // Aturan 3: Jika semua bayar, default-nya null ("Tanpa...")
+          defaultFinishing[kategori] = null; 
+        }
       });
     }
     setSelectedFinishing(defaultFinishing);
@@ -698,16 +708,16 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
   };
 
-  // 👇 FUNGSI RENDER TOOLTIP RINCIAN HARGA 👇
+  // 👇 FUNGSI RENDER TOOLTIP RINCIAN HARGA (PERHITUNGAN PERSENTASE SUDAH FIX) 👇
   const renderTooltipHarga = () => {
     let totalSatuan = hargaSatuProdukFull;
 
     return (
-      <div className="ml-1 dropdown dropdown-end dropdown-hover">
-        <div tabIndex={0} role="button" className="min-h-0 w-5 h-5 flex items-center justify-center btn btn-circle btn-ghost btn-xs text-base-content/50 hover:bg-base-200">
+      <div className="dropdown dropdown-end dropdown-hover z-50">
+        <div tabIndex={0} role="button" className="flex items-center justify-center btn btn-circle btn-ghost btn-xs text-base-content/50 hover:text-primary hover:bg-base-200 ml-1.5 min-h-0 w-5 h-5">
           <HelpCircle size={14} />
         </div>
-        <div tabIndex={0} className="dropdown-content z-50 p-4 shadow-xl bg-base-100 rounded-xl w-64 border border-base-content/10 text-xs font-normal normal-case mt-1 cursor-default">
+        <div tabIndex={0} className="dropdown-content p-4 shadow-2xl bg-base-100 rounded-xl w-64 border border-base-content/10 text-xs font-normal normal-case mt-1 cursor-default">
           <div className="font-black text-[10px] uppercase opacity-50 mb-2 border-b border-base-content/10 pb-1">
             Rincian Harga Satuan
           </div>
@@ -722,7 +732,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             const { harga, tipe } = getActiveFinishingPrice(fin, effectiveQtyForTier);
             
             let valRp = 0;
-            // KONVERSI PERSENTASE KE RUPIAH
+            // KONVERSI PERSENTASE KE RUPIAH KHUSUS DI TOOLTIP
             if (tipe === 'persen') {
               valRp = hargaSatuProdukFull * (harga / 100);
             } else {
@@ -757,7 +767,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       </div>
     );
   };
-  // 👆 END FUNGSI RENDER TOOLTIP 👆
 
   return (
     <main className="min-h-screen px-4 py-6 relative bg-base-200 md:px-8">
@@ -786,7 +795,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                   <div className="p-4 space-y-3 text-xs leading-relaxed border bg-base-200/50 rounded-xl border-base-content/5">
                     <div>
-                      {/* 👇 PERBAIKAN: Baca object kategori.nama_kategori 👇 */}
                       <span className="opacity-60">Kategori:</span> <span className="font-bold text-base-content">{itemDetail?.kategori?.nama_kategori || "Lainnya"}</span> <br/>
                     </div>
                     <div className="pt-2 border-t border-base-content/10">
@@ -922,7 +930,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                     <div className="space-y-3 text-xs font-bold uppercase">
                       <div className="flex items-center justify-between">
                         <span className="flex flex-col opacity-60">
-                          Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
+                          {/* 👇 PENEMPATAN TOOLTIP DI SEBELAH LABEL HARGA 👇 */}
+                          <span className="flex items-center">
+                            Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
+                            {renderTooltipHarga()}
+                          </span>
                           {sku?.tipe_kalkulasi === 'cetak_buku' && (
                               <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
                           )}
@@ -935,8 +947,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                              <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
                            )}
                            <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
-                           
-                           {renderTooltipHarga()}
                         </div>
                       </div>
                       
@@ -993,7 +1003,11 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
              <div className="space-y-3 text-xs font-bold uppercase">
                 <div className="flex items-center justify-between">
                   <span className="flex flex-col opacity-60">
-                    Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
+                    {/* 👇 PENEMPATAN TOOLTIP DI SEBELAH LABEL HARGA 👇 */}
+                    <span className="flex items-center">
+                      Harga ({currentQty} {sku?.satuan || (sku?.tipe_kalkulasi === 'cetak_buku' ? 'buku' : 'pcs')})
+                      {renderTooltipHarga()}
+                    </span>
                     {sku?.tipe_kalkulasi === 'cetak_buku' && (
                         <span className="text-[9px] lowercase opacity-70">@ {jumlahHalaman} lbr x {sisiCetakMultiplier} sisi</span>
                     )}

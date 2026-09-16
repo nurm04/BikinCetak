@@ -47,29 +47,6 @@ export default function FormPesan({
   hargaTambahanDimensi = 0 
 }: FormPesanProps) {
   
-  // ATURAN DEFAULT FINISHING
-  useEffect(() => {
-    if (!groupedAddons || !onValueChange || !selectedFinishing) return;
-
-    Object.entries(groupedAddons).forEach(([groupName, addons]) => {
-      const currentFinishingObj = selectedFinishing[groupName];
-      const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
-
-      if (currentFinishingObj === undefined) {
-        if (hasZero) {
-          // Jika ada yang harganya 0, otomatis pilih itu (Aturan 1 & 2)
-          const zeroAddon = addons.find((a) => Number(a.harga_tambahan) === 0);
-          if (zeroAddon) {
-            onValueChange(groupName, String(zeroAddon.id_sku_finishing));
-          }
-        } else {
-          // Jika semua bayar, otomatis pilih "Tanpa..." (Aturan 3)
-          onValueChange(groupName, "");
-        }
-      }
-    });
-  }, [groupedAddons]); 
-
   useEffect(() => {
     if (!onValueChange) return;
 
@@ -201,31 +178,25 @@ export default function FormPesan({
             const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
             const addonOptions: FormFieldOption[] = [];
 
-            // 👇 MURNI LABEL TANPA HARGA RUPIAH DI DROPDOWN 👇
+            // Aturan 3: Jika semua bayar, tambahkan opsi "Tanpa..."
             if (!hasZero) {
               addonOptions.push({
                 value: "",
-                label: `Tanpa ${groupName}` // <-- "(+ Rp 0)" dihapus
+                label: `Tanpa ${groupName}` // <-- Bersih tanpa harga
               });
             }
 
+            // Aturan 1 & 2: Loop semua opsi asli (Bersih tanpa harga)
             addons.forEach(a => {
               addonOptions.push({
                 value: String(a.id_sku_finishing), 
-                label: a.nama_pilihan // <-- Label harga dihapus
+                label: a.nama_pilihan // <-- Murni hanya nama (Contoh: "Merah", "Satu Sisi")
               });
             });
 
+            // Baca state dari Parent
             const currentFinishingObj = selectedFinishing ? selectedFinishing[groupName] : undefined;
-            let selectedAddonId = "";
-
-            if (currentFinishingObj !== undefined && currentFinishingObj !== null) {
-                selectedAddonId = String(currentFinishingObj.id_sku_finishing);
-            } else if (currentFinishingObj === null) {
-                selectedAddonId = ""; 
-            } else {
-                selectedAddonId = hasZero ? String(addons.find(a => Number(a.harga_tambahan) === 0)?.id_sku_finishing || "") : "";
-            }
+            const selectedAddonId = currentFinishingObj ? String(currentFinishingObj.id_sku_finishing) : "";
 
             const selectedAddonInfo = addons.find(a => String(a.id_sku_finishing) === selectedAddonId);
 
