@@ -21,6 +21,7 @@ export interface ItemData {
   harga_mulai_dari?: number;
   diskon_roles?: Record<string, number>;
   dataSkus?: { nama_sku: string; harga: number; satuan?: string; tipe_kalkulasi?: string }[];
+  updated_at?: string;
 }
 
 export interface PilihanVarian {
