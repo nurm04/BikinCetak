@@ -115,7 +115,7 @@ export default function Footer({ items = [] }: FooterProps) {
   // DATA DINAMIS DARI PENGATURAN (Dengan Fallback)
   // ==========================================
   const logoUtama = pengaturan?.logo_utama || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
-  const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKINCETAK";
+  const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKIN CETAK";
   const deskripsi = pengaturan?.deskripsi_singkat || "";
   const alamatLengkap = pengaturan?.informasi_lokasi?.alamat_lengkap || "Layanan Online - Seluruh Indonesia";
   const linkGmaps = pengaturan?.informasi_lokasi?.link_gmaps || "https://maps.app.goo.gl/VwC6C6tzCZ8CwPSK8";

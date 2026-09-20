@@ -67,7 +67,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
   const logoUtama = pengaturan?.logo_utama || fallbackLogo;
   const namaWebsite = pengaturan?.nama_website 
     ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() 
-    : "BIKINCETAK";
+    : "BIKIN CETAK";
 
   // ==========================================
   // LOGIC GROUPING KATEGORI (DI-MEMOIZE BIAR ENTENG)
