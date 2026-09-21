@@ -30,6 +30,9 @@ export async function generateMetadata(): Promise<Metadata> {
     description: deskripsi,
     keywords: keywordsArray,
     authors: [{ name: `${namaBrand} Team` }],
+    verification: {
+      google: "j9aui-uIG1sAWD10fSffD4WDnIKhDh3OFcIuc4KSPaM",
+    },
     openGraph: {
       title: namaWebsite,
       description: deskripsi,
