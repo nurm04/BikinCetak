@@ -271,7 +271,7 @@ function KatalogContent({ sidebarData, skuItems, activeRoleId }: KatalogClientPr
                 return (
                   <Link
                     key={item.id_sku}
-                    href={`/produk/${item.parent_slug}`} 
+                    href={`/produk/${item.slug}`}
                     className="card bg-base-100 shadow-sm border border-base-300 group overflow-hidden transition-all duration-300 hover:shadow-md hover:border-primary/50 relative cursor-pointer flex flex-col h-full rounded-2xl"
                   >
                     {/* Badge Diskon */}

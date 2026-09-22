@@ -37,8 +37,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const targetSku = initialSku || (itemDetail?.skus?.[0] ?? null);
 
-  const getLabelBersih = useCallback((nama_sku: string) => {
-    const hasVarianTambahan = itemDetail.varians?.some(v => v.jenis_varian === 'tambahan') || false;
+  const getLabelBersih = useCallback((nama_sku: string, skuKombinasiPilihan?: string[]) => {
     let labelBersih = nama_sku;
     
     const prefix1 = `${itemDetail.id_produk}-${itemDetail.nama_produk}-`;
@@ -51,7 +50,18 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       labelBersih = labelBersih.replace(regex, '');
     }
     
-    if (hasVarianTambahan && labelBersih.includes('-')) {
+    // Cek apakah SKU INI benar-benar punya id_pilihan yang berasal dari varian tambahan
+    const varianTambahan = itemDetail.varians?.filter(v => v.jenis_varian === 'tambahan') || [];
+    let hasExtraVariantInThisSku = false;
+    
+    if (skuKombinasiPilihan && Array.isArray(skuKombinasiPilihan)) {
+        hasExtraVariantInThisSku = varianTambahan.some(v => 
+            v.pilihan_varian.some(pv => skuKombinasiPilihan.includes(pv.id_pilihan))
+        );
+    }
+
+    // Hanya potong nama dari belakang JIKA sku ini terbukti punya varian tambahan
+    if (hasExtraVariantInThisSku && labelBersih.includes('-')) {
       const lastDashIndex = labelBersih.lastIndexOf('-');
       labelBersih = labelBersih.substring(0, lastDashIndex).trim();
     }
@@ -69,7 +79,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     };
 
     if (targetSku && itemDetail) {
-      defaults["kombinasi_utama"] = getLabelBersih(targetSku.nama_sku);
+      // Pass kombinasi pilihan agar tidak salah potong
+      defaults["kombinasi_utama"] = getLabelBersih(targetSku.nama_sku, targetSku.kombinasi_pilihan);
 
       const varianTambahanDefs = itemDetail.varians?.filter(v => v.jenis_varian === 'tambahan') || [];
       varianTambahanDefs.forEach(v => {
@@ -96,24 +107,75 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
 
   const currentQty = parseInt(selectedOptions.qty || "0", 10) || 0;
 
+  const fieldsUtama = useMemo(() => {
+    if (!itemDetail?.skus || itemDetail.skus.length === 0) return [];
+    const uniqueSkuLabels = new Map<string, string>(); 
+    itemDetail.skus.forEach(s => {
+      const labelBersih = getLabelBersih(s.nama_sku, s.kombinasi_pilihan);
+      if (!uniqueSkuLabels.has(labelBersih)) {
+        uniqueSkuLabels.set(labelBersih, labelBersih);
+      }
+    });
+
+    return [
+      {
+        name: "kombinasi_utama",
+        label: "Pilihan Spesifikasi Dasar",
+        options: Array.from(uniqueSkuLabels.keys()).map(label => ({ label, value: label }))
+      }
+    ];
+  }, [itemDetail, getLabelBersih]);
+
+  const fieldsTambahan = useMemo(() => {
+    if (!itemDetail?.varians || itemDetail.varians.length === 0) return [];
+    
+    const varianTambahan = itemDetail.varians.filter(v => v.jenis_varian === 'tambahan');
+    if (varianTambahan.length === 0) return [];
+
+    const selectedUtama = selectedOptions["kombinasi_utama"];
+    const validSkus = itemDetail.skus.filter(s => getLabelBersih(s.nama_sku, s.kombinasi_pilihan) === selectedUtama);
+
+    const availableOptionIds = new Set<string>();
+    validSkus.forEach(sku => {
+      if (sku.kombinasi_pilihan && Array.isArray(sku.kombinasi_pilihan)) {
+        sku.kombinasi_pilihan.forEach(id => availableOptionIds.add(id));
+      }
+    });
+
+    const result = [];
+    for (const v of varianTambahan) {
+      const validOptions = v.pilihan_varian.filter(pv => availableOptionIds.has(pv.id_pilihan));
+      
+      // Varian hanya di-render jika ada opsinya untuk SKU base ini
+      if (validOptions.length > 0) {
+        result.push({
+          name: v.id_varian,
+          label: v.nama_varian,
+          options: validOptions.map(pv => ({ label: pv.nama_pilihan, value: pv.id_pilihan }))
+        });
+      }
+    }
+    return result;
+  }, [itemDetail, selectedOptions["kombinasi_utama"], getLabelBersih]);
+
   const sku = useMemo<SkuDetail | null>(() => {
     if (!itemDetail || !itemDetail.skus) return null;
 
-    const hasVarianTambahan = itemDetail.varians?.some(v => v.jenis_varian === 'tambahan') || false;
     const selectedUtama = selectedOptions["kombinasi_utama"];
     
-    const varianTambahanDefs = itemDetail.varians?.filter(v => v.jenis_varian === 'tambahan') || [];
-    const selectedTambahanIds = varianTambahanDefs.map(v => selectedOptions[v.id_varian]).filter(Boolean);
+    // Hanya periksa ID opsi varian yang saat ini aktif/muncul di form
+    const activeVarianIds = fieldsTambahan.map(f => f.name);
+    const selectedTambahanIds = activeVarianIds.map(name => selectedOptions[name]).filter(Boolean);
 
     for (const s of itemDetail.skus) {
       let isUtamaMatch = true;
       if (selectedUtama) {
-        const labelBersih = getLabelBersih(s.nama_sku);
+        const labelBersih = getLabelBersih(s.nama_sku, s.kombinasi_pilihan);
         isUtamaMatch = labelBersih === selectedUtama;
       }
 
       let isTambahanMatch = true;
-      if (hasVarianTambahan && selectedTambahanIds.length > 0) {
+      if (activeVarianIds.length > 0 && selectedTambahanIds.length > 0) {
         isTambahanMatch = selectedTambahanIds.every(id => s.kombinasi_pilihan?.includes(id));
       }
 
@@ -121,7 +183,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
 
     return itemDetail.skus[0] || null;
-  }, [selectedOptions, itemDetail, getLabelBersih]);
+  }, [selectedOptions, itemDetail, getLabelBersih, fieldsTambahan]);
 
   useEffect(() => {
     if (sku?.nama_sku && typeof window !== "undefined") {
@@ -457,56 +519,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     }
     return [];
   }, [sku?.gambar, itemDetail?.gambar_urls]);
-  
-  const fieldsUtama = useMemo(() => {
-    if (!itemDetail?.skus || itemDetail.skus.length === 0) return [];
-    const uniqueSkuLabels = new Map<string, string>(); 
-    itemDetail.skus.forEach(s => {
-      const labelBersih = getLabelBersih(s.nama_sku);
-      if (!uniqueSkuLabels.has(labelBersih)) {
-        uniqueSkuLabels.set(labelBersih, labelBersih);
-      }
-    });
-
-    return [
-      {
-        name: "kombinasi_utama",
-        label: "Pilihan Spesifikasi Dasar",
-        options: Array.from(uniqueSkuLabels.keys()).map(label => ({ label, value: label }))
-      }
-    ];
-  }, [itemDetail, getLabelBersih]);
-
-  const fieldsTambahan = useMemo(() => {
-    if (!itemDetail?.varians || itemDetail.varians.length === 0) return [];
-    
-    const varianTambahan = itemDetail.varians.filter(v => v.jenis_varian === 'tambahan');
-    if (varianTambahan.length === 0) return [];
-
-    const selectedUtama = selectedOptions["kombinasi_utama"];
-    const validSkus = itemDetail.skus.filter(s => getLabelBersih(s.nama_sku) === selectedUtama);
-
-    const validVarianNames = new Set(
-      validSkus.map(s => {
-        const parts = s.nama_sku.split('-');
-        return parts[parts.length - 1]?.trim() || "";
-      })
-    );
-
-    return varianTambahan.map(v => {
-      const filteredOptions = v.pilihan_varian.filter(pv => 
-        validVarianNames.has(pv.nama_pilihan.trim())
-      );
-
-      const finalOptions = filteredOptions.length > 0 ? filteredOptions : v.pilihan_varian;
-
-      return {
-        name: v.id_varian,
-        label: v.nama_varian,
-        options: finalOptions.map(pv => ({ label: pv.nama_pilihan, value: pv.id_pilihan }))
-      };
-    });
-  }, [itemDetail, selectedOptions["kombinasi_utama"], getLabelBersih]);
 
   useEffect(() => {
     let changed = false;
