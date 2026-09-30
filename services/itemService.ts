@@ -15,6 +15,7 @@ export interface KategoriData {
 export interface ItemData {
   id_produk: string;
   nama_produk: string;
+  urutan?: number;
   kategori: KategoriData | null;
   is_active: number;
   gambar_urls: string[];

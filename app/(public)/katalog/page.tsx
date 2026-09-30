@@ -13,6 +13,7 @@ interface SidebarProduct {
   id: string;
   name: string;
   slug: string;
+  urutan: number; // 👈 Tambahkan ini untuk sorting
 }
 
 interface SkuGridItem {
@@ -24,6 +25,7 @@ interface SkuGridItem {
   harga: number;
   image: string;
   diskon_roles: Record<string, number>;
+  urutan: number; // 👈 Tambahkan ini untuk sorting grid utama
 }
 
 interface CategoryGroup {
@@ -40,16 +42,20 @@ export default async function KatalogPage() {
   const rawSidebarData: Record<string, CategoryGroup> = {};
   const skuItems: SkuGridItem[] = [];
 
+  // 👇 1. Urutkan seluruh data items (produk) berdasarkan urutan dari CMS secara global terlebih dahulu
+  items.sort((a, b) => (a.urutan ?? 999) - (b.urutan ?? 999));
+
   items.forEach((item) => {
     if (item.is_active === 0) return;
     
-    // 👇 Tarik nama kategori dari Object 👇
+    // Tarik nama kategori dari Object
     const catName = item.kategori?.nama_kategori || "Lainnya";
     const catUrutan = item.kategori?.urutan ?? 999;
     
     if (catName.toLowerCase() === "services" || catName.toLowerCase() === "jasa") return;
 
     const productSlug = slugify(item.nama_produk);
+    const productUrutan = item.urutan ?? 999; // 👈 Ambil nilai urutan produk
 
     if (!rawSidebarData[catName]) {
       rawSidebarData[catName] = { categoryName: catName, urutan: catUrutan, products: [] };
@@ -59,6 +65,7 @@ export default async function KatalogPage() {
       id: item.id_produk,
       name: item.nama_produk,
       slug: productSlug,
+      urutan: productUrutan, // 👈 Simpan ke object
     });
 
     if (item.dataSkus && item.dataSkus.length > 0) {
@@ -74,13 +81,19 @@ export default async function KatalogPage() {
           harga: sku.harga,              
           image: item.gambar_urls?.[0] || "/favicon.ico", 
           diskon_roles: item.diskon_roles || {},
+          urutan: productUrutan, // 👈 Simpan urutan untuk grid
         });
       });
     }
   });
 
-  // Konversi SidebarData jadi Array yang sudah terurut sesuai CMS Admin
+  // Konversi SidebarData jadi Array dan urutkan Kategori berdasarkan CMS Admin
   const sidebarDataArray = Object.values(rawSidebarData).sort((a, b) => a.urutan - b.urutan);
+
+  // 👇 2. Pastikan daftar produk di dalam tiap kategori Sidebar juga diurutkan
+  sidebarDataArray.forEach(cat => {
+    cat.products.sort((a, b) => a.urutan - b.urutan);
+  });
 
   return (
     <KatalogClient

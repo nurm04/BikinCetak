@@ -121,7 +121,6 @@ export default async function Produk({ params }: PageProps) {
         
         return isSameKategori && isDifferentProduct;
       })
-      .slice(0, 4)
       .map((item) => ({
         id: item.id_produk,
         name: item.nama_produk,

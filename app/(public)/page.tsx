@@ -2,7 +2,7 @@ import HeroCarousel from "@/components/shared/HeroCarousel";
 import ProductRow from "@/components/shared/ProductRow";
 import { getItems } from "@/services/itemService";
 import { getUserProfile } from "@/services/userService"; 
-import { getBanners } from "@/services/pengaturanWebService"; // 👈 WAJIB IMPORT INI
+import { getBanners } from "@/services/pengaturanWebService";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -20,6 +20,7 @@ interface CategoryGroup {
     image: string[];
     harga_mulai_dari?: number;
     diskon_roles?: Record<string, number>;
+    urutan: number; // 👈 Tambahkan ini untuk membaca urutan produk
   }>;
 }
 
@@ -27,7 +28,7 @@ export default async function Home() {
   const items = await getItems();
   const { data: userProfile } = await getUserProfile();
   
-  // 👇 WAJIB FETCH DATA BANNER DARI DATABASE 👇
+  // FETCH DATA BANNER DARI DATABASE
   const banners = await getBanners(); 
   
   const activeRoleId = userProfile?.customer?.id_role_customer || null;
@@ -35,6 +36,7 @@ export default async function Home() {
   const groupedCategories: Record<string, CategoryGroup> = {};
 
   items.forEach((item) => {
+    // Abaikan jika produk tidak aktif atau produk Custom Jasa
     if (item.is_active === 0) return;
     if (item.id_produk === "PRD-0001") return;
 
@@ -59,15 +61,21 @@ export default async function Home() {
       image: (item.gambar_urls && item.gambar_urls.length > 0) ? item.gambar_urls : defaultImage,
       harga_mulai_dari: item.harga_mulai_dari,
       diskon_roles: item.diskon_roles,
+      urutan: item.urutan ?? 999, // 👈 Ambil data urutan produk dari backend
     });
   });
 
+  // 1. Urutkan Kategori secara global
   const dynamicCategories = Object.values(groupedCategories).sort((a, b) => a.urutan - b.urutan);
+
+  // 2. Urutkan Produk di dalam masing-masing Kategori berdasarkan field 'urutan'
+  dynamicCategories.forEach(category => {
+    category.submenu.sort((a, b) => a.urutan - b.urutan);
+  });
 
   return (
     <main className="min-h-screen bg-base-200">
       <div className="py-4 md:py-8">
-        {/* 👇 WAJIB MASUKIN PROPS 'banners' KE DALAM SINI 👇 */}
         <HeroCarousel banners={banners} />
       </div>
 
