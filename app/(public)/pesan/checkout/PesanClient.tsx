@@ -12,6 +12,7 @@ import UbahAlamat from "./UbahAlamat";
 // 👇 IMPORT CourierOption DARI cartService
 import { checkoutCart, CheckoutPayload, getShippingCost, RincianDiskonAPI, CustomAttributeValue, CourierOption } from "@/services/cartService";
 import { cekVoucher, getVouchers, Voucher } from "@/services/voucherService";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService";
 
 interface CheckoutItem {
   id: number;
@@ -57,6 +58,7 @@ export default function PesanClient() {
   const [couriers, setCouriers] = useState<CourierOption[]>([]);
   const [loadingOngkir, setLoadingOngkir] = useState(false);
   const [ongkirError, setOngkirError] = useState<string | null>(null);
+  const [pengaturanWeb, setPengaturanWeb] = useState<PengaturanData | null>(null);
   
   const [selectedShipping, setSelectedShipping] = useState<{
     courier_code: string;
@@ -129,15 +131,26 @@ export default function PesanClient() {
     }
   }, []);
 
+  const loadPengaturan = useCallback(async () => {
+    try {
+      const res = await getPengaturan();
+      if (res) setPengaturanWeb(res);
+    } catch (err) {
+      console.error("Gagal load pengaturan", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadInitialData();
     loadAlamatUtama();
     loadVouchersList();
-  }, [loadInitialData, loadAlamatUtama, loadVouchersList]);
+    loadPengaturan();
+  }, [loadInitialData, loadAlamatUtama, loadVouchersList, loadPengaturan]);
 
   // ONGKIR LOGIC...
   useEffect(() => {
-    if (!alamatUtama) return;
+    // Tunggu sampai alamat dan pengaturan web sudah ter-load
+    if (!alamatUtama || !pengaturanWeb) return;
 
     const fetchOngkir = async () => {
       setLoadingOngkir(true);
@@ -145,46 +158,76 @@ export default function PesanClient() {
       setOngkirError(null);
       setCouriers([]);
 
-      const manualPickup: CourierOption = {
-        code: "toko",
-        name: "Ambil di Toko",
-        logo_url: "",
-        costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
-      };
-
-      const requestCargo: CourierOption = {
-        code: "cargo",
-        name: "Request Expedisi Cargo",
-        logo_url: "",
-        costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
-      };
-      
       try {
         const result = await getShippingCost(alamatUtama.id_alamat);
         
-        if (result.error) {
-          setOngkirError(result.error);
-          setCouriers([manualPickup, requestCargo]);
-          return;
+        let apiCouriers = (!result.error && result.data) ? (result.data as CourierOption[]) : [];
+
+        // 1. FILTER & ENHANCE DATA KURIR RAJAONGKIR DARI DATABASE
+        if (pengaturanWeb.kurir_rajaongkir) {
+          apiCouriers = apiCouriers
+            .filter(courier => {
+              const settings = pengaturanWeb.kurir_rajaongkir?.[courier.code.toLowerCase()];
+              // Jika ada di database dan is_active false, sembunyikan (return false)
+              if (settings && settings.is_active === false) return false;
+              return true;
+            })
+            .map(courier => {
+              const settings = pengaturanWeb.kurir_rajaongkir?.[courier.code.toLowerCase()];
+              if (settings) {
+                // Timpa logo URL & Nama jika diatur di panel admin
+                if (settings.gambar_url) courier.logo_url = settings.gambar_url;
+                if (settings.nama) courier.name = settings.nama;
+              }
+              return courier;
+            });
         }
 
-        // Karena hasil udah dirapikan sama cartService.ts, kita tinggal pake data-nya
-        const apiCouriers = (result.data as CourierOption[]) || [];
-        const finalCouriers = [manualPickup, requestCargo, ...apiCouriers];
+        // 2. FILTER & ENHANCE DATA KURIR LAINNYA (Toko / Cargo)
+        const finalCouriers: CourierOption[] = [];
 
-        if (finalCouriers.length === 2) {
-            setOngkirError("Tidak ada layanan pengiriman otomatis ke alamat ini. Anda masih bisa menggunakan opsi manual.");
-        } 
-        setCouriers(finalCouriers);
+        // Setup Kurir Toko
+        const settingToko = pengaturanWeb.kurir_lainnya?.['kurir_toko'];
+        if (!settingToko || settingToko.is_active !== false) { // Tampilkan jika tidak ada setingan ATAU aktif
+          finalCouriers.push({
+            code: "toko",
+            name: settingToko?.nama || "Ambil di Toko",
+            logo_url: settingToko?.gambar_url || "",
+            costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
+          });
+        }
+
+        // Setup Kurir Cargo
+        const settingCargo = pengaturanWeb.kurir_lainnya?.['cargo'];
+        if (!settingCargo || settingCargo.is_active !== false) {
+          finalCouriers.push({
+            code: "cargo",
+            name: settingCargo?.nama || "Request Expedisi Cargo",
+            logo_url: settingCargo?.gambar_url || "",
+            costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
+          });
+        }
+
+        // 3. GABUNGKAN SEMUA KURIR
+        const combinedCouriers = [...finalCouriers, ...apiCouriers];
+
+        if (apiCouriers.length === 0 && !result.error) {
+          setOngkirError("Tidak ada layanan pengiriman otomatis yang aktif. Anda bisa menggunakan opsi kurir toko/cargo.");
+        } else if (result.error) {
+          setOngkirError(result.error);
+        }
+
+        setCouriers(combinedCouriers);
+
       } catch (error) {
         setOngkirError("Terjadi kesalahan sistem saat mengambil tarif logistik.");
-        setCouriers([manualPickup, requestCargo]);
       } finally {
         setLoadingOngkir(false);
       }
     };
+
     fetchOngkir();
-  }, [alamatUtama]);
+  }, [alamatUtama, pengaturanWeb]);
 
   const hitungRowTotal = (item: CheckoutItem) => {
     let hargaDasar = item.harga_satuan || 0;
@@ -491,13 +534,13 @@ export default function PesanClient() {
                                 <input type="radio" className="radio radio-primary radio-sm" checked={isSelected} readOnly />
                                 
                                 <div className="w-12 h-10 bg-white rounded-lg border border-base-content/10 flex items-center justify-center p-1 shrink-0 overflow-hidden">
-                                  {courier.code === "toko" ? (
+                                  {courier.logo_url ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={courier.logo_url} alt={courier.name} className="w-full h-full object-contain" />
+                                  ) : courier.code === "toko" ? (
                                     <Home className="text-primary" size={24} />
                                   ) : courier.code === "cargo" ? (
                                     <Truck className="text-primary" size={24} />
-                                  ) : courier.logo_url ? (
-                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                    <img src={courier.logo_url} alt={courier.name} className="w-full h-full object-contain" />
                                   ) : (
                                     <Truck className="text-base-content/30" size={20} /> 
                                   )}

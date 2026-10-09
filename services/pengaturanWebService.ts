@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // @/services/pengaturanWebService.ts
 "use server";
@@ -46,6 +47,12 @@ export interface MetodePembayaran {
   is_active: boolean;
 }
 
+export interface KurirItem {
+  nama?: string;
+  is_active: boolean;
+  [key: string]: any;
+}
+
 export interface PengaturanData {
   // Identitas & SEO
   nama_website?: string;
@@ -61,9 +68,11 @@ export interface PengaturanData {
   // Pembayaran
   teks_info_pembayaran?: string;
   metode_pembayaran?: MetodePembayaran[];
+
+  kurir_rajaongkir?: Record<string, KurirItem>;
+  kurir_lainnya?: Record<string, KurirItem>;
   
   // Membiarkan sisa key dinamis (Flexible Fallback) jika ke depannya ada penambahan opsi baru di panel Admin
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; 
 }
 // 👆 ========================================= 👆
