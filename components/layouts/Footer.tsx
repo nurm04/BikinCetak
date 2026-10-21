@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import Image from 'next/image';
-import { Mail, Phone, Search, MapPin, Globe } from 'lucide-react';
+import { Mail, Phone, Search, MapPin, Globe, Truck } from 'lucide-react';
 import { ItemData } from "@/services/itemService";
-import { getPengaturan, PengaturanData, getHalamanStatisList, HalamanStatisListData } from "@/services/pengaturanWebService";
+import { getPengaturan, PengaturanData, getHalamanStatisList, HalamanStatisListData, KurirItem } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
 
-// Custom Icon untuk TikTok
+// Custom Icon Sosmed
 const TikTokIcon = ({ size = 24 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
@@ -60,7 +60,6 @@ export default function Footer({ items = [] }: FooterProps) {
   const [halamanStatis, setHalamanStatis] = useState<HalamanStatisListData[]>([]);
   const [kodeTransaksi, setKodeTransaksi] = useState("");
 
-  // 👇 FETCHING PARALEL (Lebih cepat dari kode versi awal lu)
   useEffect(() => {
     Promise.all([getPengaturan(), getHalamanStatisList()]).then(([resPengaturan, resHalaman]) => {
       if (resPengaturan) setPengaturan(resPengaturan);
@@ -75,14 +74,10 @@ export default function Footer({ items = [] }: FooterProps) {
     router.push(`/pesan/status/${encodeURIComponent(kode)}`);
   };
 
-  // ==========================================
-  // LOGIC GROUPING KATEGORI
-  // ==========================================
+  // Grouping Kategori
   const groupedCategories: Record<string, CategoryGroup> = {};
-
   items.forEach((item) => {
     if (item.is_active === 0) return;
-
     const catId = item.kategori?.id_kategori || "lainnya";
     const catName = item.kategori?.nama_kategori || "Lainnya";
     const catUrutan = item.kategori?.urutan ?? 999;
@@ -98,7 +93,6 @@ export default function Footer({ items = [] }: FooterProps) {
         submenu: []
       };
     }
-
     groupedCategories[catId].submenu.push({ name: item.nama_produk });
   });
 
@@ -110,10 +104,7 @@ export default function Footer({ items = [] }: FooterProps) {
       submenu: category.submenu,
     }));
 
-
-  // ==========================================
-  // DATA DINAMIS DARI PENGATURAN (Dengan Fallback)
-  // ==========================================
+  // Data Dinamis
   const logoUtama = pengaturan?.logo_utama || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
   const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKIN CETAK";
   const deskripsi = pengaturan?.deskripsi_singkat || "";
@@ -127,6 +118,10 @@ export default function Footer({ items = [] }: FooterProps) {
   const sosmedList = pengaturan?.daftar_sosmed?.filter(s => s.is_active) || [];
   const metodePembayaran = pengaturan?.metode_pembayaran?.filter(m => m.is_active) || [];
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
+
+  const kurirEkspedisi: KurirItem[] = pengaturan?.kurir_rajaongkir 
+    ? (Object.values(pengaturan.kurir_rajaongkir) as KurirItem[]).filter((k) => k && k.is_active !== false) 
+    : [];
 
   const renderSosmedIcon = (iconName: string) => {
     const name = iconName.toLowerCase();
@@ -184,7 +179,7 @@ export default function Footer({ items = [] }: FooterProps) {
               {deskripsi}
             </p>
             
-            {/* Tombol Sosial Media Dinamis */}
+            {/* Sosmed */}
             {sosmedList.length > 0 && (
               <div className="flex gap-4 mt-6">
                 {sosmedList.map((sosmed, idx) => (
@@ -201,27 +196,6 @@ export default function Footer({ items = [] }: FooterProps) {
                 ))}
               </div>
             )}
-
-            {/* METODE PEMBAYARAN DINAMIS */}
-            <div className="max-w-2xl pt-6 mt-8 border-t border-white/20">
-              <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Metode Pembayaran</h6>
-              <div className="flex flex-wrap items-center gap-3">
-                {metodePembayaran.map((bank, index) => (
-                  <div key={index} className="relative overflow-hidden bg-white rounded-lg shadow-sm h-10 w-16 group" title={`${bank.nama_metode} - ${bank.no_rekening}`}>
-                    <Image 
-                      src={bank.icon_url} 
-                      alt={bank.nama_metode} 
-                      fill 
-                      unoptimized 
-                      className="object-contain p-1.5" 
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] mt-3 opacity-70 font-medium max-w-xl">
-                {teksPembayaran}
-              </p>
-            </div>
             
           </div>
 
@@ -246,7 +220,6 @@ export default function Footer({ items = [] }: FooterProps) {
                 Cek Status Pesanan
               </h6>
 
-              {/* 👇 FORM DIKEMBALIKAN KE VERSI ON-SUBMIT (CLIENT SIDE) 👇 */}
               <form onSubmit={handleCheckOrder} className="flex gap-2">
                 <input
                   type="text"
@@ -269,6 +242,77 @@ export default function Footer({ items = [] }: FooterProps) {
             </div>
           </div>
         </div>
+
+        {/* 👇 BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN DIJAJARKAN BERBINGKAI DI ATAS GARIS FOOTER PALING BAWAH 👇 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 mt-4 border-t border-white/20">
+          
+          {/* Metode Pembayaran */}
+          <div>
+            <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Metode Pembayaran</h6>
+            <div className="flex flex-wrap items-center gap-2">
+              {metodePembayaran.map((bank, index) => (
+                <div key={index} className="relative overflow-hidden bg-white rounded-lg shadow-sm h-9 w-14 group" title={`${bank.nama_metode} - ${bank.no_rekening}`}>
+                  <Image 
+                    src={bank.icon_url} 
+                    alt={bank.nama_metode} 
+                    fill 
+                    unoptimized 
+                    className="object-contain p-1.5" 
+                  />
+                </div>
+              ))}
+            </div>
+            {teksPembayaran && (
+              <p className="text-[10px] mt-2 opacity-70 font-medium">
+                {teksPembayaran}
+              </p>
+            )}
+          </div>
+
+          {/* Jasa Pengiriman RajaOngkir */}
+          <div>
+            <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Jasa Pengiriman</h6>
+            <div className="flex flex-wrap items-center gap-2">
+              {kurirEkspedisi.length > 0 ? (
+                kurirEkspedisi.map((kurir, index) => {
+                  const namaKurir = kurir.nama || "Kurir";
+                  const gambarKurir = kurir.image || kurir.gambar_url || null;
+
+                  return (
+                    <div 
+                      key={index} 
+                      className="flex items-center justify-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-2.5 py-1.5 min-h-9 group transition-all hover:bg-white/20"
+                      title={namaKurir}
+                    >
+                      {gambarKurir ? (
+                        <div className="relative h-6 w-12">
+                          <Image 
+                            src={gambarKurir} 
+                            alt={namaKurir} 
+                            fill 
+                            unoptimized 
+                            className="object-contain" 
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-[11px] font-bold text-white tracking-wide">
+                          {namaKurir}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs opacity-60">
+                  <Truck size={14} />
+                  <span>Pengiriman Seluruh Indonesia</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
       {/* Baris Bawah / Copyright */}
