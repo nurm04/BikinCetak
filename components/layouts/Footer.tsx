@@ -243,7 +243,7 @@ export default function Footer({ items = [] }: FooterProps) {
           </div>
         </div>
 
-        {/* 👇 BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN DIJAJARKAN BERBINGKAI DI ATAS GARIS FOOTER PALING BAWAH 👇 */}
+        {/* BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 mt-4 border-t border-white/20">
           
           {/* Metode Pembayaran */}
@@ -269,23 +269,24 @@ export default function Footer({ items = [] }: FooterProps) {
             )}
           </div>
 
-          {/* Jasa Pengiriman RajaOngkir */}
+          {/* Jasa Pengiriman RajaOngkir (Mendukung gambar_url / image) */}
           <div>
             <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Jasa Pengiriman</h6>
             <div className="flex flex-wrap items-center gap-2">
               {kurirEkspedisi.length > 0 ? (
                 kurirEkspedisi.map((kurir, index) => {
                   const namaKurir = kurir.nama || "Kurir";
-                  const gambarKurir = kurir.image || kurir.gambar_url || null;
+                  // Memeriksa properti gambar_url atau image yang dikirimkan dari database/backend
+                  const gambarKurir = kurir.gambar_url || kurir.image || null;
 
                   return (
                     <div 
                       key={index} 
-                      className="flex items-center justify-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-2.5 py-1.5 min-h-9 group transition-all hover:bg-white/20"
+                      className="flex items-center justify-center bg-white rounded-lg px-3 py-1.5 min-h-9 group transition-all shadow-sm"
                       title={namaKurir}
                     >
                       {gambarKurir ? (
-                        <div className="relative h-6 w-12">
+                        <div className="relative h-6 w-14">
                           <Image 
                             src={gambarKurir} 
                             alt={namaKurir} 
@@ -295,7 +296,7 @@ export default function Footer({ items = [] }: FooterProps) {
                           />
                         </div>
                       ) : (
-                        <span className="text-[11px] font-bold text-white tracking-wide">
+                        <span className="text-[11px] font-black text-base-content tracking-wide uppercase">
                           {namaKurir}
                         </span>
                       )}
