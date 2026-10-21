@@ -54,6 +54,13 @@ interface CategoryGroup {
   submenu: Array<{ name: string }>;
 }
 
+// Interface pendukung agar sama persis strukturnya dengan logic di checkout
+interface FooterCourierDisplay {
+  code: string;
+  name: string;
+  logo_url: string;
+}
+
 export default function Footer({ items = [] }: FooterProps) {
   const router = useRouter();
   const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
@@ -119,9 +126,20 @@ export default function Footer({ items = [] }: FooterProps) {
   const metodePembayaran = pengaturan?.metode_pembayaran?.filter(m => m.is_active) || [];
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
 
-  const kurirEkspedisi: KurirItem[] = pengaturan?.kurir_rajaongkir 
-    ? (Object.values(pengaturan.kurir_rajaongkir) as KurirItem[]).filter((k) => k && k.is_active !== false) 
-    : [];
+  // 👇 MENGAMBIL DATA KURIR PERSIS SEPERTI DI HALAMAN CHECKOUT (MENGGUNAKAN logo_url)
+  const kurirEkspedisi: FooterCourierDisplay[] = [];
+  if (pengaturan?.kurir_rajaongkir) {
+    const rawKurirMap = pengaturan.kurir_rajaongkir as Record<string, KurirItem>;
+    Object.entries(rawKurirMap).forEach(([code, settings]) => {
+      if (settings && settings.is_active !== false) {
+        kurirEkspedisi.push({
+          code: code,
+          name: settings.nama || code.toUpperCase(),
+          logo_url: settings.gambar_url || settings.image || "",
+        });
+      }
+    });
+  }
 
   const renderSosmedIcon = (iconName: string) => {
     const name = iconName.toLowerCase();
@@ -269,40 +287,34 @@ export default function Footer({ items = [] }: FooterProps) {
             )}
           </div>
 
-          {/* Jasa Pengiriman RajaOngkir (Mendukung gambar_url / image) */}
+          {/* Jasa Pengiriman RajaOngkir (Menggunakan logo_url persis seperti checkout) */}
           <div>
             <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Jasa Pengiriman</h6>
             <div className="flex flex-wrap items-center gap-2">
               {kurirEkspedisi.length > 0 ? (
-                kurirEkspedisi.map((kurir, index) => {
-                  const namaKurir = kurir.nama || "Kurir";
-                  // Memeriksa properti gambar_url atau image yang dikirimkan dari database/backend
-                  const gambarKurir = kurir.gambar_url || kurir.image || null;
-
-                  return (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-center bg-white rounded-lg px-3 py-1.5 min-h-9 group transition-all shadow-sm"
-                      title={namaKurir}
-                    >
-                      {gambarKurir ? (
-                        <div className="relative h-6 w-14">
-                          <Image 
-                            src={gambarKurir} 
-                            alt={namaKurir} 
-                            fill 
-                            unoptimized 
-                            className="object-contain" 
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-[11px] font-black text-base-content tracking-wide uppercase">
-                          {namaKurir}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
+                kurirEkspedisi.map((kurir, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-center bg-white rounded-lg px-2.5 py-1.5 h-9 w-14 group transition-all shadow-sm overflow-hidden"
+                    title={kurir.name}
+                  >
+                    {kurir.logo_url ? (
+                      <div className="relative h-6 w-12">
+                        <Image 
+                          src={kurir.logo_url} 
+                          alt={kurir.name} 
+                          fill 
+                          unoptimized 
+                          className="object-contain" 
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-black text-base-content tracking-wide uppercase">
+                        {kurir.name}
+                      </span>
+                    )}
+                  </div>
+                ))
               ) : (
                 <div className="flex items-center gap-1.5 text-xs opacity-60">
                   <Truck size={14} />
