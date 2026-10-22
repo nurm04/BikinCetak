@@ -54,7 +54,6 @@ interface CategoryGroup {
   submenu: Array<{ name: string }>;
 }
 
-// Interface pendukung agar sama persis strukturnya dengan logic di checkout
 interface FooterCourierDisplay {
   code: string;
   name: string;
@@ -79,6 +78,17 @@ export default function Footer({ items = [] }: FooterProps) {
     const kode = kodeTransaksi.trim();
     if (!kode) return;
     router.push(`/pesan/status/${encodeURIComponent(kode)}`);
+  };
+
+  // Helper untuk memperbaiki URL gambar jika path dari database bersifat relatif
+  const resolveStorageUrl = (pathOrUrl: string | null): string => {
+    if (!pathOrUrl) return "";
+    if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+      return pathOrUrl;
+    }
+    // Gabungkan dengan domain storage backend admin
+    const cleanPath = pathOrUrl.startsWith("/") ? pathOrUrl.substring(1) : pathOrUrl;
+    return `https://admin.bikincetak.co.id/storage/${cleanPath}`;
   };
 
   // Grouping Kategori
@@ -112,7 +122,7 @@ export default function Footer({ items = [] }: FooterProps) {
     }));
 
   // Data Dinamis
-  const logoUtama = pengaturan?.logo_utama || "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
+  const logoUtama = resolveStorageUrl(pengaturan?.logo_utama || "img_web/logobikincetak.png");
   const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKIN CETAK";
   const deskripsi = pengaturan?.deskripsi_singkat || "";
   const alamatLengkap = pengaturan?.informasi_lokasi?.alamat_lengkap || "Layanan Online - Seluruh Indonesia";
@@ -123,19 +133,23 @@ export default function Footer({ items = [] }: FooterProps) {
   const waUtamaLink = `https://wa.me/${waUtama.nomor.replace(/\D/g, '').startsWith('0') ? '62' + waUtama.nomor.replace(/\D/g, '').substring(1) : waUtama.nomor.replace(/\D/g, '')}`;
 
   const sosmedList = pengaturan?.daftar_sosmed?.filter(s => s.is_active) || [];
-  const metodePembayaran = pengaturan?.metode_pembayaran?.filter(m => m.is_active) || [];
+  const metodePembayaran = (pengaturan?.metode_pembayaran?.filter(m => m.is_active) || []).map(m => ({
+    ...m,
+    icon_url: resolveStorageUrl(m.icon_url)
+  }));
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
 
-  // 👇 MENGAMBIL DATA KURIR PERSIS SEPERTI DI HALAMAN CHECKOUT (MENGGUNAKAN logo_url)
+  // Kurir Ekspedisi dengan mapping helper URL storage
   const kurirEkspedisi: FooterCourierDisplay[] = [];
   if (pengaturan?.kurir_rajaongkir) {
     const rawKurirMap = pengaturan.kurir_rajaongkir as Record<string, KurirItem>;
     Object.entries(rawKurirMap).forEach(([code, settings]) => {
       if (settings && settings.is_active !== false) {
+        const rawImg = settings.gambar_url || settings.image || "";
         kurirEkspedisi.push({
           code: code,
           name: settings.nama || code.toUpperCase(),
-          logo_url: settings.gambar_url || settings.image || "",
+          logo_url: resolveStorageUrl(rawImg),
         });
       }
     });
@@ -287,7 +301,7 @@ export default function Footer({ items = [] }: FooterProps) {
             )}
           </div>
 
-          {/* Jasa Pengiriman RajaOngkir (Menggunakan logo_url persis seperti checkout) */}
+          {/* Jasa Pengiriman RajaOngkir (Dengan Domain Storage Resolver) */}
           <div>
             <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Jasa Pengiriman</h6>
             <div className="flex flex-wrap items-center gap-2">
@@ -331,7 +345,7 @@ export default function Footer({ items = [] }: FooterProps) {
       {/* Baris Bawah / Copyright */}
       <div className="py-6 bg-black/15">
         <div className="container flex flex-col items-center justify-between gap-4 px-4 mx-auto text-[10px] font-bold tracking-wider uppercase md:px-8 md:flex-row">
-          <p className="opacity-80">© {new Date().getFullYear()} {namaWebsite} - Layanan Percetakan Online</p>
+          <p className="opacity-80">© {new Date().getFullYear()} {namaWebsite} - Percetakan Online Indonesia</p>
           <div className="flex flex-wrap justify-center gap-4 md:gap-6">
             
             {halamanStatis && halamanStatis.length > 0 && (
