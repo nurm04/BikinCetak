@@ -84,6 +84,16 @@ export default function PesanClient() {
     isOpen: false, title: "", message: "", type: "info"
   });
 
+  // Helper untuk memperbaiki URL gambar relatif dari database
+  const resolveStorageUrl = (pathOrUrl: string | null): string => {
+    if (!pathOrUrl) return "";
+    if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+      return pathOrUrl;
+    }
+    const cleanPath = pathOrUrl.startsWith("/") ? pathOrUrl.substring(1) : pathOrUrl;
+    return `https://admin.bikincetak.co.id/storage/${cleanPath}`;
+  };
+
   const loadInitialData = useCallback(() => {
     const savedData = localStorage.getItem("checkout_items");
     if (!savedData) {
@@ -147,9 +157,8 @@ export default function PesanClient() {
     loadPengaturan();
   }, [loadInitialData, loadAlamatUtama, loadVouchersList, loadPengaturan]);
 
-  // ONGKIR LOGIC...
+  // ONGKIR & KURIR LOGIC...
   useEffect(() => {
-    // Tunggu sampai alamat dan pengaturan web sudah ter-load
     if (!alamatUtama || !pengaturanWeb) return;
 
     const fetchOngkir = async () => {
@@ -168,52 +177,63 @@ export default function PesanClient() {
           apiCouriers = apiCouriers
             .filter(courier => {
               const settings = pengaturanWeb.kurir_rajaongkir?.[courier.code.toLowerCase()];
-              // Jika ada di database dan is_active false, sembunyikan (return false)
               if (settings && settings.is_active === false) return false;
               return true;
             })
             .map(courier => {
               const settings = pengaturanWeb.kurir_rajaongkir?.[courier.code.toLowerCase()];
               if (settings) {
-                // Timpa logo URL & Nama jika diatur di panel admin
-                if (settings.gambar_url) courier.logo_url = settings.gambar_url;
+                const rawImg = settings.gambar_url || settings.image;
+                if (rawImg) courier.logo_url = resolveStorageUrl(rawImg);
                 if (settings.nama) courier.name = settings.nama;
               }
               return courier;
             });
         }
 
-        // 2. FILTER & ENHANCE DATA KURIR LAINNYA (Toko / Cargo)
+        // 2. FILTER & ENHANCE DATA KURIR LAINNYA / KURIR LOKAL (GoSend, Grab, Lalamove, Toko, Cargo, dll)
         const finalCouriers: CourierOption[] = [];
 
-        // Setup Kurir Toko
-        const settingToko = pengaturanWeb.kurir_lainnya?.['kurir_toko'];
-        if (!settingToko || settingToko.is_active !== false) { // Tampilkan jika tidak ada setingan ATAU aktif
-          finalCouriers.push({
-            code: "toko",
-            name: settingToko?.nama || "Ambil di Toko",
-            logo_url: settingToko?.gambar_url || "",
-            costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
-          });
-        }
+        if (pengaturanWeb.kurir_lainnya) {
+          Object.entries(pengaturanWeb.kurir_lainnya).forEach(([code, settings]) => {
+            if (settings && settings.is_active !== false) {
+              const rawImg = settings.gambar_url || settings.image || "";
+              const logoResolved = resolveStorageUrl(rawImg);
+              const courierName = settings.nama || code.toUpperCase();
 
-        // Setup Kurir Cargo
-        const settingCargo = pengaturanWeb.kurir_lainnya?.['cargo'];
-        if (!settingCargo || settingCargo.is_active !== false) {
-          finalCouriers.push({
-            code: "cargo",
-            name: settingCargo?.nama || "Request Expedisi Cargo",
-            logo_url: settingCargo?.gambar_url || "",
-            costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
+              if (code === "toko") {
+                finalCouriers.push({
+                  code: "toko",
+                  name: courierName,
+                  logo_url: logoResolved,
+                  costs: [{ service: "Ambil Sendiri", description: "Ambil pesanan langsung di toko kami", cost: 0, etd: "0" }]
+                });
+              } else if (code === "cargo") {
+                finalCouriers.push({
+                  code: "cargo",
+                  name: courierName,
+                  logo_url: logoResolved,
+                  costs: [{ service: "Cargo / Custom", description: "Pembayaran ongkir bisa tujuan / transfer belakangan", cost: 0, etd: "Menyesuaikan" }]
+                });
+              } else {
+                // Untuk kurir lokal instan/sameday lainnya (seperti gosend, grab, lalamove)
+                finalCouriers.push({
+                  code: code,
+                  name: courierName,
+                  logo_url: logoResolved,
+                  costs: [{ service: "Instant / Regular", description: `Pengiriman via ${courierName}`, cost: 15000, etd: "1 Hari" }]
+                });
+              }
+            }
           });
         }
 
         // 3. GABUNGKAN SEMUA KURIR
         const combinedCouriers = [...finalCouriers, ...apiCouriers];
 
-        if (apiCouriers.length === 0 && !result.error) {
-          setOngkirError("Tidak ada layanan pengiriman otomatis yang aktif. Anda bisa menggunakan opsi kurir toko/cargo.");
-        } else if (result.error) {
+        if (apiCouriers.length === 0 && finalCouriers.length === 0 && !result.error) {
+          setOngkirError("Tidak ada layanan pengiriman otomatis yang aktif.");
+        } else if (result.error && finalCouriers.length === 0) {
           setOngkirError(result.error);
         }
 

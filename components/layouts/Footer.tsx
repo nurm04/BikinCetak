@@ -86,7 +86,6 @@ export default function Footer({ items = [] }: FooterProps) {
     if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
       return pathOrUrl;
     }
-    // Gabungkan dengan domain storage backend admin
     const cleanPath = pathOrUrl.startsWith("/") ? pathOrUrl.substring(1) : pathOrUrl;
     return `https://admin.bikincetak.co.id/storage/${cleanPath}`;
   };
@@ -139,11 +138,28 @@ export default function Footer({ items = [] }: FooterProps) {
   }));
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
 
-  // Kurir Ekspedisi dengan mapping helper URL storage
+  // Menggabungkan kurir_rajaongkir DAN kurir_lainnya secara aman
   const kurirEkspedisi: FooterCourierDisplay[] = [];
+
+  // 1. Ambil Kurir RajaOngkir yang aktif
   if (pengaturan?.kurir_rajaongkir) {
-    const rawKurirMap = pengaturan.kurir_rajaongkir as Record<string, KurirItem>;
-    Object.entries(rawKurirMap).forEach(([code, settings]) => {
+    const rawRajaOngkirMap = pengaturan.kurir_rajaongkir as Record<string, KurirItem>;
+    Object.entries(rawRajaOngkirMap).forEach(([code, settings]) => {
+      if (settings && settings.is_active !== false) {
+        const rawImg = settings.gambar_url || settings.image || "";
+        kurirEkspedisi.push({
+          code: code,
+          name: settings.nama || code.toUpperCase(),
+          logo_url: resolveStorageUrl(rawImg),
+        });
+      }
+    });
+  }
+
+  // 2. Ambil Kurir Lainnya / Kurir Lokal (GoSend, Lalamove, J&T Cargo, dll) yang aktif
+  if (pengaturan?.kurir_lainnya) {
+    const rawKurirLainnyaMap = pengaturan.kurir_lainnya as Record<string, KurirItem>;
+    Object.entries(rawKurirLainnyaMap).forEach(([code, settings]) => {
       if (settings && settings.is_active !== false) {
         const rawImg = settings.gambar_url || settings.image || "";
         kurirEkspedisi.push({
@@ -275,7 +291,7 @@ export default function Footer({ items = [] }: FooterProps) {
           </div>
         </div>
 
-        {/* BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN */}
+        {/* BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN (RajaOngkir + Kurir Lainnya) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 mt-4 border-t border-white/20">
           
           {/* Metode Pembayaran */}
@@ -301,7 +317,7 @@ export default function Footer({ items = [] }: FooterProps) {
             )}
           </div>
 
-          {/* Jasa Pengiriman RajaOngkir (Dengan Domain Storage Resolver) */}
+          {/* Jasa Pengiriman (Gabungan RajaOngkir & Kurir Lainnya / Lokal) */}
           <div>
             <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Jasa Pengiriman</h6>
             <div className="flex flex-wrap items-center gap-2">
