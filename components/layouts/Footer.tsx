@@ -138,7 +138,7 @@ export default function Footer({ items = [] }: FooterProps) {
   }));
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
 
-  // Menggabungkan kurir_rajaongkir DAN kurir_lainnya secara aman
+  // Menggabungkan kurir_rajaongkir DAN kurir_lainnya (Kecuali kurir toko)
   const kurirEkspedisi: FooterCourierDisplay[] = [];
 
   // 1. Ambil Kurir RajaOngkir yang aktif
@@ -156,10 +156,13 @@ export default function Footer({ items = [] }: FooterProps) {
     });
   }
 
-  // 2. Ambil Kurir Lainnya / Kurir Lokal (GoSend, Lalamove, J&T Cargo, dll) yang aktif
+  // 2. Ambil Kurir Lainnya (Mengabaikan 'kurir_toko')
   if (pengaturan?.kurir_lainnya) {
     const rawKurirLainnyaMap = pengaturan.kurir_lainnya as Record<string, KurirItem>;
     Object.entries(rawKurirLainnyaMap).forEach(([code, settings]) => {
+      // Sembunyikan jika kodenya kurir_toko atau toko
+      if (code === "kurir_toko" || code === "toko") return;
+
       if (settings && settings.is_active !== false) {
         const rawImg = settings.gambar_url || settings.image || "";
         kurirEkspedisi.push({
@@ -291,7 +294,7 @@ export default function Footer({ items = [] }: FooterProps) {
           </div>
         </div>
 
-        {/* BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN (RajaOngkir + Kurir Lainnya) */}
+        {/* BAGIAN BAWAH UTAMA: METODE PEMBAYARAN & JASA PENGIRIMAN */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 mt-4 border-t border-white/20">
           
           {/* Metode Pembayaran */}
@@ -317,7 +320,7 @@ export default function Footer({ items = [] }: FooterProps) {
             )}
           </div>
 
-          {/* Jasa Pengiriman (Gabungan RajaOngkir & Kurir Lainnya / Lokal) */}
+          {/* Jasa Pengiriman */}
           <div>
             <h6 className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-3">Jasa Pengiriman</h6>
             <div className="flex flex-wrap items-center gap-2">
