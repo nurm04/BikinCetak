@@ -29,17 +29,18 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
 
   if (!banners || banners.length === 0) {
     return (
-      <div className="relative w-full px-4 md:px-10 lg:px-20">
-        <div className="relative overflow-hidden rounded-3xl h-50 md:h-75 bg-base-300 animate-pulse"></div>
+      <div className="w-full px-4 md:px-10 lg:px-20">
+        <div className="w-full aspect-[21/9] rounded-3xl bg-base-300 animate-pulse"></div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full px-4 md:px-10 lg:px-20 group">
-      <div className="relative overflow-hidden rounded-3xl h-50 md:h-75 shadow-xl bg-base-300">
+    <div className="w-full px-4 md:px-10 lg:px-20 group">
+      {/* Container utama dengan aspect-ratio agar proporsional di semua layar */}
+      <div className="relative w-full aspect-[21/9] sm:aspect-[2.5/1] md:aspect-[3/1] overflow-hidden rounded-3xl shadow-xl bg-base-300">
         <div 
-          className="flex transition-transform duration-700 ease-in-out h-full"
+          className="flex transition-transform duration-700 ease-in-out h-full w-full"
           style={{ transform: `translateX(-${current * 100}%)` }}
         >
           {banners.map((slide, index) => {
@@ -50,14 +51,14 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
                 fill
                 unoptimized
                 priority={index === 0} 
-                className="object-cover"
+                className="object-cover w-full h-full"
               />
             ) : null;
 
             // 👇 KONTEN TEKS & TOMBOL DI ATAS BANNER 👇
             const hasTextOrLink = slide.judul || slide.link_tujuan;
             const OverlayContent = hasTextOrLink ? (
-              <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12 lg:p-16 bg-linear-to-t from-black/80 via-black/20 to-transparent">
+              <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12 lg:p-16 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
                 {slide.judul && (
                   <h2 className="text-white text-xl md:text-3xl lg:text-4xl font-black drop-shadow-lg mb-3 md:mb-5 max-w-2xl leading-tight">
                     {slide.judul}
@@ -76,13 +77,13 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
               <Link 
                 href={slide.link_tujuan} 
                 key={slide.id} 
-                className="min-w-full h-full relative block group/banner cursor-pointer"
+                className="min-w-full w-full h-full relative block flex-shrink-0 group/banner cursor-pointer"
               >
                 {ImgComponent}
                 {OverlayContent}
               </Link>
             ) : (
-              <div key={slide.id} className="min-w-full h-full relative block group/banner">
+              <div key={slide.id} className="min-w-full w-full h-full relative block flex-shrink-0 group/banner">
                 {ImgComponent}
                 {OverlayContent}
               </div>
@@ -111,14 +112,14 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
         <>
           <button
             onClick={prevSlide}
-            className="absolute top-1/2 -left-1 md:left-4 lg:left-14 -translate-y-1/2 btn btn-circle btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95"
+            className="absolute top-1/2 left-6 md:left-14 lg:left-24 -translate-y-1/2 btn btn-circle btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95 opacity-80 hover:opacity-100"
           >
             <ChevronLeft size={32} />
           </button>
 
           <button
             onClick={nextSlide}
-            className="absolute top-1/2 -right-1 md:right-4 lg:right-14 -translate-y-1/2 btn btn-circle btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95"
+            className="absolute top-1/2 right-6 md:right-14 lg:right-24 -translate-y-1/2 btn btn-circle btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95 opacity-80 hover:opacity-100"
           >
             <ChevronRight size={32} />
           </button>
