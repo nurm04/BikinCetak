@@ -30,7 +30,7 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
   if (!banners || banners.length === 0) {
     return (
       <div className="w-full px-4 md:px-10 lg:px-20">
-        <div className="w-full aspect-[21/9] rounded-3xl bg-base-300 animate-pulse"></div>
+        <div className="w-full aspect-21/9 rounded-3xl bg-base-300 animate-pulse"></div>
       </div>
     );
   }
@@ -38,7 +38,7 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
   return (
     <div className="w-full px-4 md:px-10 lg:px-20 group">
       {/* Container utama dengan aspect-ratio agar proporsional di semua layar */}
-      <div className="relative w-full aspect-[21/9] sm:aspect-[2.5/1] md:aspect-[3/1] overflow-hidden rounded-3xl shadow-xl bg-base-300">
+      <div className="relative w-full aspect-21/9 sm:aspect-2.5/1 md:aspect-3/1 overflow-hidden rounded-3xl shadow-xl bg-base-300">
         <div 
           className="flex transition-transform duration-700 ease-in-out h-full w-full"
           style={{ transform: `translateX(-${current * 100}%)` }}
@@ -58,7 +58,7 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
             // 👇 KONTEN TEKS & TOMBOL DI ATAS BANNER 👇
             const hasTextOrLink = slide.judul || slide.link_tujuan;
             const OverlayContent = hasTextOrLink ? (
-              <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12 lg:p-16 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
+              <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12 lg:p-16 bg-linear-to-t from-black/80 via-black/20 to-transparent">
                 {slide.judul && (
                   <h2 className="text-white text-xl md:text-3xl lg:text-4xl font-black drop-shadow-lg mb-3 md:mb-5 max-w-2xl leading-tight">
                     {slide.judul}
@@ -77,13 +77,13 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
               <Link 
                 href={slide.link_tujuan} 
                 key={slide.id} 
-                className="min-w-full w-full h-full relative block flex-shrink-0 group/banner cursor-pointer"
+                className="min-w-full w-full h-full relative block shrink-0 group/banner cursor-pointer"
               >
                 {ImgComponent}
                 {OverlayContent}
               </Link>
             ) : (
-              <div key={slide.id} className="min-w-full w-full h-full relative block flex-shrink-0 group/banner">
+              <div key={slide.id} className="min-w-full w-full h-full relative block shrink-0 group/banner">
                 {ImgComponent}
                 {OverlayContent}
               </div>
