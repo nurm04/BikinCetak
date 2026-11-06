@@ -174,7 +174,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const pengaturan: PengaturanData | null = await getPengaturan();
   
   // Template dari pengaturan atau gunakan fallback default
-  const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} di {{ kota }} - Area Layanan`;
+  const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} di {{ kota }} - Desain Custom`;
   const descTemplate = pengaturan?.seo_desc_template || `Melayani cetak {{ produk }} di {{ kota }} melalui pesan online. Kebutuhan percetakan Anda lebih murah, cepat, dan terjangkau dengan kualitas terbaik.`;
 
   const finalTitle = titleTemplate
