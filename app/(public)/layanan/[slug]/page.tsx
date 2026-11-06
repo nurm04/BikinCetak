@@ -173,7 +173,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const pengaturan: PengaturanData | null = await getPengaturan();
   
   // Template dari pengaturan atau gunakan fallback default
-  const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} Murah di {{ kota }} - Desain Custom`;
+  const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} di {{ kota }} - Desain Custom`;
   const descTemplate = pengaturan?.seo_desc_template || `Melayani cetak {{ produk }} di {{ kota }} melalui pesan online. Kebutuhan percetakan Anda lebih murah, cepat, dan terjangkau dengan kualitas terbaik.`;
 
   const finalTitle = titleTemplate
@@ -235,6 +235,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
     notFound();
   }
 
+  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
   const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
   const gambarProduk = matchedProduct.gambar_urls?.[0] ? matchedProduct.gambar_urls[0] : null;
 
@@ -256,8 +257,8 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
         <div className="text-xs breadcrumbs opacity-60">
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li>SEO Area</li>
-            <li className="capitalize">{matchedProduct.nama_produk} di {wilayahLengkap}</li>
+            <li>Area Layanan</li>
+            <li className="capitalize">{matchedProduct.nama_produk} di {kotaAja}</li>
           </ul>
         </div>
 
@@ -265,10 +266,10 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
         <div className="bg-primary text-primary-content p-8 md:p-12 rounded-3xl shadow-xl flex flex-col md:flex-row items-center gap-8">
           <div className="flex-1 space-y-4">
             <span className="badge badge-neutral font-bold uppercase tracking-wider">
-              Wilayah Pengiriman: {wilayahLengkap}
+              Wilayah Pengiriman: {kotaAja}
             </span>
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
-              Cetak {matchedProduct.nama_produk} Berkualitas di {wilayahLengkap}
+              Cetak {matchedProduct.nama_produk} Berkualitas di {kotaAja}
             </h1>
             <p className="opacity-90 text-sm md:text-base leading-relaxed">
               Melayani cetak <strong>{matchedProduct.nama_produk}</strong> di <strong>{wilayahLengkap}</strong> melalui pesan online, jadi kebutuhan percetakan Anda lebih murah, dengan harga terjangkau.
@@ -302,13 +303,16 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
             Pusat Jasa Cetak {matchedProduct.nama_produk} Terlengkap & Terjangkau di {wilayahLengkap}
           </h2>
           <p>
-            Menjelang berbagai kebutuhan promosi maupun personal, banyak perusahaan, instansi kantor, lembaga, sekolah, yayasan, hingga keperluan perorangan di <strong>{wilayahLengkap}</strong> mulai mencari vendor percetakan profesional. Tentunya saat ini Anda sedang mencari informasi produsen cetak terpercaya yang mampu melayani pemesanan praktis tanpa harus keluar rumah.
+            Menjelang berbagai kebutuhan promosi maupun personal, banyak perusahaan, instansi kantor, lembaga, sekolah, yayasan, hingga keperluan bisnis dan perorangan di <strong>{wilayahLengkap}</strong> mulai mencari vendor percetakan profesional. Tentunya saat ini Anda sedang mencari informasi produsen cetak terpercaya yang mampu melayani pemesanan praktis tanpa harus keluar rumah.
           </p>
           <p>
             Kami hadir untuk memudahkan Anda warga <strong>{wilayahLengkap}</strong> dan sekitarnya. Produk <strong>{matchedProduct.nama_produk}</strong> ini dirancang dengan standar produksi terbaik, menggunakan mesin cetak berteknologi tinggi untuk menghasilkan cetakan yang tajam, presisi, serta material pilihan yang awet.
           </p>
           <p>
-            Dengan sistem pemesanan online yang efisien, kami siap melayani pengiriman pesanan Anda dengan aman dan cepat menjangkau seluruh kecamatan di wilayah <strong>{matchedCity.province}</strong>. Tunggu apalagi? Segera tentukan pilihan spesifikasi dan desain terbaik Anda, lalu dapatkan penawaran harga terbaik bersama BikinCetak.
+            Semua proses produksi dan pengiriman pesanan langsung dikirimkan dari workshop utama kami di <strong>Surabaya</strong>, memastikan kualitas kontrol terjaga ketat sebelum dikirim ke lokasi Anda. Dengan sistem pemesanan online yang efisien, kami siap melayani pengiriman pesanan Anda dengan aman dan cepat menjangkau seluruh kecamatan di wilayah <strong>{matchedCity.province}</strong>.
+          </p>
+          <p>
+            Tunggu apalagi? Segera tentukan pilihan spesifikasi dan desain terbaik Anda, lalu <Link href="/login" className="text-primary font-bold underline hover:text-primary-focus">daftarkan</Link> diri Anda dan dapatkan penawaran harga terbaik bersama BikinCetak.
           </p>
         </section>
 
