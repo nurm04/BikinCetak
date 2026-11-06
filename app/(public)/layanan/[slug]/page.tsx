@@ -167,6 +167,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return { title: "Layanan Cetak | BikinCetak" };
   }
 
+  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
   const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
   
   // Ambil pengaturan umum/SEO dari backend (pengaturan_web)
@@ -178,7 +179,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const finalTitle = titleTemplate
     .replace(/\{\{\s*produk\s*\}\}/gi, matchedProduct.nama_produk)
-    .replace(/\{\{\s*kota\s*\}\}/gi, wilayahLengkap);
+    .replace(/\{\{\s*kota\s*\}\}/gi, kotaAja);
 
   const finalDesc = descTemplate
     .replace(/\{\{\s*produk\s*\}\}/gi, matchedProduct.nama_produk)
@@ -300,7 +301,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
         {/* Artikel Narasi SEO Informatif */}
         <section className="space-y-4 text-base-content/80 text-sm md:text-base leading-relaxed bg-base-200/50 p-6 md:p-8 rounded-3xl border border-base-200">
           <h2 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight">
-            Pusat Jasa Cetak {matchedProduct.nama_produk} Terlengkap & Terjangkau di {wilayahLengkap}
+            Pusat Jasa Cetak {matchedProduct.nama_produk} Terlengkap & Terjangkau di {kotaAja}
           </h2>
           <p>
             Menjelang berbagai kebutuhan promosi maupun personal, banyak perusahaan, instansi kantor, lembaga, sekolah, yayasan, hingga keperluan bisnis dan perorangan di <strong>{wilayahLengkap}</strong> mulai mencari vendor percetakan profesional. Tentunya saat ini Anda sedang mencari informasi produsen cetak terpercaya yang mampu melayani pemesanan praktis tanpa harus keluar rumah.
