@@ -170,10 +170,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
   const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
   
-  // Ambil pengaturan umum/SEO dari backend (pengaturan_web)
   const pengaturan: PengaturanData | null = await getPengaturan();
   
-  // Template dari pengaturan atau gunakan fallback default
   const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} di {{ kota }} - Desain Custom`;
   const descTemplate = pengaturan?.seo_desc_template || `Melayani cetak {{ produk }} di {{ kota }} melalui pesan online. Kebutuhan percetakan Anda lebih murah, cepat, dan terjangkau dengan kualitas terbaik.`;
 
@@ -249,6 +247,11 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
       harga_mulai_dari: p.harga_mulai_dari,
       diskon_roles: p.diskon_roles,
     }));
+
+  // Filter kota-kota lain dalam 1 provinsi yang sama untuk internal linking
+  const kotaSeProvinsi = cities.filter(
+    c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase()
+  );
 
   return (
     <main className="min-h-screen bg-base-100 py-8 px-4 md:px-12 lg:px-24">
@@ -380,6 +383,43 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
         {produkSerupa.length > 0 && (
           <div>
             <ProductRow title={`Produk ${matchedProduct.kategori?.nama_kategori || 'Serupa'} Lainnya`} data={produkSerupa} />
+          </div>
+        )}
+
+        {/* ========================================================== */}
+        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI               */}
+        {/* ========================================================== */}
+        {kotaSeProvinsi.length > 0 && (
+          <div className="pt-8 border-t border-base-200 space-y-4">
+            <div className="space-y-1">
+              <span className="badge badge-outline text-xs font-bold uppercase tracking-wider text-primary border-primary/30">
+                Area Layanan {matchedCity.province}
+              </span>
+              <h3 className="text-xl md:text-2xl font-black text-base-content tracking-tight">
+                Cetak {matchedProduct.nama_produk} di Kota Lain
+              </h3>
+              <p className="text-sm opacity-70">
+                Layanan cetak {matchedProduct.nama_produk} online siap kirim ke seluruh kota dan kabupaten di {matchedCity.province}.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              {kotaSeProvinsi.map((kota) => {
+                const citySlug = slugify(kota.city_name);
+                const routeUrl = `/layanan/cetak-${slugify(matchedProduct.nama_produk)}-di-${citySlug}`;
+                const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
+
+                return (
+                  <Link
+                    key={kota.city_id}
+                    href={routeUrl}
+                    className="px-4 py-2 text-xs font-semibold bg-base-100 hover:bg-primary hover:text-primary-content border border-base-300 rounded-full shadow-xs transition-all duration-200"
+                  >
+                    {namaKotaLengkap}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
 
