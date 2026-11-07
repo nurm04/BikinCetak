@@ -80,7 +80,6 @@ export default function Footer({ items = [] }: FooterProps) {
     router.push(`/pesan/status/${encodeURIComponent(kode)}`);
   };
 
-  // Helper untuk memperbaiki URL gambar jika path dari database bersifat relatif
   const resolveStorageUrl = (pathOrUrl: string | null): string => {
     if (!pathOrUrl) return "";
     if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
@@ -120,7 +119,6 @@ export default function Footer({ items = [] }: FooterProps) {
       submenu: category.submenu,
     }));
 
-  // Data Dinamis
   const logoUtama = resolveStorageUrl(pengaturan?.logo_utama || "img_web/logobikincetak.png");
   const namaWebsite = pengaturan?.nama_website ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() : "BIKIN CETAK";
   const deskripsi = pengaturan?.deskripsi_singkat || "";
@@ -138,10 +136,8 @@ export default function Footer({ items = [] }: FooterProps) {
   }));
   const teksPembayaran = pengaturan?.teks_info_pembayaran || "";
 
-  // Menggabungkan kurir_rajaongkir DAN kurir_lainnya (Kecuali kurir toko)
   const kurirEkspedisi: FooterCourierDisplay[] = [];
 
-  // 1. Ambil Kurir RajaOngkir yang aktif
   if (pengaturan?.kurir_rajaongkir) {
     const rawRajaOngkirMap = pengaturan.kurir_rajaongkir as Record<string, KurirItem>;
     Object.entries(rawRajaOngkirMap).forEach(([code, settings]) => {
@@ -156,11 +152,9 @@ export default function Footer({ items = [] }: FooterProps) {
     });
   }
 
-  // 2. Ambil Kurir Lainnya (Mengabaikan 'kurir_toko')
   if (pengaturan?.kurir_lainnya) {
     const rawKurirLainnyaMap = pengaturan.kurir_lainnya as Record<string, KurirItem>;
     Object.entries(rawKurirLainnyaMap).forEach(([code, settings]) => {
-      // Sembunyikan jika kodenya kurir_toko atau toko
       if (code === "kurir_toko" || code === "toko") return;
 
       if (settings && settings.is_active !== false) {
@@ -188,26 +182,27 @@ export default function Footer({ items = [] }: FooterProps) {
     <footer className="text-white bg-primary">
       <div className="container px-4 mx-auto py-12 md:px-8">
         
-        {/* Kategori Menu */}
-        <div className="hidden pb-12 border-b md:grid grid-cols-2 md:grid-cols-4 gap-8 border-white/20">
+        {/* Kategori Menu dengan Format 3 Kolom & Tautan Lebih Besar + Spasi */}
+        <div className="hidden pb-12 border-b md:grid grid-cols-1 md:grid-cols-3 gap-8 border-white/20">
           {dynamicCategories.map((menu) => (
-            <nav key={menu.key} className="flex flex-col gap-2">
-              <h6 className="mb-2 font-bold text-white border-b footer-title opacity-100 border-white/30 w-fit">
+            <div key={menu.key} className="flex flex-col gap-2.5">
+              <h6 className="mb-1 font-bold text-white border-b footer-title opacity-100 border-white/30 w-fit">
                 {menu.label}
               </h6>
-              {menu.submenu.slice(0, 6).map((item, i) => (
-                <Link 
-                  key={i} 
-                  href={`/produk/${slugify(item.name)}`}
-                  className="text-xs transition-opacity opacity-80 link link-hover hover:opacity-100"
-                >
-                  {item.name}
-                </Link>
-              ))}
-              {menu.submenu.length > 6 && (
-                <span className="text-[10px] italic opacity-50">dan lainnya...</span>
-              )}
-            </nav>
+              <p className="text-sm leading-relaxed opacity-90 space-x-1.5">
+                {menu.submenu.map((item, i) => (
+                  <span key={i} className="inline-block my-1">
+                    <Link 
+                      href={`/produk/${slugify(item.name)}`}
+                      className="transition-opacity hover:opacity-100 hover:underline font-medium"
+                    >
+                      {item.name}
+                    </Link>
+                    {i < menu.submenu.length - 1 && <span className="ml-1.5 opacity-60">|</span>}
+                  </span>
+                ))}
+              </p>
+            </div>
           ))}
         </div>
 
