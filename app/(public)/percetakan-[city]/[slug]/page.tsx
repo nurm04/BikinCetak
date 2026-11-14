@@ -353,7 +353,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
           </div>
         )}
 
-        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI */}
+        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSIv */}
         {kotaSeProvinsi.length > 0 && (
           <div className="pt-8 border-t border-base-200 space-y-4">
             <div className="space-y-1">

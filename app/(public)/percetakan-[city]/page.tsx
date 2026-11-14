@@ -248,7 +248,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         ))}
       </div>
 
-      {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI */}
+      {/* INTERNAL LINKING: KOTA LAINv DALAM 1 PROVINSI */}
       {kotaSeProvinsi.length > 0 && (
         <div className="container mx-auto px-4 md:px-12 pb-16">
           <div className="bg-base-100 border border-base-300 p-6 md:p-8 rounded-3xl space-y-4 shadow-sm">
