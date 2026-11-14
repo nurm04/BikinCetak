@@ -17,27 +17,15 @@ export interface CityResult {
   postal_code: string;
 }
 
-export interface ProvinceResult {
-  province_id?: string;
-  id?: string;
-  province?: string;
-  name?: string;
-}
-
 function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>[] {
   let results: Record<string, unknown>[] = [];
-  
   if (Array.isArray(responsePayload)) {
     results = responsePayload as Record<string, unknown>[];
   } else if (responsePayload && typeof responsePayload === "object") {
     const payload = responsePayload as Record<string, unknown>;
     if (Array.isArray(payload.data)) {
       results = payload.data as Record<string, unknown>[];
-    } else if (
-      payload.rajaongkir &&
-      typeof payload.rajaongkir === "object" &&
-      Array.isArray((payload.rajaongkir as Record<string, unknown>).results)
-    ) {
+    } else if (payload.rajaongkir && typeof payload.rajaongkir === "object" && Array.isArray((payload.rajaongkir as Record<string, unknown>).results)) {
       results = (payload.rajaongkir as Record<string, unknown>).results as Record<string, unknown>[];
     } else if (Array.isArray(payload.results)) {
       results = payload.results as Record<string, unknown>[];
@@ -49,10 +37,9 @@ function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>
 async function getAllCities(): Promise<CityResult[]> {
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    
     const res = await fetch(`${API_URL}/api/shipping/provinces`, { cache: "force-cache" });
+    if (!res.ok) throw new Error("Failed");
     const provinceJson = unknownToRecord(await res.json());
-    
     const provinces = normalizeApiResponse(provinceJson);
     let allCities: CityResult[] = [];
 
@@ -60,80 +47,65 @@ async function getAllCities(): Promise<CityResult[]> {
       const cityPromises = provinces.map(async (prov: Record<string, unknown>) => {
         const provId = String(prov.province_id || prov.id || "");
         if (!provId) return [];
-
         const cityRes = await fetch(`${API_URL}/api/shipping/cities/${provId}`, { cache: "force-cache" });
+        if (!cityRes.ok) return [];
         const cityJson = await cityRes.json();
-        
         const citiesData = normalizeApiResponse(cityJson);
         return citiesData.map((c: Record<string, unknown>) => ({
           city_id: String(c.city_id || c.id || ""),
           province_id: String(c.province_id || provId),
-          province: String(c.province || prov.province || prov.name || ""),
-          type: String(c.type || ""),
+          province: String(c.province || prov.province || prov.name || "Jawa Timur"),
+          type: String(c.type || "Kabupaten"),
           city_name: String(c.city_name || c.name || ""),
           postal_code: String(c.postal_code || "")
         }));
       });
-      
       const citiesArrays = await Promise.all(cityPromises);
       allCities = citiesArrays.flat();
     }
 
+    if (allCities.length === 0) {
+      return [{ city_id: "419", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: "Sumenep", postal_code: "69411" }];
+    }
     return allCities;
   } catch (error) {
-    return [];
+    return [{ city_id: "419", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: "Sumenep", postal_code: "69411" }];
   }
 }
 
 function unknownToRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === "object") {
-    return value as Record<string, unknown>;
-  }
+  if (value && typeof value === "object") return value as Record<string, unknown>;
   return {};
 }
 
 const formatRupiah = (angka: number) => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(angka);
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(angka);
 };
 
 const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
     let labelBersih = skuName;
-    
     const prefix1Match = labelBersih.match(/^[A-Z0-9]+-\d+-/i);
-    if (prefix1Match) {
-      labelBersih = labelBersih.replace(prefix1Match[0], '');
-    }
-
+    if (prefix1Match) labelBersih = labelBersih.replace(prefix1Match[0], '');
     if (productName) {
        const escProd = productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
        const regexProd = new RegExp(`^${escProd}-?`, 'i');
        labelBersih = labelBersih.replace(regexProd, '').trim();
     }
-
     if (labelBersih.includes('-')) {
         const lastDashIndex = labelBersih.lastIndexOf('-');
         labelBersih = labelBersih.substring(0, lastDashIndex).trim();
     }
-
     return labelBersih || "Standar";
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ city: string; slug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
-  const citySlug = resolvedParams?.city; // contoh: "sumenep"
-  const productSlug = resolvedParams?.slug; // contoh: "cetak-print-a0"
-  
-  if (!citySlug || !productSlug || !productSlug.startsWith("cetak-")) {
-    return { title: "Halaman Tidak Ditemukan | BikinCetak" };
-  }
+  const cityParam = resolvedParams?.city || "";
+  const productSlug = resolvedParams?.slug || "";
 
   const cities = await getAllCities();
   
-  const cleanCityQuery = citySlug
+  const cleanCityQuery = cityParam
     .replace(/-/g, " ")
     .replace(/^kabupaten\s+/i, "")
     .replace(/^kota\s+/i, "")
@@ -175,54 +147,30 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   };
 }
 
-export default async function ProgrammaticSeoPage({ params }: { params: Promise<{ city: string; slug: string }> }) {
+export default async function CityProductPage({ params }: { params: Promise<{ city: string; slug: string }> }) {
   const resolvedParams = await params;
-  const citySlug = resolvedParams?.city;
-  const productSlug = resolvedParams?.slug;
+  const cityParam = resolvedParams?.city || "";
+  const productSlug = resolvedParams?.slug || "";
 
-  if (!citySlug || !productSlug || !productSlug.startsWith("cetak-")) {
-    notFound();
-  }
+  const cities = await getAllCities();
+  const matchedCity = cities.find(c => slugify(c.city_name) === cityParam) || {
+    city_id: "999", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: cityParam.charAt(0).toUpperCase() + cityParam.slice(1), postal_code: "69411"
+  };
 
   const products: ItemData[] = await getItems();
-  const cities = await getAllCities();
+  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlug.replace(/-di-.*/, "").replace("cetak-", "")) || products[0];
 
-  const cleanCityQuery = citySlug
-    .replace(/-/g, " ")
-    .replace(/^kabupaten\s+/i, "")
-    .replace(/^kota\s+/i, "")
-    .trim();
-
-  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlug);
-  
-  const matchedCity = cities.find(c => {
-    const dbCity = c.city_name.toLowerCase();
-    return dbCity === cleanCityQuery || 
-           dbCity.includes(cleanCityQuery) || 
-           cleanCityQuery.includes(dbCity);
-  });
-
-  if (!matchedProduct || !matchedCity) {
-    notFound();
-  }
+  if (!matchedProduct) notFound();
 
   const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
   const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
-  const gambarProduk = matchedProduct.gambar_urls?.[0] ? matchedProduct.gambar_urls[0] : null;
+  const gambarProduk = matchedProduct.gambar_urls?.[0] || null;
 
-  const kategoriId = matchedProduct.kategori?.id_kategori;
   const produkSerupa = products
-    .filter(p => p.kategori?.id_kategori === kategoriId && p.id_produk !== matchedProduct.id_produk)
-    .map(p => ({
-      name: p.nama_produk,
-      image: p.gambar_urls,
-      harga_mulai_dari: p.harga_mulai_dari,
-      diskon_roles: p.diskon_roles,
-    }));
+    .filter(p => p.kategori?.id_kategori === matchedProduct.kategori?.id_kategori && p.id_produk !== matchedProduct.id_produk)
+    .map(p => ({ name: p.nama_produk, image: p.gambar_urls, harga_mulai_dari: p.harga_mulai_dari, diskon_roles: p.diskon_roles }));
 
-  const kotaSeProvinsi = cities.filter(
-    c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase()
-  );
+  const kotaSeProvinsi = cities.filter(c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase());
 
   return (
     <main className="min-h-screen bg-base-100 py-8 px-4 md:px-12 lg:px-24">
@@ -232,7 +180,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
         <div className="text-xs breadcrumbs opacity-60">
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li><Link href={`/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {matchedCity.city_name}</Link></li>
+            <li><Link href={`/percetakan/${slugify(matchedCity.city_name)}`}>Percetakan {matchedCity.city_name}</Link></li>
             <li className="capitalize">{matchedProduct.nama_produk}</li>
           </ul>
         </div>
@@ -353,7 +301,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
           </div>
         )}
 
-        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSIv */}
+        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI */}
         {kotaSeProvinsi.length > 0 && (
           <div className="pt-8 border-t border-base-200 space-y-4">
             <div className="space-y-1">
@@ -371,7 +319,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
             <div className="flex flex-wrap gap-2 pt-2">
               {kotaSeProvinsi.map((kota) => {
                 const citySlug = slugify(kota.city_name);
-                const routeUrl = `/percetakan-${citySlug}/${slugify(matchedProduct.nama_produk)}`;
+                const routeUrl = `/percetakan/${citySlug}/${slugify(matchedProduct.nama_produk)}`;
                 const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
 
                 return (
