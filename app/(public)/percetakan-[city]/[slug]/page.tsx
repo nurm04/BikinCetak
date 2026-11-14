@@ -122,33 +122,19 @@ const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
     return labelBersih || "Standar";
 };
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ city: string; slug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
-  const slug = resolvedParams?.slug;
+  const citySlug = resolvedParams?.city; // contoh: "sumenep"
+  const productSlug = resolvedParams?.slug; // contoh: "cetak-print-a0"
   
-  if (!slug || !slug.startsWith("cetak-")) {
+  if (!citySlug || !productSlug || !productSlug.startsWith("cetak-")) {
     return { title: "Halaman Tidak Ditemukan | BikinCetak" };
-  }
-
-  let productSlugQuery = "";
-  let citySlugQuery = "";
-
-  if (slug.includes("-di-")) {
-    const parts = slug.replace("cetak-", "").split("-di-");
-    productSlugQuery = parts[0];
-    citySlugQuery = parts[1] ? parts[1].replace(/-/g, " ").toLowerCase() : "";
-  } else {
-    const cleanSlug = slug.replace("cetak-", "");
-    const lastHyphenIndex = cleanSlug.lastIndexOf("-");
-    if (lastHyphenIndex !== -1) {
-      productSlugQuery = cleanSlug.substring(0, lastHyphenIndex);
-      citySlugQuery = cleanSlug.substring(lastHyphenIndex + 1).replace(/-/g, " ").toLowerCase();
-    }
   }
 
   const cities = await getAllCities();
   
-  const cleanCityQuery = citySlugQuery
+  const cleanCityQuery = citySlug
+    .replace(/-/g, " ")
     .replace(/^kabupaten\s+/i, "")
     .replace(/^kota\s+/i, "")
     .trim();
@@ -161,7 +147,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   });
 
   const products: ItemData[] = await getItems();
-  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlugQuery);
+  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlug);
 
   if (!matchedProduct || !matchedCity) {
     return { title: "Layanan Cetak | BikinCetak" };
@@ -172,7 +158,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   
   const pengaturan: PengaturanData | null = await getPengaturan();
   
-  const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} di {{ kota }} - Desain Custom`;
+  const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} Murah di {{ kota }} - Print Custom`;
   const descTemplate = pengaturan?.seo_desc_template || `Melayani cetak {{ produk }} di {{ kota }} melalui pesan online. Kebutuhan percetakan Anda lebih murah, cepat, dan terjangkau dengan kualitas terbaik.`;
 
   const finalTitle = titleTemplate
@@ -189,39 +175,25 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-export default async function ProgrammaticSeoPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ProgrammaticSeoPage({ params }: { params: Promise<{ city: string; slug: string }> }) {
   const resolvedParams = await params;
-  const slug = resolvedParams?.slug;
+  const citySlug = resolvedParams?.city;
+  const productSlug = resolvedParams?.slug;
 
-  if (!slug || !slug.startsWith("cetak-")) {
+  if (!citySlug || !productSlug || !productSlug.startsWith("cetak-")) {
     notFound();
-  }
-
-  let productSlugQuery = "";
-  let citySlugQuery = "";
-
-  if (slug.includes("-di-")) {
-    const parts = slug.replace("cetak-", "").split("-di-");
-    productSlugQuery = parts[0];
-    citySlugQuery = parts[1] ? parts[1].replace(/-/g, " ").toLowerCase() : "";
-  } else {
-    const cleanSlug = slug.replace("cetak-", "");
-    const lastHyphenIndex = cleanSlug.lastIndexOf("-");
-    if (lastHyphenIndex !== -1) {
-      productSlugQuery = cleanSlug.substring(0, lastHyphenIndex);
-      citySlugQuery = cleanSlug.substring(lastHyphenIndex + 1).replace(/-/g, " ").toLowerCase();
-    }
   }
 
   const products: ItemData[] = await getItems();
   const cities = await getAllCities();
 
-  const cleanCityQuery = citySlugQuery
+  const cleanCityQuery = citySlug
+    .replace(/-/g, " ")
     .replace(/^kabupaten\s+/i, "")
     .replace(/^kota\s+/i, "")
     .trim();
 
-  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlugQuery);
+  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlug);
   
   const matchedCity = cities.find(c => {
     const dbCity = c.city_name.toLowerCase();
@@ -248,7 +220,6 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
       diskon_roles: p.diskon_roles,
     }));
 
-  // Filter kota-kota lain dalam 1 provinsi yang sama untuk internal linking
   const kotaSeProvinsi = cities.filter(
     c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase()
   );
@@ -261,8 +232,8 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
         <div className="text-xs breadcrumbs opacity-60">
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li>Area Layanan</li>
-            <li className="capitalize">{matchedProduct.nama_produk} di {kotaAja}</li>
+            <li><Link href={`/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {matchedCity.city_name}</Link></li>
+            <li className="capitalize">{matchedProduct.nama_produk}</li>
           </ul>
         </div>
 
@@ -307,7 +278,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
             Pusat Jasa Cetak {matchedProduct.nama_produk} Terlengkap & Terjangkau di {kotaAja}
           </h2>
           <p>
-            Menjelang berbagai kebutuhan promosi maupun personal, banyak perusahaan, instansi kantor, lembaga, sekolah, yayasan, hingga keperluan bisnis dan perorangan di <strong>{wilayahLengkap}</strong> mulai mencari vendor percetakan profesional. Tentunya saat ini Anda sedang mencari informasi produsen cetak terpercaya yang mampu melayani pemesanan praktis tanpa harus keluar rumah.
+            Menjelang berbagai kebutuhan promosi maupun personal, banyak perusahaan, instansi kantor, lembaga, sekolah, yayasan, pondok pesantren, hingga keperluan bisnis dan perorangan di <strong>{wilayahLengkap}</strong> mulai mencari vendor percetakan profesional. Tentunya saat ini Anda sedang mencari informasi produsen cetak terpercaya yang mampu melayani pemesanan praktis tanpa harus keluar rumah.
           </p>
           <p>
             Kami hadir untuk memudahkan Anda warga <strong>{wilayahLengkap}</strong> dan sekitarnya. Produk <strong>{matchedProduct.nama_produk}</strong> ini dirancang dengan standar produksi terbaik, menggunakan mesin cetak berteknologi tinggi untuk menghasilkan cetakan yang tajam, presisi, serta material pilihan yang awet.
@@ -320,14 +291,12 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
           </p>
         </section>
 
-        {/* ========================================================== */}
-        {/* TABEL SKU / VARIAN PRODUK                                  */}
-        {/* ========================================================== */}
+        {/* TABEL SKU / VARIAN PRODUK */}
         {matchedProduct.dataSkus && matchedProduct.dataSkus.length > 0 && (
           <div className="space-y-6 pt-4">
             <div className="border-b-2 border-primary pb-2 w-fit">
               <h2 className="font-bold tracking-wider uppercase text-primary lg:text-xl">
-                Daftar Harga & Spesifikasi Varian {matchedProduct.nama_produk} di {matchedCity.city_name}
+                Daftar Harga & Spesifikasi Cetak {matchedProduct.nama_produk} di {matchedCity.city_name}
               </h2>
             </div>
 
@@ -367,28 +336,24 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
           </div>
         )}
 
-        {/* ========================================================== */}
-        {/* TEKS PEMISAH ANTARA TABEL SKU & PRODUK LAINNYA             */}
-        {/* ========================================================== */}
+        {/* TEKS PEMISAH */}
         <div className="pt-6 pb-2 text-center border-t border-base-200">
           <h3 className="text-base md:text-lg font-bold text-base-content/80">
             Mencari Jenis Percetakan Lainnya?
           </h3>
           <p className="text-sm opacity-60 mt-1">
-            Jelajahi berbagai pilihan produk penunjang promosi dan kebutuhan kantor terbaik kami di bawah ini.
+            Jelajahi berbagai pilihan produk printing penunjang promosi dan kebutuhan kantor terbaik kami di bawah ini.
           </p>
         </div>
 
-        {/* PRODUK SERUPA (1 KATEGORI) DI BAGIAN BAWAH */}
+        {/* PRODUK SERUPA */}
         {produkSerupa.length > 0 && (
           <div>
             <ProductRow title={`Produk ${matchedProduct.kategori?.nama_kategori || 'Serupa'} Lainnya`} data={produkSerupa} />
           </div>
         )}
 
-        {/* ========================================================== */}
-        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI               */}
-        {/* ========================================================== */}
+        {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI */}
         {kotaSeProvinsi.length > 0 && (
           <div className="pt-8 border-t border-base-200 space-y-4">
             <div className="space-y-1">
@@ -406,7 +371,7 @@ export default async function ProgrammaticSeoPage({ params }: { params: Promise<
             <div className="flex flex-wrap gap-2 pt-2">
               {kotaSeProvinsi.map((kota) => {
                 const citySlug = slugify(kota.city_name);
-                const routeUrl = `/layanan/cetak-${slugify(matchedProduct.nama_produk)}-di-${citySlug}`;
+                const routeUrl = `/percetakan-${citySlug}/${slugify(matchedProduct.nama_produk)}`;
                 const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
 
                 return (
