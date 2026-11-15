@@ -7,7 +7,6 @@ import FormInput from "@/components/ui/FormInput";
 import FormSelect from "@/components/ui/FormSelect";
 import FormTextarea from "@/components/ui/FormTextarea";
 import { OpsiFinishing } from "@/services/itemService";
-import { Plus, Minus } from "lucide-react"; // 👈 Tambahkan ikon Plus & Minus
 
 interface FormFieldOption {
   label: string;
@@ -73,18 +72,6 @@ export default function FormPesan({
   const maxDim = Math.max(currentPanjang, currentLebar);
   const qtyInput = parseInt(values?.qty || String(minimumQty), 10);
   const renderUtama = fieldsUtama?.length ? fieldsUtama : (fields || []);
-
-  // Handler untuk tombol plus & minus Qty
-  const handleQtyChange = (delta: number) => {
-    if (!onValueChange) return;
-    const step = kelipatanQty > 0 ? kelipatanQty : 1;
-    let nextQty = qtyInput + (delta * step);
-    
-    if (nextQty < minimumQty) {
-      nextQty = minimumQty;
-    }
-    onValueChange("qty", String(nextQty));
-  };
 
   return (
     <div className="grid grid-cols-1 gap-4">
@@ -233,46 +220,18 @@ export default function FormPesan({
         </div>
       )}
       
-      <div className="pt-4 space-y-4 border-t border-base-content/5">
+      {/* Sembunyikan input jumlah pesanan di mobile (hidden md:block) karena sudah dipindah ke mobile bottom bar */}
+      <div className="pt-4 space-y-4 border-t border-base-content/5 hidden md:block">
         <div className="form-control">
-          {/* Input Qty dengan Tombol (+) dan (-) */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase opacity-60 block tracking-widest px-1">
-              Jumlah Pesanan (Qty)
-            </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleQtyChange(-1)}
-                className="btn btn-square btn-outline border-base-content/20 hover:bg-base-200 shrink-0"
-                title="Kurangi"
-              >
-                <Minus size={16} />
-              </button>
-              
-              <div className="flex-1">
-                <FormInput
-                  label=""
-                  name="qty"
-                  type="number"
-                  min={String(minimumQty)}
-                  step={String(kelipatanQty)} 
-                  value={values?.qty ?? String(minimumQty)} 
-                  onChange={onValueChange}
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleQtyChange(1)}
-                className="btn btn-square btn-outline border-base-content/20 hover:bg-base-200 shrink-0"
-                title="Tambah"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-
+          <FormInput
+            label="Jumlah Pesanan (Qty)"
+            name="qty"
+            type="number"
+            min={String(minimumQty)}
+            step={String(kelipatanQty)} 
+            value={values?.qty ?? String(minimumQty)} 
+            onChange={onValueChange}
+          />
           {minimumQty > 1 && kelipatanQty === 1 && (
             <p className="text-[11px] text-warning font-bold mt-1 leading-tight px-1">
               * Konfigurasi pesanan ini mewajibkan minimum {minimumQty} pcs
@@ -285,6 +244,18 @@ export default function FormPesan({
           )}
         </div>
 
+        <FormTextarea
+          label="Catatan Cetak"
+          name="catatan"
+          placeholder="Contoh: Potong pola, laminasi doff..."
+          className="bg-base-100"
+          value={values?.catatan || ""}
+          onChange={onValueChange}
+        />
+      </div>
+
+      {/* Jika form di atas disembunyikan di mobile, pastikan "Catatan Cetak" tetap muncul secara mandiri di mobile */}
+      <div className="pt-4 space-y-4 border-t border-base-content/5 md:hidden">
         <FormTextarea
           label="Catatan Cetak"
           name="catatan"
