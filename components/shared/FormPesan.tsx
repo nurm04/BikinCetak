@@ -1,4 +1,3 @@
-// FormPesan.tsx
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
@@ -220,7 +219,7 @@ export default function FormPesan({
         </div>
       )}
       
-      {/* Sembunyikan input jumlah pesanan di mobile (hidden md:block) karena sudah dipindah ke mobile bottom bar */}
+      {/* BAGIAN QTY DI FORM UTAMA (DISEMBUNYIKAN DI MOBILE, TAMPIL NORMAL SEPERTI AWAL DI DESKTOP TANPA TOMBOL + -) */}
       <div className="pt-4 space-y-4 border-t border-base-content/5 hidden md:block">
         <div className="form-control">
           <FormInput
@@ -254,7 +253,7 @@ export default function FormPesan({
         />
       </div>
 
-      {/* Jika form di atas disembunyikan di mobile, pastikan "Catatan Cetak" tetap muncul secara mandiri di mobile */}
+      {/* Catatan Cetak khusus versi mobile */}
       <div className="pt-4 space-y-4 border-t border-base-content/5 md:hidden">
         <FormTextarea
           label="Catatan Cetak"
@@ -265,6 +264,7 @@ export default function FormPesan({
           onChange={onValueChange}
         />
       </div>
+
     </div>
   );
 }
