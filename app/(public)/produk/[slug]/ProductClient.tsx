@@ -1041,13 +1041,16 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             <span className="text-[9px] font-black uppercase opacity-50">Total Estimasi</span>
             <span className="text-lg font-black tracking-tighter text-primary">Rp {totalPrice.toLocaleString("id-ID")}</span>
           </div>
-          <button 
-            onClick={handleAddToCart} 
-            disabled={cartLoading || !sku} 
-            className="btn btn-primary btn-sm md:btn-md font-black tracking-widest uppercase rounded-xl flex-1 max-w-55"
-          >
-            {cartLoading ? <span className="loading loading-spinner"></span> : <><ShoppingBag size={16}/> Tambah Keranjang</>}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleAddToCart} 
+              disabled={cartLoading || !sku} 
+              className="btn btn-primary btn-square btn-md rounded-xl shadow-md"
+              title="Tambah Keranjang"
+            >
+              {cartLoading ? <span className="loading loading-spinner"></span> : <ShoppingBag size={20}/>}
+            </button>
+          </div>
         </div>
       </div>
     </main>

@@ -1,3 +1,4 @@
+// FormPesan.tsx
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
@@ -6,6 +7,7 @@ import FormInput from "@/components/ui/FormInput";
 import FormSelect from "@/components/ui/FormSelect";
 import FormTextarea from "@/components/ui/FormTextarea";
 import { OpsiFinishing } from "@/services/itemService";
+import { Plus, Minus } from "lucide-react"; // 👈 Tambahkan ikon Plus & Minus
 
 interface FormFieldOption {
   label: string;
@@ -71,6 +73,18 @@ export default function FormPesan({
   const maxDim = Math.max(currentPanjang, currentLebar);
   const qtyInput = parseInt(values?.qty || String(minimumQty), 10);
   const renderUtama = fieldsUtama?.length ? fieldsUtama : (fields || []);
+
+  // Handler untuk tombol plus & minus Qty
+  const handleQtyChange = (delta: number) => {
+    if (!onValueChange) return;
+    const step = kelipatanQty > 0 ? kelipatanQty : 1;
+    let nextQty = qtyInput + (delta * step);
+    
+    if (nextQty < minimumQty) {
+      nextQty = minimumQty;
+    }
+    onValueChange("qty", String(nextQty));
+  };
 
   return (
     <div className="grid grid-cols-1 gap-4">
@@ -178,26 +192,22 @@ export default function FormPesan({
             const hasZero = addons.some((a) => Number(a.harga_tambahan) === 0);
             const addonOptions: FormFieldOption[] = [];
 
-            // Aturan 3: Jika semua bayar, tambahkan opsi "Tanpa..."
             if (!hasZero) {
               addonOptions.push({
                 value: "",
-                label: `Tanpa ${groupName}` // <-- Bersih tanpa harga
+                label: `Tanpa ${groupName}`
               });
             }
 
-            // Aturan 1 & 2: Loop semua opsi asli (Bersih tanpa harga)
             addons.forEach(a => {
               addonOptions.push({
                 value: String(a.id_sku_finishing), 
-                label: a.nama_pilihan // <-- Murni hanya nama (Contoh: "Merah", "Satu Sisi")
+                label: a.nama_pilihan 
               });
             });
 
-            // Baca state dari Parent
             const currentFinishingObj = selectedFinishing ? selectedFinishing[groupName] : undefined;
             const selectedAddonId = currentFinishingObj ? String(currentFinishingObj.id_sku_finishing) : "";
-
             const selectedAddonInfo = addons.find(a => String(a.id_sku_finishing) === selectedAddonId);
 
             return (
@@ -225,15 +235,44 @@ export default function FormPesan({
       
       <div className="pt-4 space-y-4 border-t border-base-content/5">
         <div className="form-control">
-          <FormInput
-            label="Jumlah Pesanan (Qty)"
-            name="qty"
-            type="number"
-            min={String(minimumQty)}
-            step={String(kelipatanQty)} 
-            value={values?.qty ?? String(minimumQty)} 
-            onChange={onValueChange}
-          />
+          {/* Input Qty dengan Tombol (+) dan (-) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase opacity-60 block tracking-widest px-1">
+              Jumlah Pesanan (Qty)
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleQtyChange(-1)}
+                className="btn btn-square btn-outline border-base-content/20 hover:bg-base-200 shrink-0"
+                title="Kurangi"
+              >
+                <Minus size={16} />
+              </button>
+              
+              <div className="flex-1">
+                <FormInput
+                  label=""
+                  name="qty"
+                  type="number"
+                  min={String(minimumQty)}
+                  step={String(kelipatanQty)} 
+                  value={values?.qty ?? String(minimumQty)} 
+                  onChange={onValueChange}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleQtyChange(1)}
+                className="btn btn-square btn-outline border-base-content/20 hover:bg-base-200 shrink-0"
+                title="Tambah"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
           {minimumQty > 1 && kelipatanQty === 1 && (
             <p className="text-[11px] text-warning font-bold mt-1 leading-tight px-1">
               * Konfigurasi pesanan ini mewajibkan minimum {minimumQty} pcs
