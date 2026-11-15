@@ -548,7 +548,14 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
     
     if (name === "qty") {
       const cleanValue = value.replace(/\D/g, ""); 
-      setSelectedOptions((prev) => ({ ...prev, qty: cleanValue }));
+      const numericValue = parseInt(cleanValue, 10);
+      
+      if (isNaN(numericValue)) {
+        setSelectedOptions((prev) => ({ ...prev, qty: "" }));
+        return;
+      }
+
+      setSelectedOptions((prev) => ({ ...prev, qty: String(numericValue) }));
       return;
     }
     
@@ -1037,20 +1044,54 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
       {/* MOBILE BOTTOM NAVIGATION BAR (FIXED DI ATAS MOBILE BOTTOM NAV) */}
       <div className="fixed bottom-16 left-0 right-0 z-40 block bg-base-100 border-t border-base-content/10 p-3 shadow-lg lg:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex flex-col">
-            <span className="text-[9px] font-black uppercase opacity-50">Total Estimasi</span>
-            <span className="text-lg font-black tracking-tighter text-primary">Rp {totalPrice.toLocaleString("id-ID")}</span>
-          </div>
+          
+          {/* QTY CONTROLLER & TOTAL ESTIMASI */}
           <div className="flex items-center gap-2">
-            <button 
-              onClick={handleAddToCart} 
-              disabled={cartLoading || !sku} 
-              className="btn btn-primary btn-square btn-md rounded-xl shadow-md"
-              title="Tambah Keranjang"
-            >
-              {cartLoading ? <span className="loading loading-spinner"></span> : <ShoppingBag size={20}/>}
-            </button>
+            <div className="flex items-center border border-base-content/20 rounded-xl overflow-hidden bg-base-200/50">
+              <button
+                type="button"
+                onClick={() => {
+                  const currentQty = parseInt(selectedOptions['qty'] || String(minimumQty), 10);
+                  const step = kelipatanOrder > 0 ? kelipatanOrder : 1;
+                  const newQty = Math.max(minimumQty, currentQty - step);
+                  handleAttributeChange('qty', String(newQty));
+                }}
+                className="px-2.5 py-2 text-xs font-bold hover:bg-base-300 transition-colors"
+              >
+                -
+              </button>
+              <span className="px-2 text-xs font-black min-w-7 text-center">
+                {selectedOptions['qty'] || minimumQty}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const currentQty = parseInt(selectedOptions['qty'] || String(minimumQty), 10);
+                  const step = kelipatanOrder > 0 ? kelipatanOrder : 1;
+                  const newQty = currentQty + step;
+                  handleAttributeChange('qty', String(newQty));
+                }}
+                className="px-2.5 py-2 text-xs font-bold hover:bg-base-300 transition-colors"
+              >
+                +
+              </button>
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase opacity-50">Total Estimasi</span>
+              <span className="text-sm font-black tracking-tight text-primary">Rp {totalPrice.toLocaleString("id-ID")}</span>
+            </div>
           </div>
+
+          {/* Tombol Keranjang Berbentuk Ikon Saja */}
+          <button 
+            onClick={handleAddToCart} 
+            disabled={cartLoading || !sku} 
+            className="btn btn-primary btn-square btn-md rounded-xl shrink-0 shadow-md"
+            title="Tambah Keranjang"
+          >
+            {cartLoading ? <span className="loading loading-spinner loading-xs"></span> : <ShoppingBag size={20}/>}
+          </button>
         </div>
       </div>
     </main>
