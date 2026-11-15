@@ -3,12 +3,11 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import ProductRow from "@/components/shared/ProductRow";
 import { getItems, ItemData } from "@/services/itemService";
 import { getUserProfile } from "@/services/userService";
-import { getBanners, getPengaturan, PengaturanData } from "@/services/pengaturanWebService";
+import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
-import ProductRow from "@/components/shared/ProductRow";
-import HeroCarousel from "@/components/shared/HeroCarousel";
 
 export interface CityResult {
   city_id: string;
@@ -21,13 +20,18 @@ export interface CityResult {
 
 function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>[] {
   let results: Record<string, unknown>[] = [];
+  
   if (Array.isArray(responsePayload)) {
     results = responsePayload as Record<string, unknown>[];
   } else if (responsePayload && typeof responsePayload === "object") {
     const payload = responsePayload as Record<string, unknown>;
     if (Array.isArray(payload.data)) {
       results = payload.data as Record<string, unknown>[];
-    } else if (payload.rajaongkir && typeof payload.rajaongkir === "object" && Array.isArray((payload.rajaongkir as Record<string, unknown>).results)) {
+    } else if (
+      payload.rajaongkir &&
+      typeof payload.rajaongkir === "object" &&
+      Array.isArray((payload.rajaongkir as Record<string, unknown>).results)
+    ) {
       results = (payload.rajaongkir as Record<string, unknown>).results as Record<string, unknown>[];
     } else if (Array.isArray(payload.results)) {
       results = payload.results as Record<string, unknown>[];
@@ -39,9 +43,10 @@ function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>
 async function getAllCities(): Promise<CityResult[]> {
   try {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    
     const res = await fetch(`${API_URL}/api/shipping/provinces`, { cache: "force-cache" });
-    if (!res.ok) throw new Error("Failed");
     const provinceJson = unknownToRecord(await res.json());
+    
     const provinces = normalizeApiResponse(provinceJson);
     let allCities: CityResult[] = [];
 
@@ -49,34 +54,43 @@ async function getAllCities(): Promise<CityResult[]> {
       const cityPromises = provinces.map(async (prov: Record<string, unknown>) => {
         const provId = String(prov.province_id || prov.id || "");
         if (!provId) return [];
+
         const cityRes = await fetch(`${API_URL}/api/shipping/cities/${provId}`, { cache: "force-cache" });
-        if (!cityRes.ok) return [];
         const cityJson = await cityRes.json();
+        
         const citiesData = normalizeApiResponse(cityJson);
         return citiesData.map((c: Record<string, unknown>) => ({
           city_id: String(c.city_id || c.id || ""),
           province_id: String(c.province_id || provId),
-          province: String(c.province || prov.province || prov.name || "Jawa Timur"),
-          type: String(c.type || "Kabupaten"),
+          province: String(c.province || prov.province || prov.name || ""),
+          type: String(c.type || ""),
           city_name: String(c.city_name || c.name || ""),
           postal_code: String(c.postal_code || "")
         }));
       });
+      
       const citiesArrays = await Promise.all(cityPromises);
       allCities = citiesArrays.flat();
     }
 
     if (allCities.length === 0) {
-      return [{ city_id: "419", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: "Sumenep", postal_code: "69411" }];
+      return [
+        { city_id: "1", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: "Kediri", postal_code: "64111" }
+      ];
     }
+
     return allCities;
   } catch (error) {
-    return [{ city_id: "419", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: "Sumenep", postal_code: "69411" }];
+    return [
+      { city_id: "1", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: "Kediri", postal_code: "64111" }
+    ];
   }
 }
 
 function unknownToRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === "object") return value as Record<string, unknown>;
+  if (value && typeof value === "object") {
+    return value as Record<string, unknown>;
+  }
   return {};
 }
 
@@ -84,23 +98,86 @@ interface CategoryGroup {
   id: string;
   label: string;
   urutan: number;
-  submenu: Array<{ id: string; name: string; image: string[]; harga_mulai_dari?: number; diskon_roles?: Record<string, number>; urutan: number; }>;
+  submenu: Array<{
+    id: string;
+    name: string;
+    image: string[];
+    harga_mulai_dari?: number;
+    diskon_roles?: Record<string, number>;
+    urutan: number;
+  }>;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ city: string }> }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
-  const citySlug = resolvedParams?.city || "";
-  const cityName = citySlug.charAt(0).toUpperCase() + citySlug.slice(1);
-  return { title: `Jasa Percetakan Online Terlengkap di ${cityName} - BikinCetak` };
-}
+  const rawSlug = resolvedParams?.slug || ""; 
 
-export default async function CityHomePage({ params }: { params: Promise<{ city: string }> }) {
-  const resolvedParams = await params;
-  const citySlug = resolvedParams?.city || "";
+  if (!rawSlug.startsWith("percetakan-")) {
+    return { title: "Halaman Tidak Ditemukan | BikinCetak" };
+  }
+
+  const citySlug = rawSlug.replace(/^percetakan-/, "");
 
   const cities = await getAllCities();
-  const matchedCity = cities.find(c => slugify(c.city_name) === citySlug) || {
-    city_id: "999", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: citySlug.charAt(0).toUpperCase() + citySlug.slice(1), postal_code: "69411"
+  const cleanCityQuery = citySlug
+    .replace(/-/g, " ")
+    .replace(/^kabupaten\s+/i, "")
+    .replace(/^kota\s+/i, "")
+    .trim();
+
+  const matchedCity = cities.find(c => {
+    const dbCity = c.city_name.toLowerCase();
+    return dbCity === cleanCityQuery || 
+           dbCity.includes(cleanCityQuery) || 
+           cleanCityQuery.includes(dbCity);
+  }) || { type: "Kabupaten", city_name: cleanCityQuery.charAt(0).toUpperCase() + cleanCityQuery.slice(1), province: "Jawa Timur" };
+
+  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
+  const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
+
+  const pengaturan: PengaturanData | null = await getPengaturan();
+  
+  const titleTemplate = pengaturan?.seo_city_title_template || `Jasa Percetakan Online Terlengkap & Termurah di {{ kota }} - BikinCetak`;
+  const descTemplate = pengaturan?.seo_city_desc_template || `Melayani jasa percetakan online di {{ kota }} dan sekitarnya. Produksi sticker, banner, merchandise, dan kebutuhan kantor berkualitas langsung dikirim dari Surabaya.`;
+
+  const finalTitle = titleTemplate.replace(/\{\{\s*kota\s*\}\}/gi, kotaAja);
+  const finalDesc = descTemplate.replace(/\{\{\s*kota\s*\}\}/gi, wilayahLengkap);
+
+  return {
+    title: finalTitle,
+    description: finalDesc,
+  };
+}
+
+export default async function DigitalPrintingCityPage({ params }: { params: Promise<{ slug: string }> }) {
+  const resolvedParams = await params;
+  const rawSlug = resolvedParams?.slug || "";
+
+  if (!rawSlug.startsWith("percetakan-")) {
+    notFound();
+  }
+
+  const citySlug = rawSlug.replace(/^percetakan-/, "");
+
+  const cities = await getAllCities();
+  const cleanCityQuery = citySlug
+    .replace(/-/g, " ")
+    .replace(/^kabupaten\s+/i, "")
+    .replace(/^kota\s+/i, "")
+    .trim();
+
+  const matchedCity = cities.find(c => {
+    const dbCity = c.city_name.toLowerCase();
+    return dbCity === cleanCityQuery || 
+           dbCity.includes(cleanCityQuery) || 
+           cleanCityQuery.includes(dbCity);
+  }) || {
+    city_id: "999",
+    province_id: "11",
+    province: "Jawa Timur",
+    type: "Kabupaten",
+    city_name: cleanCityQuery.charAt(0).toUpperCase() + cleanCityQuery.slice(1),
+    postal_code: "64111"
   };
 
   const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
@@ -108,22 +185,33 @@ export default async function CityHomePage({ params }: { params: Promise<{ city:
 
   const items = await getItems();
   const { data: userProfile } = await getUserProfile(); 
-  const banners = await getBanners();
+  
   const activeRoleId = userProfile?.customer?.id_role_customer || null;
   const groupedCategories: Record<string, CategoryGroup> = {};
 
   items.forEach((item) => {
-    if (item.is_active === 0 || item.id_produk === "PRD-0001") return;
+    if (item.is_active === 0) return;
+    if (item.id_produk === "PRD-0001") return;
+
     const catId = item.kategori?.id_kategori || "lainnya";
     const catName = item.kategori?.nama_kategori || "Lainnya";
     const catUrutan = item.kategori?.urutan ?? 999;
+
     if (!groupedCategories[catId]) {
-      groupedCategories[catId] = { id: catId, label: catName, urutan: catUrutan, submenu: [] };
+      groupedCategories[catId] = {
+        id: catId,
+        label: catName,
+        urutan: catUrutan,
+        submenu: [],
+      };
     }
+
+    const defaultImage = ["https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico"];
+
     groupedCategories[catId].submenu.push({
       id: item.id_produk,
       name: item.nama_produk,
-      image: item.gambar_urls?.length ? item.gambar_urls : ["https://admin.bikincetak.co.id/storage/img_web/logobikincetak.ico"],
+      image: (item.gambar_urls && item.gambar_urls.length > 0) ? item.gambar_urls : defaultImage,
       harga_mulai_dari: item.harga_mulai_dari,
       diskon_roles: item.diskon_roles,
       urutan: item.urutan ?? 999,
@@ -131,14 +219,19 @@ export default async function CityHomePage({ params }: { params: Promise<{ city:
   });
 
   const dynamicCategories = Object.values(groupedCategories).sort((a, b) => a.urutan - b.urutan);
-  dynamicCategories.forEach(cat => cat.submenu.sort((a, b) => a.urutan - b.urutan));
-  const kotaSeProvinsi = cities.filter(c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase());
+  dynamicCategories.forEach(category => {
+    category.submenu.sort((a, b) => a.urutan - b.urutan);
+  });
+
+  const kotaSeProvinsi = cities.filter(
+    c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase()
+  );
 
   return (
-    <main className="min-h-screen bg-base-200 py-8">
+    <main className="min-h-screen bg-base-200">
 
       {/* Informasi / Heading SEO Wilayah */}
-      <div className="container mx-auto px-4 md:px-12 mb-8">
+      <div className="py-4 md:py-8 container mx-auto px-4 md:px-12 mb-8">
         <div className="bg-primary text-primary-content p-6 md:p-10 rounded-3xl shadow-md space-y-3">
           <span className="badge badge-neutral font-bold uppercase tracking-wider text-xs">
             Area Layanan Percetakan: {kotaAja}
@@ -152,7 +245,7 @@ export default async function CityHomePage({ params }: { params: Promise<{ city:
         </div>
       </div>
 
-      {/* Daftar Produk Berdasarkan Kategori (Sama seperti Homepage) */}
+      {/* Daftar Produk Berdasarkan Kategori */}
       <div className="container mx-auto px-4 md:px-12 pb-16">
         {dynamicCategories.map((category) => (
           <ProductRow 
@@ -182,8 +275,8 @@ export default async function CityHomePage({ params }: { params: Promise<{ city:
 
             <div className="flex flex-wrap gap-2 pt-2">
               {kotaSeProvinsi.map((kota) => {
-                const citySlug = slugify(kota.city_name);
-                const routeUrl = `/percetakan/${citySlug}`;
+                const cSlug = slugify(kota.city_name);
+                const routeUrl = `/digital-printing/percetakan-${cSlug}`;
                 const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
 
                 return (

@@ -98,9 +98,9 @@ const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
     return labelBersih || "Standar";
 };
 
-export async function generateMetadata({ params }: { params: Promise<{ city: string; slug: string }> }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ city?: string; slug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
-  const cityParam = resolvedParams?.city || "";
+  const cityParam = resolvedParams?.city || "kediri";
   const productSlug = resolvedParams?.slug || "";
 
   const cities = await getAllCities();
@@ -116,12 +116,22 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
     return dbCity === cleanCityQuery || 
            dbCity.includes(cleanCityQuery) || 
            cleanCityQuery.includes(dbCity);
-  });
+  }) || { type: "Kabupaten", city_name: cleanCityQuery, province: "Jawa Timur" };
 
   const products: ItemData[] = await getItems();
-  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlug);
+  
+  // PERBAIKAN: Bersihkan awalan "cetak-" dan akhiran "-di-[kota]" agar cocok dengan slug produk asli
+  const cleanedProductQuery = productSlug
+    .replace(/-di-.*/, "")
+    .replace(/^cetak-/, "");
 
-  if (!matchedProduct || !matchedCity) {
+  const matchedProduct = products.find(p => 
+    slugify(p.nama_produk) === cleanedProductQuery || 
+    slugify(p.nama_produk).includes(cleanedProductQuery) ||
+    cleanedProductQuery.includes(slugify(p.nama_produk))
+  ) || products[0];
+
+  if (!matchedProduct) {
     return { title: "Layanan Cetak | BikinCetak" };
   }
 
@@ -147,9 +157,9 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   };
 }
 
-export default async function CityProductPage({ params }: { params: Promise<{ city: string; slug: string }> }) {
+export default async function CityProductPage({ params }: { params: Promise<{ city?: string; slug: string }> }) {
   const resolvedParams = await params;
-  const cityParam = resolvedParams?.city || "";
+  const cityParam = resolvedParams?.city || "kediri";
   const productSlug = resolvedParams?.slug || "";
 
   const cities = await getAllCities();
@@ -158,7 +168,17 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
   };
 
   const products: ItemData[] = await getItems();
-  const matchedProduct = products.find(p => slugify(p.nama_produk) === productSlug.replace(/-di-.*/, "").replace("cetak-", "")) || products[0];
+  
+  // PERBAIKAN: Logika pencocokan produk disamakan dengan generateMetadata
+  const cleanedProductQuery = productSlug
+    .replace(/-di-.*/, "")
+    .replace(/^cetak-/, "");
+
+  const matchedProduct = products.find(p => 
+    slugify(p.nama_produk) === cleanedProductQuery || 
+    slugify(p.nama_produk).includes(cleanedProductQuery) ||
+    cleanedProductQuery.includes(slugify(p.nama_produk))
+  ) || products[0];
 
   if (!matchedProduct) notFound();
 
@@ -180,7 +200,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
         <div className="text-xs breadcrumbs opacity-60">
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li><Link href={`/percetakan/${slugify(matchedCity.city_name)}`}>Percetakan {matchedCity.city_name}</Link></li>
+            <li><Link href={`/digital-printing/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {matchedCity.city_name}</Link></li>
             <li className="capitalize">{matchedProduct.nama_produk}</li>
           </ul>
         </div>
@@ -312,14 +332,14 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
                 Cetak {matchedProduct.nama_produk} di Kota Lain
               </h3>
               <p className="text-sm opacity-70">
-                Layanan cetak {matchedProduct.nama_produk} online siap kirim ke seluruh kota dan kabupaten di {matchedCity.province}.
+                Layanan cetak {matchedProduct.nama_produk} online siap kirim aman dan cepat ke seluruh kota dan kabupaten di {matchedCity.province}.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
               {kotaSeProvinsi.map((kota) => {
                 const citySlug = slugify(kota.city_name);
-                const routeUrl = `/percetakan/${citySlug}/${slugify(matchedProduct.nama_produk)}`;
+                const routeUrl = `/print/${slugify(matchedProduct.nama_produk)}-di-${citySlug}`;
                 const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
 
                 return (
