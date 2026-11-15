@@ -800,7 +800,9 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         <div className="space-y-6 lg:col-span-3">
           <div className="grid grid-cols-1 p-6 border shadow-sm md:grid-cols-2 gap-8 bg-base-100 rounded-2xl border-base-content/5">
 
-            <ProductCarousel images={displayImages} name={sku?.nama_sku || itemDetail?.nama_produk || "Produk"} />
+            
+
+<ProductCarousel images={displayImages} name={sku?.nama_sku || itemDetail?.nama_produk || "Produk"} />
             
             <div className="flex flex-col">
               <h1 className="mb-6 text-3xl font-black tracking-tighter uppercase">{itemDetail?.nama_produk}</h1>
@@ -828,7 +830,7 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <>
                     <div className="space-y-3">
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-40 flex justify-between">
-                        <span>Daftar Harga Grosir</span>
+                         <span>Daftar Harga Grosir</span>
                       </p>
                       <div className="overflow-hidden border border-base-content/10 rounded-xl">
                         <table className="w-full table table-xs bg-base-100">
@@ -931,9 +933,9 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   </div>
                 )}
 
-                {/* UPLOAD FILE KHUSUS DESKTOP DI SINI */}
-                <div className="hidden lg:block space-y-2">
-                  <FileUpload onChange={setFileDesain} />
+                {/* FILE UPLOAD KHUSUS MOBILE (Hanya muncul di layar kecil / lg:hidden) */}
+                <div className="block lg:hidden space-y-2">
+                  <FileUpload variant="minimal" onChange={setFileDesain} />
                   <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
                     <Info size={14} className="shrink-0 mt-0.5" />
                     <p>
@@ -944,11 +946,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                 </div>
 
               </div>
-
-              {/* TOMBOL TAMBAH KERANJANG DESKTOP */}
-              <button onClick={handleAddToCart} disabled={cartLoading || !sku} className="hidden lg:flex mt-8 font-black tracking-widest uppercase btn btn-primary rounded-2xl">
-                {cartLoading ? <span className="loading loading-spinner"></span> : <><ShoppingBag size={18}/> Tambah Keranjang</>}
-              </button>
             </div>
           </div>
           
@@ -959,8 +956,8 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         <div className="hidden lg:block">
           <div className="sticky space-y-4 top-24">
             <div className="p-6 border shadow-sm card bg-base-100 rounded-2xl border-base-content/10">
-            <h3 className="text-[10px] font-black uppercase opacity-40 mb-4 flex items-center gap-2"><CreditCard size={14}/> Ringkasan</h3>
-            <div className="space-y-3 text-xs font-bold uppercase">
+             <h3 className="text-[10px] font-black uppercase opacity-40 mb-4 flex items-center gap-2"><CreditCard size={14}/> Ringkasan</h3>
+             <div className="space-y-3 text-xs font-bold uppercase">
                 <div className="flex items-center justify-between">
                   <span className="flex flex-col opacity-60">
                     <span className="flex items-center">
@@ -975,10 +972,10 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                     )}
                   </span>
                   <div className="flex items-center text-right">
-                    {hargaDasarFullUI > hargaSatuProdukFull && (
+                     {hargaDasarFullUI > hargaSatuProdukFull && (
                         <span className="line-through text-error opacity-70 text-[10px] mr-1.5">Rp {hargaDasarFullUI.toLocaleString("id-ID")}</span>
-                    )}
-                    <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
+                     )}
+                     <span>Rp {hargaSatuProdukFull.toLocaleString("id-ID")}</span>
                   </div>
                 </div>
 
@@ -1001,19 +998,20 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
                   <div className="flex items-center justify-between mt-2 text-base-content">
                     <span className="opacity-60 flex items-center gap-1.5"><Clock size={12}/> Estimasi Waktu</span>
                     <span className="font-black tracking-widest text-warning">
-                        {activeTierObj ? activeTierObj.pengerjaan : selectedPengerjaanTitle}
+                         {activeTierObj ? activeTierObj.pengerjaan : selectedPengerjaanTitle}
                     </span>
                   </div>
                 )}
                 
                 <div className="my-1 opacity-10 divider"></div>
                 <div className="flex flex-col items-end pt-1">
-                    <p className="text-[10px] opacity-40 mb-1">Total Estimasi</p>
-                    <p className="text-2xl font-black tracking-tighter text-primary">Rp {totalPrice.toLocaleString("id-ID")}</p>
+                     <p className="text-[10px] opacity-40 mb-1">Total Estimasi</p>
+                     <p className="text-2xl font-black tracking-tighter text-primary">Rp {totalPrice.toLocaleString("id-ID")}</p>
                 </div>
-            </div>
+             </div>
             </div>
             
+            {/* FILE UPLOAD KHUSUS DESKTOP (Di dalam Sidebar) */}
             <div className="space-y-2">
               <FileUpload onChange={setFileDesain} />
               <div className="flex items-start gap-1.5 text-warning/90 text-[10px] font-bold leading-tight px-1">
@@ -1041,11 +1039,10 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
         </div>
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR (FIXED DI ATAS MOBILE BOTTOM NAV) */}
+      {/* MOBILE BOTTOM NAVIGATION BAR (FIXED) */}
       <div className="fixed bottom-16 left-0 right-0 z-40 block bg-base-100 border-t border-base-content/10 p-3 shadow-lg lg:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
           
-          {/* QTY CONTROLLER & TOTAL ESTIMASI */}
           <div className="flex items-center gap-2">
             <div className="flex items-center border border-base-content/20 rounded-xl overflow-hidden bg-base-200/50">
               <button
@@ -1083,7 +1080,6 @@ export default function ProductClientLayout({ itemDetail, initialSku, recommenda
             </div>
           </div>
 
-          {/* Tombol Keranjang Berbentuk Ikon Saja */}
           <button 
             onClick={handleAddToCart} 
             disabled={cartLoading || !sku} 
