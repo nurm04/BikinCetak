@@ -17,6 +17,16 @@ export interface CityResult {
   postal_code: string;
 }
 
+// Fungsi helper untuk mengubah teks menjadi Title Case (huruf depan setiap kata besar)
+function toTitleCase(str: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>[] {
   let results: Record<string, unknown>[] = [];
   if (Array.isArray(responsePayload)) {
@@ -118,9 +128,12 @@ export async function generateMetadata({ params }: { params: Promise<{ city?: st
            cleanCityQuery.includes(dbCity);
   }) || { type: "Kabupaten", city_name: cleanCityQuery, province: "Jawa Timur" };
 
+  const formattedType = toTitleCase(matchedCity.type);
+  const formattedCityName = toTitleCase(matchedCity.city_name);
+  const formattedProvince = toTitleCase(matchedCity.province);
+
   const products: ItemData[] = await getItems();
   
-  // PERBAIKAN: Bersihkan awalan "cetak-" dan akhiran "-di-[kota]" agar cocok dengan slug produk asli
   const cleanedProductQuery = productSlug
     .replace(/-di-.*/, "")
     .replace(/^cetak-/, "");
@@ -135,8 +148,8 @@ export async function generateMetadata({ params }: { params: Promise<{ city?: st
     return { title: "Layanan Cetak | BikinCetak" };
   }
 
-  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
-  const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
+  const kotaAja = `${formattedType} ${formattedCityName}`;
+  const wilayahLengkap = `${formattedType} ${formattedCityName}, ${formattedProvince}`;
   
   const pengaturan: PengaturanData | null = await getPengaturan();
   
@@ -164,12 +177,15 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
 
   const cities = await getAllCities();
   const matchedCity = cities.find(c => slugify(c.city_name) === cityParam) || {
-    city_id: "999", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: cityParam.charAt(0).toUpperCase() + cityParam.slice(1), postal_code: "69411"
+    city_id: "999", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: cityParam, postal_code: "69411"
   };
+
+  const formattedType = toTitleCase(matchedCity.type);
+  const formattedCityName = toTitleCase(matchedCity.city_name);
+  const formattedProvince = toTitleCase(matchedCity.province);
 
   const products: ItemData[] = await getItems();
   
-  // PERBAIKAN: Logika pencocokan produk disamakan dengan generateMetadata
   const cleanedProductQuery = productSlug
     .replace(/-di-.*/, "")
     .replace(/^cetak-/, "");
@@ -182,8 +198,8 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
 
   if (!matchedProduct) notFound();
 
-  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
-  const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
+  const kotaAja = `${formattedType} ${formattedCityName}`;
+  const wilayahLengkap = `${formattedType} ${formattedCityName}, ${formattedProvince}`;
   const gambarProduk = matchedProduct.gambar_urls?.[0] || null;
 
   const produkSerupa = products
@@ -200,7 +216,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
         <div className="text-xs breadcrumbs opacity-60">
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li><Link href={`/digital-printing/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {matchedCity.city_name}</Link></li>
+            <li><Link href={`/digital-printing/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {formattedCityName}</Link></li>
             <li className="capitalize">{matchedProduct.nama_produk}</li>
           </ul>
         </div>
@@ -231,7 +247,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
             <div className="w-full md:w-80 h-64 relative rounded-2xl overflow-hidden shadow-lg bg-white p-4 shrink-0">
               <Image 
                 src={gambarProduk} 
-                alt={`${matchedProduct.nama_produk} di ${matchedCity.city_name}`}
+                alt={`${matchedProduct.nama_produk} di ${formattedCityName}`}
                 fill
                 unoptimized
                 className="object-contain p-2"
@@ -252,7 +268,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
             Kami hadir untuk memudahkan Anda warga <strong>{wilayahLengkap}</strong> dan sekitarnya. Produk <strong>{matchedProduct.nama_produk}</strong> ini dirancang dengan standar produksi terbaik, menggunakan mesin cetak berteknologi tinggi untuk menghasilkan cetakan yang tajam, presisi, serta material pilihan yang awet.
           </p>
           <p>
-            Semua proses produksi dan pengiriman pesanan langsung dikirimkan dari workshop utama kami di <strong>Surabaya</strong>, memastikan kualitas kontrol terjaga ketat sebelum dikirim ke lokasi Anda. Dengan sistem pemesanan online yang efisien, kami siap melayani pengiriman pesanan Anda dengan aman dan cepat menjangkau seluruh kecamatan di wilayah <strong>{matchedCity.province}</strong>.
+            Semua proses produksi dan pengiriman pesanan langsung dikirimkan dari workshop utama kami di <strong>Surabaya</strong>, memastikan kualitas kontrol terjaga ketat sebelum dikirim ke lokasi Anda. Dengan sistem pemesanan online yang efisien, kami siap melayani pengiriman pesanan Anda dengan aman dan cepat menjangkau seluruh kecamatan di wilayah <strong>{formattedProvince}</strong>.
           </p>
           <p>
             Tunggu apalagi? Segera tentukan pilihan spesifikasi dan desain terbaik Anda, lalu <Link href="/login" className="text-primary font-bold underline hover:text-primary-focus">daftarkan</Link> diri Anda dan dapatkan penawaran harga terbaik bersama BikinCetak.
@@ -264,7 +280,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
           <div className="space-y-6 pt-4">
             <div className="border-b-2 border-primary pb-2 w-fit">
               <h2 className="font-bold tracking-wider uppercase text-primary lg:text-xl">
-                Daftar Harga & Spesifikasi Cetak {matchedProduct.nama_produk} di {matchedCity.city_name}
+                Daftar Harga & Spesifikasi Cetak {matchedProduct.nama_produk} di {formattedCityName}
               </h2>
             </div>
 
@@ -299,9 +315,9 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
+            </table>
           </div>
+        </div>
         )}
 
         {/* TEKS PEMISAH */}
@@ -326,13 +342,13 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
           <div className="pt-8 border-t border-base-200 space-y-4">
             <div className="space-y-1">
               <span className="badge badge-outline text-xs font-bold uppercase tracking-wider text-primary border-primary/30">
-                Area Layanan {matchedCity.province}
+                Area Layanan {formattedProvince}
               </span>
               <h3 className="text-xl md:text-2xl font-black text-base-content tracking-tight">
                 Cetak {matchedProduct.nama_produk} di Kota Lain
               </h3>
               <p className="text-sm opacity-70">
-                Layanan cetak {matchedProduct.nama_produk} online siap kirim aman dan cepat ke seluruh kota dan kabupaten di {matchedCity.province}.
+                Layanan cetak {matchedProduct.nama_produk} online siap kirim aman dan cepat ke seluruh kota dan kabupaten di {formattedProvince}.
               </p>
             </div>
 
@@ -340,7 +356,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
               {kotaSeProvinsi.map((kota) => {
                 const citySlug = slugify(kota.city_name);
                 const routeUrl = `/print/${slugify(matchedProduct.nama_produk)}-di-${citySlug}`;
-                const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
+                const namaKotaLengkap = `${toTitleCase(kota.type)} ${toTitleCase(kota.city_name)}`;
 
                 return (
                   <Link

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, LogOut, ShoppingBag, LogIn, Package, Search } from 'lucide-react';
 import SwapTheme from '../ui/SwapTheme';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ItemData } from "@/services/itemService";
 import { getUserProfile } from "@/services/userService";
 import { logoutAction } from "@/services/authService";
-import { getPengaturan, PengaturanData } from "@/services/pengaturanWebService";
+import { getPengaturan, PengaturanData, getHalamanStatisList, HalamanStatisListData } from "@/services/pengaturanWebService";
 import { slugify } from "@/lib/utils";
 
 interface NavbarProps {
@@ -24,10 +24,16 @@ interface CategoryGroup {
 }
 
 const Navbar = ({ items = [] }: NavbarProps) => {
-  // State User & Pengaturan
+  // State User, Pengaturan & Halaman Statis
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>("Pelanggan");
   const [pengaturan, setPengaturan] = useState<PengaturanData | null>(null);
+  const [halamanStatis, setHalamanStatis] = useState<HalamanStatisListData[]>([]);
+
+  // State Animasi Search Bar
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const pathname = usePathname();
   const router = useRouter();  
@@ -40,9 +46,9 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     router.refresh();
   }, [router]);
 
-  // 👇 FETCHING PARALEL (Jauh Lebih Cepat dari sebelumnya)
+  // Fetching Paralel User, Pengaturan, dan Halaman Statis
   useEffect(() => {
-    Promise.all([getUserProfile(), getPengaturan()]).then(([resUser, resPengaturan]) => {
+    Promise.all([getUserProfile(), getPengaturan(), getHalamanStatisList()]).then(([resUser, resPengaturan, resHalaman]) => {
       if (resUser?.data) {
         setIsLoggedIn(true);
         setUserName(resUser.data.name || resUser.data.email || "User");
@@ -50,8 +56,18 @@ const Navbar = ({ items = [] }: NavbarProps) => {
       if (resPengaturan) {
         setPengaturan(resPengaturan);
       }
+      if (resHalaman) {
+        setHalamanStatis(resHalaman);
+      }
     });
   }, []);
+
+  // Fokuskan input saat search dibuka
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchOpen]);
 
   const closeDropdown = () => {
     const elem = document.activeElement as HTMLElement;
@@ -60,18 +76,14 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   const isHome = pathname === '/';
 
-  // ==========================================
-  // DATA DINAMIS IDENTITAS WEB
-  // ==========================================
+  // Data Dinamis Identitas Web
   const fallbackLogo = "https://admin.bikincetak.co.id/storage/img_web/logobikincetak.png";
   const logoUtama = pengaturan?.logo_utama || fallbackLogo;
   const namaWebsite = pengaturan?.nama_website 
     ? pengaturan.nama_website.split('-')[0].trim().toUpperCase() 
     : "BIKIN CETAK";
 
-  // ==========================================
-  // LOGIC GROUPING KATEGORI (DI-MEMOIZE BIAR ENTENG)
-  // ==========================================
+  // Logic Grouping Kategori (Di-memoize)
   const dynamicCategories = useMemo(() => {
     const grouped: Record<string, CategoryGroup> = {};
 
@@ -96,10 +108,25 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     });
 
     return Object.values(grouped).sort((a, b) => a.urutan - b.urutan);
-  }, [items]); // Hanya ngitung ulang kalau 'items' berubah
+  }, [items]);
 
   return (
     <>
+      {/* BAR ATAS: HALAMAN STATIS */}
+      {halamanStatis.length > 0 && (
+        <div className="hidden bg-base-200/60 border-b border-base-200 px-4 md:px-12 lg:px-20 py-1.5 md:flex justify-end items-center gap-6 text-xs font-bold text-base-content/70">
+          {halamanStatis.map((halaman) => (
+            <Link 
+              key={halaman.id || halaman.slug} 
+              href={`/halaman/${halaman.slug}`}
+              className="hover:text-primary transition-colors uppercase tracking-wider"
+            >
+              {halaman.judul}
+            </Link>
+          ))}
+        </div>
+      )}
+
       <div className="sticky top-0 z-50 gap-2 px-4 shadow-sm navbar bg-base-100 md:px-12 lg:px-20 md:gap-4">
 
         {/* KIRI: LOGO */}
@@ -121,21 +148,50 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: SEARCH BAR (Ubah pakai Form Native HTML) */}
-        <div className="flex-1 px-2 navbar-center md:px-8">
-          <form action="/katalog" method="GET" className="relative w-full max-w-2xl mx-auto">
+        {/* TENGAH: SEARCH BAR DENGAN ANIMASI KLIK */}
+        <div className="flex-1 px-2 navbar-center md:px-8 flex justify-center">
+          <form 
+            action="/katalog" 
+            method="GET" 
+            className={`relative flex items-center transition-all duration-500 ease-in-out ${
+              isSearchOpen ? 'w-full max-w-2xl' : 'w-10 md:w-12'
+            }`}
+          >
             <input
+              ref={searchInputRef}
               type="text"
               name="q"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onBlur={() => {
+                if (!searchQuery.trim()) {
+                  setIsSearchOpen(false);
+                }
+              }}
               placeholder="Cari produk..."
               required
-              className="w-full pr-10 text-sm transition-all rounded-full input input-sm md:input-md input-bordered md:pr-12 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100"
+              className={`w-full text-sm transition-all rounded-full input input-sm md:input-md input-bordered focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100 duration-500 ${
+                isSearchOpen 
+                  ? 'opacity-100 pl-4 pr-10 md:pr-12 cursor-text' 
+                  : 'opacity-0 cursor-pointer px-0 pointer-events-none'
+              }`}
             />
             <button 
-              type="submit" 
-              className="absolute right-2 md:right-3 top-1/2 -translate-y-1/2 p-1.5 text-base-content/40 hover:text-primary transition-colors"
+              type="button" 
+              onClick={() => {
+                if (!isSearchOpen) {
+                  setIsSearchOpen(true);
+                } else if (!searchQuery.trim()) {
+                  setIsSearchOpen(false);
+                }
+              }}
+              className={`absolute top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-300 flex items-center justify-center ${
+                isSearchOpen 
+                  ? 'right-2 md:right-3 text-base-content/40 hover:text-primary bg-transparent' 
+                  : 'right-0 w-10 h-10 md:w-12 md:h-12 bg-primary/10 text-primary hover:bg-primary/20'
+              }`}
             >
-              <Search className="w-4 h-4 md:w-5 md:h-5" />
+              <Search className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
             </button>
           </form>
         </div>

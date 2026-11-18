@@ -18,6 +18,16 @@ export interface CityResult {
   postal_code: string;
 }
 
+// Fungsi helper untuk mengubah teks menjadi Title Case (huruf depan setiap kata besar)
+function toTitleCase(str: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>[] {
   let results: Record<string, unknown>[] = [];
   
@@ -130,15 +140,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return dbCity === cleanCityQuery || 
            dbCity.includes(cleanCityQuery) || 
            cleanCityQuery.includes(dbCity);
-  }) || { type: "Kabupaten", city_name: cleanCityQuery.charAt(0).toUpperCase() + cleanCityQuery.slice(1), province: "Jawa Timur" };
+  }) || { type: "Kabupaten", city_name: cleanCityQuery, province: "Jawa Timur" };
 
-  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
-  const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
+  const formattedType = toTitleCase(matchedCity.type);
+  const formattedCityName = toTitleCase(matchedCity.city_name);
+  const formattedProvince = toTitleCase(matchedCity.province);
+
+  const kotaAja = `${formattedType} ${formattedCityName}`;
+  const wilayahLengkap = `${formattedType} ${formattedCityName}, ${formattedProvince}`;
 
   const pengaturan: PengaturanData | null = await getPengaturan();
   
-  const titleTemplate = pengaturan?.seo_city_title_template || `Jasa Percetakan Online Terlengkap & Termurah di {{ kota }} - BikinCetak`;
-  const descTemplate = pengaturan?.seo_city_desc_template || `Melayani jasa percetakan online di {{ kota }} dan sekitarnya. Produksi sticker, banner, merchandise, dan kebutuhan kantor berkualitas langsung dikirim dari Surabaya.`;
+  const titleTemplate = pengaturan?.seo_city_title_template || `Percetakan {{ kota }} | Digital Printing | Cetak Online`;
+  const descTemplate = pengaturan?.seo_city_desc_template || `Percetakan murah {{ kota }}. Jasa cetak desain Anda, custom brosur, stiker, kalender, buku, undangan. Print Murah, Cepat, Pengiriman Aman.`;
 
   const finalTitle = titleTemplate.replace(/\{\{\s*kota\s*\}\}/gi, kotaAja);
   const finalDesc = descTemplate.replace(/\{\{\s*kota\s*\}\}/gi, wilayahLengkap);
@@ -176,12 +190,16 @@ export default async function DigitalPrintingCityPage({ params }: { params: Prom
     province_id: "11",
     province: "Jawa Timur",
     type: "Kabupaten",
-    city_name: cleanCityQuery.charAt(0).toUpperCase() + cleanCityQuery.slice(1),
+    city_name: cleanCityQuery,
     postal_code: "64111"
   };
 
-  const kotaAja = `${matchedCity.type} ${matchedCity.city_name}`;
-  const wilayahLengkap = `${matchedCity.type} ${matchedCity.city_name}, ${matchedCity.province}`;
+  const formattedType = toTitleCase(matchedCity.type);
+  const formattedCityName = toTitleCase(matchedCity.city_name);
+  const formattedProvince = toTitleCase(matchedCity.province);
+
+  const kotaAja = `${formattedType} ${formattedCityName}`;
+  const wilayahLengkap = `${formattedType} ${formattedCityName}, ${formattedProvince}`;
 
   const items = await getItems();
   const { data: userProfile } = await getUserProfile(); 
@@ -239,8 +257,8 @@ export default async function DigitalPrintingCityPage({ params }: { params: Prom
           <h1 className="text-2xl md:text-4xl font-black tracking-tight leading-tight">
             Pusat Jasa Percetakan Online Terlengkap & Termurah di {kotaAja}
           </h1>
-          <p className="opacity-90 text-sm md:text-base leading-relaxed max-w-4xl">
-            Selamat datang bagi Anda warga <strong>{wilayahLengkap}</strong> dan sekitarnya. BikinCetak hadir melayani berbagai kebutuhan cetak promosi bisnis, kantor, instansi, hingga keperluan personal dengan proses praktis secara online. Seluruh pesanan diproduksi dengan standar kualitas tinggi dan dikirimkan langsung dari workshop utama kami di <strong>Surabaya</strong>.
+          <p className="opacity-90 text-sm md:text-base leading-relaxed">
+            Selamat datang bagi Anda warga <strong>{wilayahLengkap}</strong> dan sekitarnya. BikinCetak hadir melayani berbagai kebutuhan cetak promosi bisnis, kantor, instansi, hingga keperluan personal dengan proses praktis secara online. Seluruh pesanan diproduksi dengan standar kualitas tinggi dan dikirimkan langsung dari workshop tempat utama kami di <strong>Surabaya</strong>.
           </p>
         </div>
       </div>
@@ -257,19 +275,39 @@ export default async function DigitalPrintingCityPage({ params }: { params: Prom
         ))}
       </div>
 
+      <div className="py-4 md:py-8 container mx-auto px-4 md:px-12 mb-8">
+        <div className="bg-primary text-primary-content p-6 md:p-10 rounded-3xl shadow-md space-y-3">
+          <h2 className="text-2xl md:text-1xl font-black tracking-tight leading-tight">Percetakan {kotaAja} Berbasis Online</h2>
+            <p>Kami siap memberikan layanan konsumen dari manapun, berkomunikasi dengan media online, dan kita kirimkan hasil cetak ke {kotaAja}, sehingga konsumen tidak perlu lagi datang ke tempat kami. Hal ini akan sangat menghemat waktu, tenaga, dan biaya dan bisa anda alokasikan ke urusan yang lebih penting, dan serahkan semuanya kepada kami.</p>
+            <h2 className="text-2xl md:text-1xl font-black tracking-tight leading-tight">Percetakan di {kotaAja}, Online dan Terpercaya</h2>
+              <p>Kami juga melayani segala jenis percetakan digital printing, cetak offset, outdoor, indoor, dengan harga bersaing seperti tempat jasa percetakan lainnya. Untuk Anda yang berlokasi {kotaAja} Barat, {kotaAja} Timur, {kotaAja} Selatan, {kotaAja} Utara Maupun Yang Ada di Kota {kotaAja} Pusat.</p> 
+              <ul>
+                <li>Jasa cetak online untuk kebutuhan bisnis personal atau perusahaan dengan desain custom seperti cetak brosur, poster, kalender, kartu nama, map, nota, majalah, buku tahunan sekolah, company profile, buku menu, surat yasin, buku tabungan, packaging kemasan, notes spiral, block note, undangan soft &amp; hard cover, paper bag tas kertas, voucher, kupon, tiket, id card pvc dll.</li>
+              </ul>
+              <ul>
+                <li>Kebutuhan souvenir / merchandise kami memberikan jasa cetak online seperti gantungan kunci akrilik, ganci pin, karet, pin peniti plastik, pin akrilik, pin kuningan, pulpen, mug gelas, kipas promosi, jam dinding, payung, tas plastik sablon, tas spunbon/ godybag, tas totebag, flasdisk card, tumbler, topi, kaos dan lainnya.</li>
+              </ul>
+              <ul>
+                <li>Cetak kebutuhan promosi alat dan sepanduk kami memberikan jasa cetak online banner spanduk, x banner, roll banner, pop up table, event desk, tripod, backwall, rotary ligh box, neon box dinding, umbul-umbul dan lainnya. Dan masih banyak lagi kebutuhan cetak lainnya dengan desain custom yang bisa kami kerjakan.</li>
+              </ul>
+            <h2 className="text-2xl md:text-1xl font-black tracking-tight leading-tight">Sahabat Digital Printing Anda di Kota {kotaAja}</h2>
+            <p>Kami terdiri dari tim yang berjiwa muda, yang siap terus melakukan inovasi untuk menghasilkan layanan yang semakin baik. Kami tidak hanya mampu mencetak, tetapi kami terbiasa untuk merancang, mendesain dan mengoptimasi antara harga dan kualitas sehingga bisa lebih sesuai dengan kebutuhan dan budget yang tersedia. Kami bisa mengerjakan dari konsep, hingga produk siap untuk dipergunakan.</p>
+        </div>
+      </div>
+
       {/* INTERNAL LINKING: KOTA LAIN DALAM 1 PROVINSI */}
       {kotaSeProvinsi.length > 0 && (
         <div className="container mx-auto px-4 md:px-12 pb-16">
           <div className="bg-base-100 border border-base-300 p-6 md:p-8 rounded-3xl space-y-4 shadow-sm">
             <div className="space-y-1">
               <span className="badge badge-outline text-xs font-bold uppercase tracking-wider text-primary border-primary/30">
-                Area Layanan {matchedCity.province}
+                Area Layanan {formattedProvince}
               </span>
               <h3 className="text-xl md:text-2xl font-black text-base-content tracking-tight">
                 Jasa Percetakan di Kota Lainnya
               </h3>
               <p className="text-sm opacity-70">
-                Layanan percetakan online siap kirim aman dan cepat ke seluruh kota dan kabupaten di wilayah {matchedCity.province}.
+                Layanan percetakan online siap kirim aman dan cepat ke seluruh kota dan kabupaten di wilayah {formattedProvince}.
               </p>
             </div>
 
@@ -277,7 +315,7 @@ export default async function DigitalPrintingCityPage({ params }: { params: Prom
               {kotaSeProvinsi.map((kota) => {
                 const cSlug = slugify(kota.city_name);
                 const routeUrl = `/digital-printing/percetakan-${cSlug}`;
-                const namaKotaLengkap = `${kota.type} ${kota.city_name}`;
+                const namaKotaLengkap = `${toTitleCase(kota.type)} ${toTitleCase(kota.city_name)}`;
 
                 return (
                   <Link
@@ -299,7 +337,7 @@ export default async function DigitalPrintingCityPage({ params }: { params: Prom
         <div className="container mx-auto px-4 md:px-12 text-center max-w-3xl space-y-3">
           <h3 className="text-xl md:text-2xl font-bold">Layanan Percetakan Terpercaya untuk Warga {kotaAja}</h3>
           <p className="text-sm opacity-70 leading-relaxed">
-            Percayakan kebutuhan cetak Sticker, Banner, Merchandise, Buku, hingga Atribut Kantor Anda di BikinCetak. Pengiriman aman, cepat, dan terjangkau menjangkau seluruh wilayah {matchedCity.province}.
+            Percayakan kebutuhan cetak Sticker, Banner, Merchandise, Buku, hingga Atribut Kantor Anda di BikinCetak. Pengiriman aman, cepat, dan terjangkau menjangkau seluruh wilayah {formattedProvince}.
           </p>
         </div>
       </section>
