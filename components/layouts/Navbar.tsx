@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, LogOut, ShoppingBag, LogIn, Package, Search } from 'lucide-react';
 import SwapTheme from '../ui/SwapTheme';
@@ -57,7 +58,20 @@ const Navbar = ({ items = [] }: NavbarProps) => {
         setPengaturan(resPengaturan);
       }
       if (resHalaman) {
-        setHalamanStatis(resHalaman);
+        // 👇 Urutkan halaman statis secara kustom: Tentang Kami -> Cara Pemesanan -> Karir
+        const customOrder = ["tentang kami", "cara pemesanan", "karir"];
+        
+        const sortedHalaman = [...resHalaman].sort((a, b) => {
+          const indexA = customOrder.indexOf(a.judul.toLowerCase());
+          const indexB = customOrder.indexOf(b.judul.toLowerCase());
+
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
+          return 0;
+        });
+
+        setHalamanStatis(sortedHalaman);
       }
     });
   }, []);
@@ -114,7 +128,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     <>
       <div className="sticky top-0 z-50 gap-2 px-4 shadow-sm navbar bg-base-100 md:px-12 lg:px-20 md:gap-4">
 
-        {/* KIRI: LOGO (Sembunyikan teks/logo di mobile jika search bar terbuka penuh agar tidak menumpuk) */}
+        {/* KIRI: LOGO */}
         <div className={`w-auto navbar-start transition-opacity duration-300 ${isSearchOpen ? 'opacity-0 md:opacity-100 pointer-events-none md:pointer-events-auto' : 'opacity-150'}`}>
           <Link href="/" className="p-0 px-2 flex items-center gap-1.5 btn btn-ghost hover:bg-transparent">
             <div className="relative w-5 h-5 md:w-6 md:h-6">
@@ -156,7 +170,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
               </div>
             )}
 
-            {/* Search Bar: Di mobile menggunakan absolute full width saat terbuka agar pas di dalam layar */}
+            {/* Search Bar */}
             <form 
               action="/katalog" 
               method="GET" 

@@ -69,7 +69,26 @@ export default function Footer({ items = [] }: FooterProps) {
   useEffect(() => {
     Promise.all([getPengaturan(), getHalamanStatisList()]).then(([resPengaturan, resHalaman]) => {
       if (resPengaturan) setPengaturan(resPengaturan);
-      if (resHalaman) setHalamanStatis(resHalaman);
+      if (resHalaman) {
+        // 👇 Urutkan halaman statis berdasarkan prioritas judul
+        const customOrder = ["tentang kami", "cara pemesanan", "karir"];
+        
+        const sortedHalaman = [...resHalaman].sort((a, b) => {
+          const indexA = customOrder.indexOf(a.judul.toLowerCase());
+          const indexB = customOrder.indexOf(b.judul.toLowerCase());
+
+          // Jika keduanya ada di daftar kustom, urutkan sesuai posisi di array customOrder
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          // Jika hanya A yang ada, posisikan A di depan
+          if (indexA !== -1) return -1;
+          // Jika hanya B yang ada, posisikan B di depan
+          if (indexB !== -1) return 1;
+          // Jika tidak ada di daftar kustom, biarkan sesuai urutan asli
+          return 0;
+        });
+
+        setHalamanStatis(sortedHalaman);
+      }
     });
   }, []);
 
