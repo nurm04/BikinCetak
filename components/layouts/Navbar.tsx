@@ -133,15 +133,15 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: HALAMAN STATIS & SEARCH BAR (Search bar akan menutupi halaman statis saat diklik) */}
-        <div className="flex-1 px-2 navbar-center md:px-8 flex items-center justify-end md:justify-center relative">
+        {/* TENGAH: HALAMAN STATIS & SEARCH BAR DENGAN ANIMASI HALUS */}
+        <div className="flex-1 px-2 navbar-center md:px-8 flex items-center justify-end md:justify-center">
           <div className="flex items-center gap-2 md:gap-4">
             
-            {/* Halaman Statis di sebelah kiri Search Bar */}
+            {/* Halaman Statis dengan Transisi Opacity & Lebar yang Mulus */}
             {halamanStatis && halamanStatis.length > 0 && (
               <div 
-                className={`hidden lg:flex items-center gap-1 transition-all duration-500 overflow-hidden whitespace-nowrap ${
-                  isSearchOpen ? 'opacity-0 w-0 pointer-events-none' : 'opacity-100 w-auto'
+                className={`hidden lg:flex items-center gap-1 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${
+                  isSearchOpen ? 'opacity-0 max-w-0 pointer-events-none' : 'opacity-100 max-w-md'
                 }`}
               >
                 {halamanStatis.map((halaman) => (
@@ -156,12 +156,12 @@ const Navbar = ({ items = [] }: NavbarProps) => {
               </div>
             )}
 
-            {/* Search Bar dengan Animasi Memanjang */}
+            {/* Search Bar dengan Transisi Max-Width & Absolute/Smooth Expand */}
             <form 
               action="/katalog" 
               method="GET" 
-              className={`relative flex items-center transition-all duration-500 ease-in-out ${
-                isSearchOpen ? 'w-70 sm:w-95 md:w-112.5 lg:w-137.5' : 'w-10 md:w-12'
+              className={`relative flex items-center transition-all duration-300 ease-in-out ${
+                isSearchOpen ? 'w-65 sm:w-87.5 md:w-105' : 'w-10 md:w-12'
               }`}
             >
               <input
@@ -177,7 +177,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
                 }}
                 placeholder="Cari produk..."
                 required
-                className={`w-full text-sm transition-all rounded-full input input-sm md:input-md input-bordered focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100 duration-500 ${
+                className={`w-full text-sm transition-all rounded-full input input-sm md:input-md input-bordered focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100 duration-300 ${
                   isSearchOpen 
                     ? 'opacity-100 pl-4 pr-10 md:pr-12 cursor-text' 
                     : 'opacity-0 cursor-pointer px-0 pointer-events-none'
