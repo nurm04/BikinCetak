@@ -49,11 +49,12 @@ export default async function HalamanStatisPage({ params }: PageProps) {
           </div>
           
           {/* 
-            Ditambahkan class whitespace-pre-line agar enter/spasi dari admin langsung turun ke bawah dengan rapi,
-            sekaligus mendukung tag HTML standar.
+            FIX UNTUK QUILL EDITOR DI TAILWIND V4:
+            Quill memakai <ol> dan <li data-list="bullet"> untuk bullet list.
+            Selector arbitrary di bawah memaksa list-style & padding muncul normal.
           */}
           <div 
-            className="prose max-w-none md:prose-lg prose-headings:font-bold prose-a:text-primary prose-img:rounded-2xl prose-ul:list-disc prose-ol:list-decimal prose-li:my-1 whitespace-pre-line"
+            className="prose max-w-none md:prose-lg prose-headings:font-bold prose-a:text-primary prose-img:rounded-2xl [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-disc [&_ol]:pl-6 [&_li]:my-1 [&_li[data-list=bullet]]:list-disc [&_li[data-list=ordered]]:list-decimal"
             dangerouslySetInnerHTML={{ __html: data.konten }}
           />
         </div>
