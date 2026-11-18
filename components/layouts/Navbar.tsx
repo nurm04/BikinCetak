@@ -114,8 +114,8 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     <>
       <div className="sticky top-0 z-50 gap-2 px-4 shadow-sm navbar bg-base-100 md:px-12 lg:px-20 md:gap-4">
 
-        {/* KIRI: LOGO */}
-        <div className="w-auto navbar-start">
+        {/* KIRI: LOGO (Sembunyikan teks/logo di mobile jika search bar terbuka penuh agar tidak menumpuk) */}
+        <div className={`w-auto navbar-start transition-opacity duration-300 ${isSearchOpen ? 'opacity-0 md:opacity-100 pointer-events-none md:pointer-events-auto' : 'opacity-150'}`}>
           <Link href="/" className="p-0 px-2 flex items-center gap-1.5 btn btn-ghost hover:bg-transparent">
             <div className="relative w-5 h-5 md:w-6 md:h-6">
               <Image 
@@ -133,11 +133,11 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: HALAMAN STATIS & SEARCH BAR DENGAN ANIMASI HALUS */}
-        <div className="flex-1 px-2 navbar-center md:px-8 flex items-center justify-end md:justify-center">
-          <div className="flex items-center gap-2 md:gap-4">
+        {/* TENGAH: HALAMAN STATIS & SEARCH BAR */}
+        <div className="flex-1 px-1 md:px-8 flex items-center justify-end md:justify-center">
+          <div className="flex items-center gap-2 md:gap-4 w-full justify-end md:justify-center">
             
-            {/* Halaman Statis dengan Transisi Opacity & Lebar yang Mulus */}
+            {/* Halaman Statis di sebelah kiri Search Bar */}
             {halamanStatis && halamanStatis.length > 0 && (
               <div 
                 className={`hidden lg:flex items-center gap-1 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap ${
@@ -156,12 +156,14 @@ const Navbar = ({ items = [] }: NavbarProps) => {
               </div>
             )}
 
-            {/* Search Bar dengan Transisi Max-Width & Absolute/Smooth Expand */}
+            {/* Search Bar: Di mobile menggunakan absolute full width saat terbuka agar pas di dalam layar */}
             <form 
               action="/katalog" 
               method="GET" 
-              className={`relative flex items-center transition-all duration-300 ease-in-out ${
-                isSearchOpen ? 'w-65 sm:w-87.5 md:w-105' : 'w-10 md:w-12'
+              className={`flex items-center transition-all duration-300 ease-in-out ${
+                isSearchOpen 
+                  ? 'absolute left-4 right-4 md:relative md:left-auto md:right-auto md:w-95 lg:w-120 z-20 bg-base-100 md:bg-transparent px-2 md:px-0' 
+                  : 'relative w-10 md:w-12'
               }`}
             >
               <input
@@ -194,7 +196,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
                 }}
                 className={`absolute top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-300 flex items-center justify-center ${
                   isSearchOpen 
-                    ? 'right-2 md:right-3 text-base-content/40 hover:text-primary bg-transparent' 
+                    ? 'right-4 md:right-3 text-base-content/40 hover:text-primary bg-transparent' 
                     : 'right-0 w-10 h-10 md:w-12 md:h-12 bg-primary/10 text-primary hover:bg-primary/20'
                 }`}
               >
@@ -206,7 +208,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
         </div>
 
         {/* KANAN: AUTH & PROFILE */}
-        <div className="w-auto gap-1 navbar-end md:gap-3">
+        <div className={`w-auto gap-1 navbar-end md:gap-3 transition-opacity duration-300 ${isSearchOpen ? 'opacity-0 md:opacity-100 pointer-events-none md:pointer-events-auto' : 'opacity-100'}`}>
           {!isLoggedIn ? (
             <>
               <Link href="/login" className="flex items-center px-2 border-none rounded-xl btn btn-ghost btn-sm md:btn-md hover:bg-primary/10 group md:px-4">
