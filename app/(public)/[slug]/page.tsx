@@ -49,11 +49,11 @@ export default async function HalamanStatisPage({ params }: PageProps) {
           </div>
           
           {/* 
-            RENDER HTML KONTEN
-            Ditambahkan prose-ul:list-disc, prose-ol:list-decimal, dan prose-li:my-1 agar format list muncul normal
+            Ditambahkan class whitespace-pre-line agar enter/spasi dari admin langsung turun ke bawah dengan rapi,
+            sekaligus mendukung tag HTML standar.
           */}
           <div 
-            className="prose max-w-none md:prose-lg prose-headings:font-bold prose-a:text-primary prose-img:rounded-2xl prose-ul:list-disc prose-ol:list-decimal prose-li:my-1"
+            className="prose max-w-none md:prose-lg prose-headings:font-bold prose-a:text-primary prose-img:rounded-2xl prose-ul:list-disc prose-ol:list-decimal prose-li:my-1 whitespace-pre-line"
             dangerouslySetInnerHTML={{ __html: data.konten }}
           />
         </div>
