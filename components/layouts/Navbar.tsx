@@ -133,69 +133,76 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: SEARCH BAR & HALAMAN STATIS SEJAJAR */}
-        <div className="flex-1 px-2 navbar-center md:px-8 flex items-center justify-center gap-6">
-          
-          {/* Halaman Statis (Sejajar & Style Sama dengan Nav Link Bawah: text-[11px] font-semibold uppercase) */}
-          {halamanStatis && halamanStatis.length > 0 && (
-            <div className="hidden lg:flex items-center gap-2">
-              {halamanStatis.map((halaman) => (
-                <Link 
-                  key={halaman.id} 
-                  href={`/${halaman.slug}`} 
-                  className="text-[11px] font-semibold uppercase hover:text-primary transition-colors py-3 px-3 tracking-normal"
-                >
-                  {halaman.judul}
-                </Link>
-              ))}
-            </div>
-          )}
+        {/* TENGAH: HALAMAN STATIS & SEARCH BAR (Search bar akan menutupi halaman statis saat diklik) */}
+        <div className="flex-1 px-2 navbar-center md:px-8 flex items-center justify-end md:justify-center relative">
+          <div className="flex items-center gap-2 md:gap-4">
+            
+            {/* Halaman Statis di sebelah kiri Search Bar */}
+            {halamanStatis && halamanStatis.length > 0 && (
+              <div 
+                className={`hidden lg:flex items-center gap-1 transition-all duration-500 overflow-hidden whitespace-nowrap ${
+                  isSearchOpen ? 'opacity-0 w-0 pointer-events-none' : 'opacity-100 w-auto'
+                }`}
+              >
+                {halamanStatis.map((halaman) => (
+                  <Link 
+                    key={halaman.id} 
+                    href={`/${halaman.slug}`} 
+                    className="text-[11px] font-semibold uppercase hover:text-primary transition-colors py-3 px-3 tracking-normal"
+                  >
+                    {halaman.judul}
+                  </Link>
+                ))}
+              </div>
+            )}
 
-          {/* Search Bar dengan Animasi Melingkar */}
-          <form 
-            action="/katalog" 
-            method="GET" 
-            className={`relative flex items-center transition-all duration-500 ease-in-out ${
-              isSearchOpen ? 'w-full max-w-md' : 'w-10 md:w-12'
-            }`}
-          >
-            <input
-              ref={searchInputRef}
-              type="text"
-              name="q"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onBlur={() => {
-                if (!searchQuery.trim()) {
-                  setIsSearchOpen(false);
-                }
-              }}
-              placeholder="Cari produk..."
-              required
-              className={`w-full text-sm transition-all rounded-full input input-sm md:input-md input-bordered focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100 duration-500 ${
-                isSearchOpen 
-                  ? 'opacity-100 pl-4 pr-10 md:pr-12 cursor-text' 
-                  : 'opacity-0 cursor-pointer px-0 pointer-events-none'
-              }`}
-            />
-            <button 
-              type="button" 
-              onClick={() => {
-                if (!isSearchOpen) {
-                  setIsSearchOpen(true);
-                } else if (!searchQuery.trim()) {
-                  setIsSearchOpen(false);
-                }
-              }}
-              className={`absolute top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-300 flex items-center justify-center ${
-                isSearchOpen 
-                  ? 'right-2 md:right-3 text-base-content/40 hover:text-primary bg-transparent' 
-                  : 'right-0 w-10 h-10 md:w-12 md:h-12 bg-primary/10 text-primary hover:bg-primary/20'
+            {/* Search Bar dengan Animasi Memanjang */}
+            <form 
+              action="/katalog" 
+              method="GET" 
+              className={`relative flex items-center transition-all duration-500 ease-in-out ${
+                isSearchOpen ? 'w-70 sm:w-95 md:w-112.5 lg:w-137.5' : 'w-10 md:w-12'
               }`}
             >
-              <Search className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
-            </button>
-          </form>
+              <input
+                ref={searchInputRef}
+                type="text"
+                name="q"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onBlur={() => {
+                  if (!searchQuery.trim()) {
+                    setIsSearchOpen(false);
+                  }
+                }}
+                placeholder="Cari produk..."
+                required
+                className={`w-full text-sm transition-all rounded-full input input-sm md:input-md input-bordered focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 bg-base-200/50 focus:bg-base-100 duration-500 ${
+                  isSearchOpen 
+                    ? 'opacity-100 pl-4 pr-10 md:pr-12 cursor-text' 
+                    : 'opacity-0 cursor-pointer px-0 pointer-events-none'
+                }`}
+              />
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (!isSearchOpen) {
+                    setIsSearchOpen(true);
+                  } else if (!searchQuery.trim()) {
+                    setIsSearchOpen(false);
+                  }
+                }}
+                className={`absolute top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-300 flex items-center justify-center ${
+                  isSearchOpen 
+                    ? 'right-2 md:right-3 text-base-content/40 hover:text-primary bg-transparent' 
+                    : 'right-0 w-10 h-10 md:w-12 md:h-12 bg-primary/10 text-primary hover:bg-primary/20'
+                }`}
+              >
+                <Search className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+              </button>
+            </form>
+
+          </div>
         </div>
 
         {/* KANAN: AUTH & PROFILE */}
