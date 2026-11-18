@@ -50,10 +50,10 @@ export default async function HalamanStatisPage({ params }: PageProps) {
           
           {/* 
             RENDER HTML KONTEN
-            Pakai dangerouslySetInnerHTML karena data dari editor berupa tag HTML
+            Ditambahkan prose-ul:list-disc, prose-ol:list-decimal, dan prose-li:my-1 agar format list muncul normal
           */}
           <div 
-            className="prose max-w-none md:prose-lg prose-headings:font-bold prose-a:text-primary prose-img:rounded-2xl"
+            className="prose max-w-none md:prose-lg prose-headings:font-bold prose-a:text-primary prose-img:rounded-2xl prose-ul:list-disc prose-ol:list-decimal prose-li:my-1"
             dangerouslySetInnerHTML={{ __html: data.konten }}
           />
         </div>
