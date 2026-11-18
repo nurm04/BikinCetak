@@ -209,11 +209,11 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
   const kotaSeProvinsi = cities.filter(c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase());
 
   return (
-    <main className="min-h-screen bg-base-100 py-8 px-4 md:px-12 lg:px-24">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <main className="min-h-screen bg-base-100 py-6 px-4 md:px-12 lg:px-24">
+      <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
         
         {/* Breadcrumbs */}
-        <div className="text-xs breadcrumbs opacity-60">
+        <div className="text-xs breadcrumbs opacity-60 overflow-x-auto whitespace-nowrap">
           <ul>
             <li><Link href="/">Home</Link></li>
             <li><Link href={`/digital-printing/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {formattedCityName}</Link></li>
@@ -222,12 +222,12 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
         </div>
 
         {/* Hero Section */}
-        <div className="bg-primary text-primary-content p-8 md:p-12 rounded-3xl shadow-xl flex flex-col md:flex-row items-center gap-8">
-          <div className="flex-1 space-y-4">
-            <span className="badge badge-neutral font-bold uppercase tracking-wider">
+        <div className="bg-primary text-primary-content p-6 md:p-12 rounded-3xl shadow-xl flex flex-col md:flex-row items-center gap-6 md:gap-8">
+          <div className="flex-1 space-y-4 w-full">
+            <span className="inline-block badge badge-neutral font-bold uppercase tracking-wider text-[10px] md:text-xs py-2 px-3 whitespace-normal h-auto leading-normal">
               Wilayah Pengiriman: {kotaAja}
             </span>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+            <h1 className="text-2xl md:text-5xl font-black tracking-tight leading-snug md:leading-tight">
               Cetak {matchedProduct.nama_produk} Berkualitas di {kotaAja}
             </h1>
             <p className="opacity-90 text-sm md:text-base leading-relaxed">
@@ -236,7 +236,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
             <div className="pt-2">
               <Link 
                 href={`/produk/${slugify(matchedProduct.nama_produk)}`} 
-                className="btn btn-neutral font-black uppercase tracking-wider shadow-lg"
+                className="btn btn-neutral btn-sm md:btn-md font-black uppercase tracking-wider shadow-lg w-full md:w-auto"
               >
                 Pesan {matchedProduct.nama_produk} Sekarang
               </Link>
@@ -244,7 +244,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
           </div>
           
           {gambarProduk && (
-            <div className="w-full md:w-80 h-64 relative rounded-2xl overflow-hidden shadow-lg bg-white p-4 shrink-0">
+            <div className="w-full md:w-80 h-48 md:h-64 relative rounded-2xl overflow-hidden shadow-lg bg-white p-4 shrink-0">
               <Image 
                 src={gambarProduk} 
                 alt={`${matchedProduct.nama_produk} di ${formattedCityName}`}
@@ -257,8 +257,8 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
         </div>
 
         {/* Artikel Narasi SEO Informatif */}
-        <section className="space-y-4 text-base-content/80 text-sm md:text-base leading-relaxed bg-base-200/50 p-6 md:p-8 rounded-3xl border border-base-200">
-          <h2 className="text-xl md:text-2xl font-black text-primary uppercase tracking-tight">
+        <section className="space-y-4 text-base-content/80 text-sm md:text-base leading-relaxed bg-base-200/50 p-5 md:p-8 rounded-3xl border border-base-200">
+          <h2 className="text-lg md:text-2xl font-black text-primary uppercase tracking-tight">
             Pusat Jasa Cetak {matchedProduct.nama_produk} Terlengkap & Terjangkau di {kotaAja}
           </h2>
           <p>
@@ -277,20 +277,20 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
 
         {/* TABEL SKU / VARIAN PRODUK */}
         {matchedProduct.dataSkus && matchedProduct.dataSkus.length > 0 && (
-          <div className="space-y-6 pt-4">
-            <div className="border-b-2 border-primary pb-2 w-fit">
-              <h2 className="font-bold tracking-wider uppercase text-primary lg:text-xl">
+          <div className="space-y-4 md:space-y-6 pt-4">
+            <div className="border-b-2 border-primary pb-2 w-full md:w-fit">
+              <h2 className="font-bold tracking-wider uppercase text-primary text-sm md:text-xl">
                 Daftar Harga & Spesifikasi Cetak {matchedProduct.nama_produk} di {formattedCityName}
               </h2>
             </div>
 
             <div className="overflow-x-auto bg-base-100 border border-base-300 rounded-2xl shadow-sm">
-              <table className="table w-full">
+              <table className="table table-sm md:table-md w-full">
                 <thead>
                   <tr className="bg-base-200/60 text-base-content">
                     <th className="font-bold">No</th>
                     <th className="font-bold">Nama Varian / Spesifikasi</th>
-                    <th className="font-bold">Estimasi Harga Mulai Dari</th>
+                    <th className="font-bold">Estimasi Harga</th>
                     <th className="font-bold text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -306,7 +306,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
                         <td className="text-right">
                           <Link
                             href={`/produk/${slugify(matchedProduct.nama_produk)}`}
-                            className="btn btn-sm btn-primary uppercase font-bold tracking-wider text-xs"
+                            className="btn btn-xs md:btn-sm btn-primary uppercase font-bold tracking-wider text-[10px] md:text-xs"
                           >
                             Pesan
                           </Link>
@@ -315,17 +315,17 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
                     );
                   })}
                 </tbody>
-            </table>
+              </table>
+            </div>
           </div>
-        </div>
         )}
 
         {/* TEKS PEMISAH */}
         <div className="pt-6 pb-2 text-center border-t border-base-200">
-          <h3 className="text-base md:text-lg font-bold text-base-content/80">
+          <h3 className="text-sm md:text-lg font-bold text-base-content/80">
             Mencari Jenis Percetakan Lainnya?
           </h3>
-          <p className="text-sm opacity-60 mt-1">
+          <p className="text-xs md:text-sm opacity-60 mt-1">
             Jelajahi berbagai pilihan produk printing penunjang promosi dan kebutuhan kantor terbaik kami di bawah ini.
           </p>
         </div>
@@ -341,18 +341,18 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
         {kotaSeProvinsi.length > 0 && (
           <div className="pt-8 border-t border-base-200 space-y-4">
             <div className="space-y-1">
-              <span className="badge badge-outline text-xs font-bold uppercase tracking-wider text-primary border-primary/30">
+              <span className="badge badge-outline text-[10px] md:text-xs font-bold uppercase tracking-wider text-primary border-primary/30">
                 Area Layanan {formattedProvince}
               </span>
-              <h3 className="text-xl md:text-2xl font-black text-base-content tracking-tight">
+              <h3 className="text-lg md:text-2xl font-black text-base-content tracking-tight">
                 Cetak {matchedProduct.nama_produk} di Kota Lain
               </h3>
-              <p className="text-sm opacity-70">
+              <p className="text-xs md:text-sm opacity-70">
                 Layanan cetak {matchedProduct.nama_produk} online siap kirim aman dan cepat ke seluruh kota dan kabupaten di {formattedProvince}.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="flex flex-wrap gap-1.5 md:gap-2 pt-2">
               {kotaSeProvinsi.map((kota) => {
                 const citySlug = slugify(kota.city_name);
                 const routeUrl = `/print/${slugify(matchedProduct.nama_produk)}-di-${citySlug}`;
@@ -362,7 +362,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
                   <Link
                     key={kota.city_id}
                     href={routeUrl}
-                    className="px-4 py-2 text-xs font-semibold bg-base-100 hover:bg-primary hover:text-primary-content border border-base-300 rounded-full shadow-xs transition-all duration-200"
+                    className="px-3 py-1.5 md:px-4 md:py-2 text-[11px] md:text-xs font-semibold bg-base-100 hover:bg-primary hover:text-primary-content border border-base-300 rounded-full shadow-xs transition-all duration-200"
                   >
                     {namaKotaLengkap}
                   </Link>
