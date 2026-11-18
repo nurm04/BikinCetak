@@ -46,7 +46,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
     router.refresh();
   }, [router]);
 
-  // Fetching Paralel User, Pengaturan, dan Halaman Statis
+  // Fetching Paralel User, Pengaturan, dan Halaman Statis (Mirip cara di Footer)
   useEffect(() => {
     Promise.all([getUserProfile(), getPengaturan(), getHalamanStatisList()]).then(([resUser, resPengaturan, resHalaman]) => {
       if (resUser?.data) {
@@ -112,14 +112,14 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   return (
     <>
-      {/* BAR ATAS: HALAMAN STATIS */}
-      {halamanStatis.length > 0 && (
+      {/* BAR ATAS: HALAMAN STATIS (Sesuai gaya footer) */}
+      {halamanStatis && halamanStatis.length > 0 && (
         <div className="hidden bg-base-200/60 border-b border-base-200 px-4 md:px-12 lg:px-20 py-1.5 md:flex justify-end items-center gap-6 text-xs font-bold text-base-content/70">
           {halamanStatis.map((halaman) => (
             <Link 
-              key={halaman.id || halaman.slug} 
-              href={`/halaman/${halaman.slug}`}
-              className="hover:text-primary transition-colors uppercase tracking-wider"
+              key={halaman.id} 
+              href={`/${halaman.slug}`} 
+              className="transition-colors hover:text-primary uppercase tracking-wider"
             >
               {halaman.judul}
             </Link>
@@ -148,7 +148,7 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: SEARCH BAR DENGAN ANIMASI KLIK */}
+        {/* TENGAH: SEARCH BAR DENGAN ANIMASI LINGKARAN & KLIK */}
         <div className="flex-1 px-2 navbar-center md:px-8 flex justify-center">
           <form 
             action="/katalog" 
