@@ -36,8 +36,9 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
   }
 
   return (
-    <div className="w-full px-4 md:px-10 lg:px-20 group">
-      {/* Container utama dengan aspect-ratio agar proporsional di semua layar */}
+    // Konten dibungkus relative agar tombol panah absolute patuh pada container banner ini
+    <div className="w-full px-4 md:px-10 lg:px-20 relative group">
+      {/* Container utama banner */}
       <div className="relative w-full aspect-21/9 sm:aspect-2.5/1 md:aspect-3/1 overflow-hidden rounded-3xl shadow-xl bg-base-300">
         <div 
           className="flex transition-transform duration-700 ease-in-out h-full w-full"
@@ -55,7 +56,7 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
               />
             ) : null;
 
-            // 👇 KONTEN TEKS & TOMBOL DI ATAS BANNER 👇
+            // KONTEN TEKS & TOMBOL DI ATAS BANNER
             const hasTextOrLink = slide.judul || slide.link_tujuan;
             const OverlayContent = hasTextOrLink ? (
               <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-12 lg:p-16 bg-linear-to-t from-black/80 via-black/20 to-transparent">
@@ -107,21 +108,21 @@ export default function HeroCarousel({ banners = [] }: HeroCarouselProps) {
         )}
       </div>
 
-      {/* Navigation Arrows */}
+      {/* Navigation Arrows (Diposisikan absolute di dalam kontainer utama yang relative) */}
       {banners.length > 1 && (
         <>
           <button
             onClick={prevSlide}
-            className="absolute top-1/2 left-6 md:left-14 lg:left-24 -translate-y-1/2 btn btn-circle btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95 opacity-80 hover:opacity-100"
+            className="absolute top-1/2 left-6 md:left-14 lg:left-28 -translate-y-1/2 btn btn-circle btn-sm md:btn-md btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95 opacity-80 hover:opacity-100"
           >
-            <ChevronLeft size={32} />
+            <ChevronLeft size={24} />
           </button>
 
           <button
             onClick={nextSlide}
-            className="absolute top-1/2 right-6 md:right-14 lg:right-24 -translate-y-1/2 btn btn-circle btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95 opacity-80 hover:opacity-100"
+            className="absolute top-1/2 right-6 md:right-14 lg:right-28 -translate-y-1/2 btn btn-circle btn-sm md:btn-md btn-primary shadow-2xl border-none text-white z-10 hover:scale-110 transition-transform active:scale-95 opacity-80 hover:opacity-100"
           >
-            <ChevronRight size={32} />
+            <ChevronRight size={24} />
           </button>
         </>
       )}
