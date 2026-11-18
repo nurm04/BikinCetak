@@ -52,6 +52,15 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/layanan/:path*',
+        destination: '/print/:path*',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
