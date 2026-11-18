@@ -112,23 +112,6 @@ const Navbar = ({ items = [] }: NavbarProps) => {
 
   return (
     <>
-      {/* BAR ATAS: HALAMAN STATIS (Disesuaikan padding & posisinya agar sejajar dengan navbar bawah) */}
-      {halamanStatis && halamanStatis.length > 0 && (
-        <div className="hidden bg-base-200/60 border-b border-base-200 px-4 md:px-12 lg:px-20 py-2 md:flex justify-end items-center gap-6 text-xs font-bold text-base-content/70">
-          <div className="w-full max-w-7xl mx-auto flex justify-end items-center gap-6">
-            {halamanStatis.map((halaman) => (
-              <Link 
-                key={halaman.id} 
-                href={`/${halaman.slug}`} 
-                className="transition-colors hover:text-primary uppercase tracking-wider"
-              >
-                {halaman.judul}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="sticky top-0 z-50 gap-2 px-4 shadow-sm navbar bg-base-100 md:px-12 lg:px-20 md:gap-4">
 
         {/* KIRI: LOGO */}
@@ -150,13 +133,30 @@ const Navbar = ({ items = [] }: NavbarProps) => {
           </Link>
         </div>
 
-        {/* TENGAH: SEARCH BAR DENGAN ANIMASI LINGKARAN & KLIK */}
-        <div className="flex-1 px-2 navbar-center md:px-8 flex justify-center">
+        {/* TENGAH: SEARCH BAR & HALAMAN STATIS SEJAJAR */}
+        <div className="flex-1 px-2 navbar-center md:px-8 flex items-center justify-center gap-6">
+          
+          {/* Halaman Statis (Sejajar & Style Sama dengan Nav Link Bawah: text-[11px] font-semibold uppercase) */}
+          {halamanStatis && halamanStatis.length > 0 && (
+            <div className="hidden lg:flex items-center gap-2">
+              {halamanStatis.map((halaman) => (
+                <Link 
+                  key={halaman.id} 
+                  href={`/${halaman.slug}`} 
+                  className="text-[11px] font-semibold uppercase hover:text-primary transition-colors py-3 px-3 tracking-normal"
+                >
+                  {halaman.judul}
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Search Bar dengan Animasi Melingkar */}
           <form 
             action="/katalog" 
             method="GET" 
             className={`relative flex items-center transition-all duration-500 ease-in-out ${
-              isSearchOpen ? 'w-full max-w-2xl' : 'w-10 md:w-12'
+              isSearchOpen ? 'w-full max-w-md' : 'w-10 md:w-12'
             }`}
           >
             <input
