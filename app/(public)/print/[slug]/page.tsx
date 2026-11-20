@@ -17,7 +17,6 @@ export interface CityResult {
   postal_code: string;
 }
 
-// Fungsi helper untuk mengubah teks menjadi Title Case (huruf depan setiap kata besar)
 function toTitleCase(str: string): string {
   if (!str) return "";
   return str
@@ -35,13 +34,22 @@ function normalizeApiResponse(responsePayload: unknown): Record<string, unknown>
     const payload = responsePayload as Record<string, unknown>;
     if (Array.isArray(payload.data)) {
       results = payload.data as Record<string, unknown>[];
-    } else if (payload.rajaongkir && typeof payload.rajaongkir === "object" && Array.isArray((payload.rajaongkir as Record<string, unknown>).results)) {
+    } else if (
+      payload.rajaongkir &&
+      typeof payload.rajaongkir === "object" &&
+      Array.isArray((payload.rajaongkir as Record<string, unknown>).results)
+    ) {
       results = (payload.rajaongkir as Record<string, unknown>).results as Record<string, unknown>[];
     } else if (Array.isArray(payload.results)) {
       results = payload.results as Record<string, unknown>[];
     }
   }
   return results;
+}
+
+function unknownToRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
+  return {};
 }
 
 async function getAllCities(): Promise<CityResult[]> {
@@ -67,7 +75,7 @@ async function getAllCities(): Promise<CityResult[]> {
           province: String(c.province || prov.province || prov.name || "Jawa Timur"),
           type: String(c.type || "Kabupaten"),
           city_name: String(c.city_name || c.name || ""),
-          postal_code: String(c.postal_code || "")
+          postal_code: String(c.postal_code || ""),
         }));
       });
       const citiesArrays = await Promise.all(cityPromises);
@@ -83,78 +91,97 @@ async function getAllCities(): Promise<CityResult[]> {
   }
 }
 
-function unknownToRecord(value: unknown): Record<string, unknown> {
-  if (value && typeof value === "object") return value as Record<string, unknown>;
-  return {};
-}
-
 const formatRupiah = (angka: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(angka);
 };
 
 const getCleanKatalogLabel = (skuName: string, productName: string = "") => {
-    let labelBersih = skuName;
-    const prefix1Match = labelBersih.match(/^[A-Z0-9]+-\d+-/i);
-    if (prefix1Match) labelBersih = labelBersih.replace(prefix1Match[0], '');
-    if (productName) {
-       const escProd = productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-       const regexProd = new RegExp(`^${escProd}-?`, 'i');
-       labelBersih = labelBersih.replace(regexProd, '').trim();
-    }
-    if (labelBersih.includes('-')) {
-        const lastDashIndex = labelBersih.lastIndexOf('-');
-        labelBersih = labelBersih.substring(0, lastDashIndex).trim();
-    }
-    return labelBersih || "Standar";
+  let labelBersih = skuName;
+  const prefix1Match = labelBersih.match(/^[A-Z0-9]+-\d+-/i);
+  if (prefix1Match) labelBersih = labelBersih.replace(prefix1Match[0], "");
+  if (productName) {
+    const escProd = productName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regexProd = new RegExp(`^${escProd}-?`, "i");
+    labelBersih = labelBersih.replace(regexProd, "").trim();
+  }
+  if (labelBersih.includes("-")) {
+    const lastDashIndex = labelBersih.lastIndexOf("-");
+    labelBersih = labelBersih.substring(0, lastDashIndex).trim();
+  }
+  return labelBersih || "Standar";
 };
 
-export async function generateMetadata({ params }: { params: Promise<{ city?: string; slug: string }> }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const cityParam = resolvedParams?.city || "kediri";
-  const productSlug = resolvedParams?.slug || "";
+function parseCityAndProductFromSlug(slug: string, cities: CityResult[], products: ItemData[]) {
+  const diMatch = slug.match(/-di-(.+)$/);
+  const rawCitySlug = diMatch ? diMatch[1] : "kediri";
 
-  const cities = await getAllCities();
-  
-  const cleanCityQuery = cityParam
+  const cleanCityQuery = rawCitySlug
     .replace(/-/g, " ")
-    .replace(/^kabupaten\s+/i, "")
-    .replace(/^kota\s+/i, "")
-    .trim();
+    .replace(/^(kabupaten|kab|kota)\s+/i, "")
+    .trim()
+    .toLowerCase();
 
-  const matchedCity = cities.find(c => {
-    const dbCity = c.city_name.toLowerCase();
-    return dbCity === cleanCityQuery || 
-           dbCity.includes(cleanCityQuery) || 
-           cleanCityQuery.includes(dbCity);
-  }) || { type: "Kabupaten", city_name: cleanCityQuery, province: "Jawa Timur" };
+  const matchedCity =
+    cities.find((c) => {
+      const dbCity = c.city_name.toLowerCase();
+      const dbSlug = slugify(c.city_name);
+      return (
+        dbSlug === rawCitySlug ||
+        dbCity === cleanCityQuery ||
+        dbCity.includes(cleanCityQuery) ||
+        cleanCityQuery.includes(dbCity)
+      );
+    }) || {
+      city_id: "999",
+      province_id: "11",
+      province: "Jawa Timur",
+      type: /^kota-/i.test(rawCitySlug) ? "Kota" : "Kabupaten",
+      city_name: cleanCityQuery || "Kediri",
+      postal_code: "69411",
+    };
 
-  const formattedType = toTitleCase(matchedCity.type);
-  const formattedCityName = toTitleCase(matchedCity.city_name);
-  const formattedProvince = toTitleCase(matchedCity.province);
-
-  const products: ItemData[] = await getItems();
-  
-  const cleanedProductQuery = productSlug
+  const cleanedProductQuery = slug
     .replace(/-di-.*/, "")
     .replace(/^cetak-/, "");
 
-  const matchedProduct = products.find(p => 
-    slugify(p.nama_produk) === cleanedProductQuery || 
-    slugify(p.nama_produk).includes(cleanedProductQuery) ||
-    cleanedProductQuery.includes(slugify(p.nama_produk))
-  ) || products[0];
+  const matchedProduct =
+    products.find(
+      (p) =>
+        slugify(p.nama_produk) === cleanedProductQuery ||
+        slugify(p.nama_produk).includes(cleanedProductQuery) ||
+        cleanedProductQuery.includes(slugify(p.nama_produk))
+    ) || products[0];
+
+  return { matchedCity, matchedProduct };
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const resolvedParams = await params;
+  const slug = resolvedParams?.slug || "";
+
+  const [cities, products, pengaturan] = await Promise.all([
+    getAllCities(),
+    getItems(),
+    getPengaturan(),
+  ]);
+
+  const { matchedCity, matchedProduct } = parseCityAndProductFromSlug(slug, cities, products);
 
   if (!matchedProduct) {
     return { title: "Layanan Cetak | BikinCetak" };
   }
 
+  const formattedType = toTitleCase(matchedCity.type);
+  const formattedCityName = toTitleCase(matchedCity.city_name);
+  const formattedProvince = toTitleCase(matchedCity.province);
+
   const kotaAja = `${formattedType} ${formattedCityName}`;
   const wilayahLengkap = `${formattedType} ${formattedCityName}, ${formattedProvince}`;
-  
-  const pengaturan: PengaturanData | null = await getPengaturan();
-  
+
   const titleTemplate = pengaturan?.seo_title_template || `Jasa Cetak {{ produk }} Murah di {{ kota }} - Print Custom`;
-  const descTemplate = pengaturan?.seo_desc_template || `Melayani cetak {{ produk }} di {{ kota }} melalui pesan online. Kebutuhan percetakan Anda lebih murah, cepat, dan terjangkau dengan kualitas terbaik.`;
+  const descTemplate =
+    pengaturan?.seo_desc_template ||
+    `Melayani cetak {{ produk }} di {{ kota }} melalui pesan online. Kebutuhan percetakan Anda lebih murah, cepat, dan terjangkau dengan kualitas terbaik.`;
 
   const finalTitle = titleTemplate
     .replace(/\{\{\s*produk\s*\}\}/gi, matchedProduct.nama_produk)
@@ -170,53 +197,48 @@ export async function generateMetadata({ params }: { params: Promise<{ city?: st
   };
 }
 
-export default async function CityProductPage({ params }: { params: Promise<{ city?: string; slug: string }> }) {
+export default async function CityProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const cityParam = resolvedParams?.city || "kediri";
-  const productSlug = resolvedParams?.slug || "";
+  const slug = resolvedParams?.slug || "";
 
-  const cities = await getAllCities();
-  const matchedCity = cities.find(c => slugify(c.city_name) === cityParam) || {
-    city_id: "999", province_id: "11", province: "Jawa Timur", type: "Kabupaten", city_name: cityParam, postal_code: "69411"
-  };
+  const [cities, products] = await Promise.all([getAllCities(), getItems()]);
+  const { matchedCity, matchedProduct } = parseCityAndProductFromSlug(slug, cities, products);
+
+  if (!matchedProduct) notFound();
 
   const formattedType = toTitleCase(matchedCity.type);
   const formattedCityName = toTitleCase(matchedCity.city_name);
   const formattedProvince = toTitleCase(matchedCity.province);
-
-  const products: ItemData[] = await getItems();
-  
-  const cleanedProductQuery = productSlug
-    .replace(/-di-.*/, "")
-    .replace(/^cetak-/, "");
-
-  const matchedProduct = products.find(p => 
-    slugify(p.nama_produk) === cleanedProductQuery || 
-    slugify(p.nama_produk).includes(cleanedProductQuery) ||
-    cleanedProductQuery.includes(slugify(p.nama_produk))
-  ) || products[0];
-
-  if (!matchedProduct) notFound();
 
   const kotaAja = `${formattedType} ${formattedCityName}`;
   const wilayahLengkap = `${formattedType} ${formattedCityName}, ${formattedProvince}`;
   const gambarProduk = matchedProduct.gambar_urls?.[0] || null;
 
   const produkSerupa = products
-    .filter(p => p.kategori?.id_kategori === matchedProduct.kategori?.id_kategori && p.id_produk !== matchedProduct.id_produk)
-    .map(p => ({ name: p.nama_produk, image: p.gambar_urls, harga_mulai_dari: p.harga_mulai_dari, diskon_roles: p.diskon_roles }));
+    .filter((p) => p.kategori?.id_kategori === matchedProduct.kategori?.id_kategori && p.id_produk !== matchedProduct.id_produk)
+    .map((p) => ({
+      name: p.nama_produk,
+      image: p.gambar_urls,
+      harga_mulai_dari: p.harga_mulai_dari,
+      diskon_roles: p.diskon_roles,
+    }));
 
-  const kotaSeProvinsi = cities.filter(c => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase());
+  const kotaSeProvinsi = cities.filter(
+    (c) => c.province_id === matchedCity.province_id && c.city_name.toLowerCase() !== matchedCity.city_name.toLowerCase()
+  );
 
   return (
     <main className="min-h-screen bg-base-100 py-6 px-4 md:px-12 lg:px-24">
       <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
-        
         {/* Breadcrumbs */}
         <div className="text-xs breadcrumbs opacity-60 overflow-x-auto whitespace-nowrap">
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li><Link href={`/digital-printing/percetakan-${slugify(matchedCity.city_name)}`}>Percetakan {formattedCityName}</Link></li>
+            <li>
+              <Link href={`/digital-printing/percetakan-${slugify(matchedCity.city_name)}`}>
+                Percetakan {formattedCityName}
+              </Link>
+            </li>
             <li className="capitalize">{matchedProduct.nama_produk}</li>
           </ul>
         </div>
@@ -234,19 +256,19 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
               Melayani cetak <strong>{matchedProduct.nama_produk}</strong> di <strong>{wilayahLengkap}</strong> melalui pesan online, jadi kebutuhan percetakan Anda lebih murah, dengan harga terjangkau.
             </p>
             <div className="pt-2">
-              <Link 
-                href={`/produk/${slugify(matchedProduct.nama_produk)}`} 
+              <Link
+                href={`/produk/${slugify(matchedProduct.nama_produk)}`}
                 className="btn btn-neutral btn-sm md:btn-md font-black uppercase tracking-wider shadow-lg w-full md:w-auto"
               >
                 Pesan {matchedProduct.nama_produk} Sekarang
               </Link>
             </div>
           </div>
-          
+
           {gambarProduk && (
             <div className="w-full md:w-80 h-48 md:h-64 relative rounded-2xl overflow-hidden shadow-lg bg-white p-4 shrink-0">
-              <Image 
-                src={gambarProduk} 
+              <Image
+                src={gambarProduk}
                 alt={`${matchedProduct.nama_produk} di ${formattedCityName}`}
                 fill
                 unoptimized
@@ -271,7 +293,11 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
             Semua proses produksi dan pengiriman pesanan langsung dikirimkan dari workshop utama kami di <strong>Surabaya</strong>, memastikan kualitas kontrol terjaga ketat sebelum dikirim ke lokasi Anda. Dengan sistem pemesanan online yang efisien, kami siap melayani pengiriman pesanan Anda dengan aman dan cepat menjangkau seluruh kecamatan di wilayah <strong>{formattedProvince}</strong>.
           </p>
           <p>
-            Tunggu apalagi? Segera tentukan pilihan spesifikasi dan desain terbaik Anda, lalu <Link href="/login" className="text-primary font-bold underline hover:text-primary-focus">daftarkan</Link> diri Anda dan dapatkan penawaran harga terbaik bersama BikinCetak.
+            Tunggu apalagi? Segera tentukan pilihan spesifikasi dan desain terbaik Anda, lalu{" "}
+            <Link href="/login" className="text-primary font-bold underline hover:text-primary-focus">
+              daftarkan
+            </Link>{" "}
+            diri Anda dan dapatkan penawaran harga terbaik bersama BikinCetak.
           </p>
         </section>
 
@@ -333,7 +359,7 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
         {/* PRODUK SERUPA */}
         {produkSerupa.length > 0 && (
           <div>
-            <ProductRow title={`Produk ${matchedProduct.kategori?.nama_kategori || 'Serupa'} Lainnya`} data={produkSerupa} />
+            <ProductRow title={`Produk ${matchedProduct.kategori?.nama_kategori || "Serupa"} Lainnya`} data={produkSerupa} />
           </div>
         )}
 
@@ -371,7 +397,6 @@ export default async function CityProductPage({ params }: { params: Promise<{ ci
             </div>
           </div>
         )}
-
       </div>
     </main>
   );
